@@ -1,0 +1,818 @@
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { 
+  Calendar, 
+  Clock, 
+  Users, 
+  CheckCircle, 
+  XCircle, 
+  AlertCircle,
+  Save,
+  Eye
+} from 'lucide-react';
+import { classesAPI, attendanceAPI } from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
+import { formatDate, getTodayAPI, getClassTimeOptions } from '../../utils/helpers';
+import LoadingSpinner from '../../components/UI/LoadingSpinner';
+import toast from 'react-hot-toast';
+
+const Attendance = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [selectedDate, setSelectedDate] = useState(getTodayAPI());
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedTime, setSelectedTime] = useState(1);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [isViewMode, setIsViewMode] = useState(false);
+
+  // Update attendance records when subject or time changes
+  useEffect(() => {
+    if (attendanceRecords.length > 0 && selectedSubject) {
+      setAttendanceRecords(prev => 
+        prev.map(record => ({
+          ...record,
+          subject_id: parseInt(selectedSubject),
+          class_time_num: selectedTime,
+          // When changing time, reset to present if no existing data
+          is_present: true,
+          is_Acsent: false,
+          is_Excus: false,
+          is_late: false,
+          ExcusNote: '',
+        }))
+      );
+    }
+  }, [selectedSubject, selectedTime]);
+
+  // Fetch classes
+  const { data: classes, isLoading: classesLoading } = useQuery(
+    'classes',
+    classesAPI.getMyClasses,
+    { enabled: !!user }
+  );
+
+  // Fetch subjects
+  const { data: subjects, isLoading: subjectsLoading } = useQuery(
+    'subjects',
+    classesAPI.getAllSubjects,
+    { enabled: !!user }
+  );
+
+  // Fetch class students
+  const { data: classStudents, isLoading: studentsLoading } = useQuery(
+    ['classStudents', selectedClass],
+    () => classesAPI.getClassStudents(selectedClass),
+    { 
+      enabled: !!selectedClass,
+      onSuccess: (data) => {
+        // Initialize attendance records
+        const initialRecords = data.map(student => ({
+          student_id: student.id,
+          subject_id: parseInt(selectedSubject),
+          class_time_num: selectedTime,
+          is_present: true,
+          is_Acsent: false,
+          is_Excus: false,
+          is_late: false,
+          ExcusNote: '',
+        }));
+        setAttendanceRecords(initialRecords);
+      }
+    }
+  );
+
+  // Fetch class attendance when class is selected
+  const { data: classAttendance, isLoading: classAttendanceLoading } = useQuery(
+    ['classAttendance', selectedDate, selectedClass],
+    () => attendanceAPI.getAttendanceByClassAndSubject(selectedClass, {
+      date: selectedDate,
+    }),
+    { 
+      enabled: !!selectedClass,
+      onSuccess: (data) => {
+        console.log('Class attendance data:', data);
+        // You can process the class attendance data here
+      },
+      onError: (error) => {
+        console.error('Error fetching class attendance:', error);
+        toast.error('فشل في تحميل بيانات الحضور للفصل');
+      }
+    }
+  );
+
+  // Fetch existing attendance for the selected date, class, and subject
+  const { data: existingAttendance, isLoading: attendanceLoading } = useQuery(
+    ['existingAttendance', selectedDate, selectedClass, selectedSubject, selectedTime],
+    () => attendanceAPI.getAttendanceByClassAndSubject(selectedClass, {
+      date: selectedDate,
+      subject_id: selectedSubject,
+    }),
+    { 
+      enabled: !!selectedClass && !!selectedSubject,
+      onSuccess: (data) => {
+        if (data.class_time_data && data.class_time_data[selectedTime]) {
+          const existingRecords = data.class_time_data[selectedTime].attendance || [];
+          if (existingRecords.length > 0) {
+            // Update with existing data
+            const updatedRecords = attendanceRecords.map(record => {
+              const existing = existingRecords.find(ex => ex.student_id === record.student_id);
+              if (existing) {
+                return {
+                  ...record,
+                  subject_id: parseInt(selectedSubject),
+                  class_time_num: selectedTime,
+                  is_present: existing.is_present,
+                  is_Acsent: existing.is_absent,
+                  is_Excus: existing.is_excused,
+                  is_late: existing.is_late,
+                  ExcusNote: existing.ExcusNote || '',
+                };
+              }
+              return {
+                ...record,
+                subject_id: parseInt(selectedSubject),
+                class_time_num: selectedTime,
+              };
+            });
+            setAttendanceRecords(updatedRecords);
+          } else {
+            // No existing data for this class time - set all students as present
+            const updatedRecords = attendanceRecords.map(record => ({
+              ...record,
+              subject_id: parseInt(selectedSubject),
+              class_time_num: selectedTime,
+              is_present: true,
+              is_Acsent: false,
+              is_Excus: false,
+              is_late: false,
+              ExcusNote: '',
+            }));
+            setAttendanceRecords(updatedRecords);
+          }
+        } else {
+          // No class time data at all - set all students as present
+          const updatedRecords = attendanceRecords.map(record => ({
+            ...record,
+            subject_id: parseInt(selectedSubject),
+            class_time_num: selectedTime,
+            is_present: true,
+            is_Acsent: false,
+            is_Excus: false,
+            is_late: false,
+            ExcusNote: '',
+          }));
+          setAttendanceRecords(updatedRecords);
+        }
+      }
+    }
+  );
+
+  // Take attendance mutation
+  const takeAttendanceMutation = useMutation(
+    (data) => attendanceAPI.takeAttendance(data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('existingAttendance');
+        toast.success('تم حفظ الحضور بنجاح');
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message || 'فشل في حفظ الحضور');
+      },
+    }
+  );
+
+  const handleAttendanceChange = (studentId, field, value) => {
+    setAttendanceRecords(prev => 
+      prev.map(record => {
+        if (record.student_id === studentId) {
+          const updated = { ...record, [field]: value };
+          
+          // Ensure only one status is true at a time
+          if (field === 'is_present' && value) {
+            updated.is_Acsent = false;
+            updated.is_Excus = false;
+            updated.is_late = false;
+          } else if (field === 'is_Acsent' && value) {
+            updated.is_present = false;
+            updated.is_Excus = false;
+            updated.is_late = false;
+          } else if (field === 'is_Excus' && value) {
+            updated.is_present = false;
+            updated.is_Acsent = false;
+            updated.is_late = false;
+          } else if (field === 'is_late' && value) {
+            updated.is_present = false;
+            updated.is_Acsent = false;
+            updated.is_Excus = false;
+          }
+          
+          return updated;
+        }
+        return record;
+      })
+    );
+  };
+
+  const handleSubmit = () => {
+    if (!selectedClass || !selectedSubject) {
+      toast.error('يرجى اختيار الفصل والمادة');
+      return;
+    }
+
+    // Validate that all students have attendance status selected
+    const unmarkedStudents = attendanceRecords.filter(record => {
+      const hasStatus = record.is_present || record.is_Acsent || record.is_Excus || record.is_late;
+      return !hasStatus;
+    });
+
+    if (unmarkedStudents.length > 0) {
+      toast.error(`يرجى تحديد حالة الحضور لجميع الطلاب (${unmarkedStudents.length} طالب لم يتم تحديد حالته)`);
+      return;
+    }
+
+    const attendanceData = {
+      class_id: parseInt(selectedClass),
+      subject_id: parseInt(selectedSubject),
+      class_time_num: selectedTime,
+      date: selectedDate,
+      attendance_records: attendanceRecords,
+    };
+
+    takeAttendanceMutation.mutate(attendanceData);
+  };
+
+  const getAttendanceStatus = (record) => {
+    if (record.is_present) return { status: 'present', color: 'green', text: 'حاضر' };
+    if (record.is_Acsent) return { status: 'absent', color: 'red', text: 'هارب' };
+    if (record.is_Excus) return { status: 'excused', color: 'blue', text: 'غائب' };
+    if (record.is_late) return { status: 'late', color: 'yellow', text: 'متأخر' };
+    return { status: 'unknown', color: 'gray', text: 'غير محدد' };
+  };
+
+  // Check if all students have attendance status selected
+  const allStudentsMarked = () => {
+    if (attendanceRecords.length === 0) return false;
+    return attendanceRecords.every(record => {
+      return record.is_present || record.is_Acsent || record.is_Excus || record.is_late;
+    });
+  };
+
+  // Get count of unmarked students
+  const getUnmarkedCount = () => {
+    return attendanceRecords.filter(record => {
+      const hasStatus = record.is_present || record.is_Acsent || record.is_Excus || record.is_late;
+      return !hasStatus;
+    }).length;
+  };
+
+  const classTimeOptions = getClassTimeOptions();
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">تسجيل الحضور</h1>
+          <p className="text-gray-600">تسجيل حضور الطلاب للفصول والمواد</p>
+        </div>
+        <button
+          onClick={() => setIsViewMode(!isViewMode)}
+          className="btn btn-outline"
+        >
+          <Eye className="h-5 w-5 mr-2" />
+          {isViewMode ? 'وضع التعديل' : 'وضع العرض'}
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div className="card">
+        <div className="card-body">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div>
+              <label className="label">التاريخ</label>
+              <input
+                type="date"
+                disabled={user.role === 'teacher'}
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label">الفصل</label>
+              <select
+                value={selectedClass}
+                onChange={(e) => {
+                  setSelectedClass(e.target.value);
+                  setSelectedSubject('');
+                  setAttendanceRecords([]);
+                }}
+                className="input"
+                disabled={classesLoading}
+              >
+                <option value="">اختر الفصل</option>
+                {classes?.sort((a, b) => a.id - b.id).map((cls) => (
+                  <option key={cls.id} value={cls.id}>
+                    {cls.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">المادة</label>
+              <select
+                value={selectedSubject}
+                onChange={(e) => setSelectedSubject(e.target.value)}
+                className="input"
+                disabled={subjectsLoading}
+              >
+                <option value="">اختر المادة</option>
+                {subjects?.map((subject) => (
+                  <option key={subject.id} value={subject.id}>
+                    {subject.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">الحصة</label>
+              <select
+                value={selectedTime}
+                onChange={(e) => setSelectedTime(parseInt(e.target.value))}
+                className="input"
+              >
+                {classTimeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={handleSubmit}
+                disabled={!selectedClass || !selectedSubject || takeAttendanceMutation.isLoading || !allStudentsMarked()}
+                className={`btn w-full ${
+                  allStudentsMarked() 
+                    ? 'btn-primary' 
+                    : 'btn-secondary opacity-50 cursor-not-allowed'
+                }`}
+              >
+                {takeAttendanceMutation.isLoading ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    <span className="mr-2">جاري الحفظ...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-5 w-5 mr-2" />
+                    {allStudentsMarked() ? 'حفظ الحضور' : `حفظ الحضور (${getUnmarkedCount()} طالب لم يتم تحديد حالته)`}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+
+      {/* Summary */}
+      {selectedClass && selectedSubject && attendanceRecords.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="card">
+            <div className="card-body text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {attendanceRecords.filter(r => r.is_present).length}
+              </div>
+              <div className="text-sm text-gray-600">حاضر</div>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-body text-center">
+              <div className="text-2xl font-bold text-red-600">
+                {attendanceRecords.filter(r => r.is_Acsent).length}
+              </div>
+              <div className="text-sm text-gray-600">هارب</div>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-body text-center">
+              <div className="text-2xl font-bold text-blue-600">
+                {attendanceRecords.filter(r => r.is_Excus).length}
+              </div>
+              <div className="text-sm text-gray-600">غائب</div>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-body text-center">
+              <div className="text-2xl font-bold text-yellow-600">
+                {attendanceRecords.filter(r => r.is_late).length}
+              </div>
+              <div className="text-sm text-gray-600">متأخر</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Validation Status */}
+      {selectedClass && selectedSubject && attendanceRecords.length > 0 && (
+        <div className="card">
+          <div className="card-body">
+            {/* Class and Subject Info */}
+            <div className="mb-4 pb-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">
+                    الحصة  {selectedTime} - {classes?.find(c => c.id === parseInt(selectedClass))?.name || 'غير محدد'}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    مادة: {subjects?.find(s => s.id === parseInt(selectedSubject))?.name || 'غير محدد'}
+                  </p>
+                </div>
+  
+              </div>
+            </div>
+
+            {/* Validation Status */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                {allStudentsMarked() ? (
+                  <>
+                    <CheckCircle className="h-6 w-6 text-green-600" />
+                    <div>
+                      <h3 className="text-lg font-medium text-green-900">جاهز للحفظ</h3>
+                      <p className="text-sm text-green-700">تم تحديد حالة الحضور لجميع الطلاب</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-6 w-6 text-orange-600" />
+                    <div>
+                      <h3 className="text-lg font-medium text-orange-900">يحتاج إلى إكمال</h3>
+                      <p className="text-sm text-orange-700">
+                        {getUnmarkedCount()} طالب لم يتم تحديد حالة الحضور له
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-gray-900">
+                  {attendanceRecords.length - getUnmarkedCount()}/{attendanceRecords.length}
+                </div>
+                <div className="text-sm text-gray-600">طلاب مكتملين</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Attendance Table */}
+      {selectedClass && selectedSubject && (
+        <div className="card">
+          <div className="card-header">
+            <h3 className="text-lg font-medium text-gray-900">
+              قائمة الطلاب - {formatDate(selectedDate, 'dd/MM/yyyy', 'ar-OM')}
+            </h3>
+          </div>
+          <div className="card-body">
+            {studentsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <LoadingSpinner />
+                <span className="mr-3 text-gray-500">جاري تحميل الطلاب...</span>
+              </div>
+            ) : classStudents && classStudents.length > 0 ? (
+              <>
+                {/* Desktop/Tablet Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="table text-right">
+                    <thead className="table-header text-right">
+                      <tr>
+                        <th className="table-header-cell text-right">اسم الطالب</th>
+                       
+                        
+                        
+                        {/* Class Numbers Header */}
+                        {classAttendance?.class_time_data && Object.keys(classAttendance.class_time_data).length > 0 && (
+                          <th className="table-header-cell text-center">
+                          حصص الغياب/هروب/تأخير
+                          </th>
+                        )}
+                        <th className="table-header-cell text-right text-center">الحالة الحالية</th>
+                        
+                        {!isViewMode && (
+                          <>
+                            <th className="table-header-cell text-right">حاضر</th>
+                            <th className="table-header-cell text-right">هارب</th>
+                            <th className="table-header-cell text-right">غائب</th>
+                            <th className="table-header-cell text-right">متأخر</th>
+                            <th className="table-header-cell text-right">ملاحظة العذر</th>
+                          </>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody className="table-body">
+                      {attendanceRecords.map((record, index) => {
+                        const student = classStudents.find(s => s.id === record.student_id);
+                        const status = getAttendanceStatus(record);
+                        const isUnmarked = !(record.is_present || record.is_Acsent || record.is_Excus || record.is_late);
+                        
+                        if (!student) return null;
+                        
+                        return (
+                          <tr key={record.student_id} className={isUnmarked ? 'bg-orange-50 border-l-4 border-orange-400' : ''}>
+                            <td className="table-cell">
+                              <div className="flex items-center">
+                                <div className="h-8 w-8 bg-primary-100 rounded-full flex items-center justify-center">
+                                  <Users className="h-4 w-4 text-primary-600" />
+                                </div>
+                                <span className="mr-2 text-sm font-medium text-gray-900">
+                                  {student.fullName}
+                                </span>
+                              </div>
+                            </td>
+                        
+                            
+                            
+                            {/* Class Numbers - Only show for absent, excused, or late students */}
+                            {classAttendance?.class_time_data && Object.keys(classAttendance.class_time_data).length > 0 && (
+                              <td className="table-cell text-center">
+                                {(() => {
+                                  const problemPeriods = [];
+                                  
+                                  Object.entries(classAttendance.class_time_data).forEach(([timeNum, timeData]) => {
+                                    const studentAttendance = timeData.attendance?.find(a => a.student_id === record.student_id);
+                                    
+                                    if (studentAttendance && (studentAttendance.is_absent || studentAttendance.is_late || studentAttendance.is_excused)) {
+                                      let color = 'text-gray-600';
+                                      if (studentAttendance.is_absent) {
+                                        color = 'text-red-600 font-semibold';
+                                      } else if (studentAttendance.is_late) {
+                                        color = 'text-yellow-600 font-semibold';
+                                      } else if (studentAttendance.is_excused) {
+                                        color = 'text-blue-600 font-semibold';
+                                      }
+                                      
+                                      problemPeriods.push({
+                                        number: timeNum,
+                                        color: color
+                                      });
+                                    }
+                                  });
+                                  
+                                  if (problemPeriods.length > 0) {
+                                    return (
+                                      <div className="flex flex-wrap justify-center gap-1">
+                                        {problemPeriods.map((period, index) => (
+                                          <span key={period.number} className={`text-sm ${period.color} px-1`}>
+                                            {period.number}
+                                            {index < problemPeriods.length - 1 && <span className="text-gray-400">,</span>}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    );
+                                  } else {
+                                    return <span className="text-gray-400">-</span>;
+                                  }
+                                })()}
+                              </td>
+                            )}
+                            <td className="table-cell">
+                              <span className={`badge badge-${status.color === 'green' ? 'success' : 
+                                status.color === 'red' ? 'danger' : 
+                                status.color === 'blue' ? 'info' : 
+                                status.color === 'yellow' ? 'warning' : 'info'}`}>
+                                {status.text}
+                              </span>
+                            </td>
+                            {!isViewMode && (
+                              <>
+                                <td className="table-cell">
+                                  <label className="flex items-center justify-center cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={record.is_present}
+                                      onChange={(e) => handleAttendanceChange(record.student_id, 'is_present', e.target.checked)}
+                                      className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                                    />
+                                  </label>
+                                </td>
+                                <td className="table-cell">
+                                  <label className="flex items-center justify-center cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={record.is_Acsent}
+                                      onChange={(e) => handleAttendanceChange(record.student_id, 'is_Acsent', e.target.checked)}
+                                      className="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-2"
+                                    />
+                                  </label>
+                                </td>
+                                <td className="table-cell">
+                                  <label className="flex items-center justify-center cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={record.is_Excus}
+                                      onChange={(e) => handleAttendanceChange(record.student_id, 'is_Excus', e.target.checked)}
+                                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                    />
+                                  </label>
+                                </td>
+                                <td className="table-cell">
+                                  <label className="flex items-center justify-center cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={record.is_late}
+                                      onChange={(e) => handleAttendanceChange(record.student_id, 'is_late', e.target.checked)}
+                                      className="w-4 h-4 text-yellow-600 bg-gray-100 border-gray-300 rounded focus:ring-yellow-500 focus:ring-2"
+                                    />
+                                  </label>
+                                </td>
+                                <td className="table-cell">
+                                  <input
+                                    type="text"
+                                    value={record.ExcusNote}
+                                    onChange={(e) => handleAttendanceChange(record.student_id, 'ExcusNote', e.target.value)}
+                                    placeholder="ملاحظة العذر"
+                                    className="input text-sm"
+                                    disabled={!record.is_Excus}
+                                  />
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="md:hidden">
+                  <div className="space-y-2">
+                    {attendanceRecords.map((record, index) => {
+                      const student = classStudents.find(s => s.id === record.student_id);
+                      const status = getAttendanceStatus(record);
+                      const isUnmarked = !(record.is_present || record.is_Acsent || record.is_Excus || record.is_late);
+                      
+                      if (!student) return null;
+                      
+                      return (
+                        <div key={record.student_id} className={`bg-white border rounded-lg p-3 shadow-sm ${
+                          isUnmarked ? 'border-orange-400 border-l-4 bg-orange-50' : 'border-gray-200'
+                        }`}>
+                          {/* Student Info */}
+                          <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-sm font-semibold text-gray-900 truncate">
+                                {student.fullName}
+                              </h3>
+                              {student.phone_number && (
+                                <p className="text-xs text-gray-500 truncate">
+                                  {student.phone_number}
+                                </p>
+                              )}
+                            </div>
+                            <div className="ml-2 flex-shrink-0">
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                status.color === 'green' ? 'bg-green-100 text-green-800' : 
+                                status.color === 'red' ? 'bg-red-100 text-red-800' : 
+                                status.color === 'blue' ? 'bg-blue-100 text-blue-800' : 
+                                status.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {status.text}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Class Numbers - Only show for absent, excused, or late students */}
+                          {classAttendance?.class_time_data && Object.keys(classAttendance.class_time_data).length > 0 && (
+                            <div className="mb-2">
+                              {(() => {
+                                const problemPeriods = [];
+                                
+                                Object.entries(classAttendance.class_time_data).forEach(([timeNum, timeData]) => {
+                                  const studentAttendance = timeData.attendance?.find(a => a.student_id === record.student_id);
+                                  
+                                  if (studentAttendance && (studentAttendance.is_absent || studentAttendance.is_late || studentAttendance.is_excused)) {
+                                    let bgColor = 'bg-gray-100';
+                                    let textColor = 'text-gray-700';
+                                    
+                                    if (studentAttendance.is_absent) {
+                                      bgColor = 'bg-red-100';
+                                      textColor = 'text-red-700';
+                                    } else if (studentAttendance.is_late) {
+                                      bgColor = 'bg-yellow-100';
+                                      textColor = 'text-yellow-700';
+                                    } else if (studentAttendance.is_excused) {
+                                      bgColor = 'bg-blue-100';
+                                      textColor = 'text-blue-700';
+                                    }
+                                    
+                                    problemPeriods.push({
+                                      number: timeNum,
+                                      bgColor: bgColor,
+                                      textColor: textColor
+                                    });
+                                  }
+                                });
+                                
+                                if (problemPeriods.length > 0) {
+                                  return (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-medium text-gray-500">حصص الغياب:</span>
+                                      <div className="flex flex-wrap gap-1">
+                                        {problemPeriods.map((period) => (
+                                          <span key={period.number} className={`text-xs px-1.5 py-0.5 rounded ${period.bgColor} ${period.textColor} font-medium`}>
+                                            {period.number}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
+                          )}
+
+                          {/* Attendance Options */}
+                          {!isViewMode && (
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-2 gap-1">
+                                <label className="flex items-center p-1.5 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+                                  <input
+                                    type="checkbox"
+                                    checked={record.is_present}
+                                    onChange={(e) => handleAttendanceChange(record.student_id, 'is_present', e.target.checked)}
+                                    className="w-3.5 h-3.5 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-1 ml-1.5"
+                                  />
+                                  <span className="text-xs text-green-600">حاضر</span>
+                                </label>
+                                <label className="flex items-center p-1.5 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+                                  <input
+                                    type="checkbox"
+                                    checked={record.is_Acsent}
+                                    onChange={(e) => handleAttendanceChange(record.student_id, 'is_Acsent', e.target.checked)}
+                                    className="w-3.5 h-3.5 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-1 ml-1.5"
+                                  />
+                                  <span className="text-xs text-red-600">هارب</span>
+                                </label>
+                                <label className="flex items-center p-1.5 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+                                  <input
+                                    type="checkbox"
+                                    checked={record.is_Excus}
+                                    onChange={(e) => handleAttendanceChange(record.student_id, 'is_Excus', e.target.checked)}
+                                    className="w-3.5 h-3.5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-1 ml-1.5"
+                                  />
+                                  <span className="text-xs text-blue-600">غائب</span>
+                                </label>
+                                <label className="flex items-center p-1.5 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+                                  <input
+                                    type="checkbox"
+                                    checked={record.is_late}
+                                    onChange={(e) => handleAttendanceChange(record.student_id, 'is_late', e.target.checked)}
+                                    className="w-3.5 h-3.5 text-yellow-600 bg-gray-100 border-gray-300 rounded focus:ring-yellow-500 focus:ring-1 ml-1.5"
+                                  />
+                                  <span className="text-xs text-yellow-600">متأخر</span>
+                                </label>
+                              </div>
+                              
+                              {/* Excuse Note */}
+                              {record.is_Excus && (
+                                <div className="mt-2">
+                                  <input
+                                    type="text"
+                                    value={record.ExcusNote}
+                                    onChange={(e) => handleAttendanceChange(record.student_id, 'ExcusNote', e.target.value)}
+                                    placeholder="ملاحظة العذر..."
+                                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-12">
+                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">لا توجد طلاب في هذا الفصل</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+    
+    </div>
+  );
+};
+
+export default Attendance;
+

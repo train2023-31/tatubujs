@@ -1,0 +1,171 @@
+# app/routes/user_routes.py
+
+from flask import Blueprint, jsonify ,request
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from app.models import User, Student, Teacher, School,Class, Subject
+from app import db
+from werkzeug.security import generate_password_hash
+from io import StringIO
+from app.logger import log_action
+import pandas as pd
+
+
+user_blueprint = Blueprint('user_blueprint', __name__)
+
+@user_blueprint.route('/my-school', methods=['GET'])
+@jwt_required()
+def get_users_of_my_school():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify(message="User not found."), 404
+
+    # Check user role
+    if user.user_role == 'teacher' or user.user_role == 'school_admin':
+        # Retrieve the Teacher instance to get school_id
+        teacher = Teacher.query.get(user_id)
+        if not teacher or not user.school_id:
+            return jsonify(message="Teacher is not associated with a school."), 400
+        school_id = user.school_id
+
+        # Fetch all students and teachers in the school
+        students = Student.query.filter_by(school_id=school_id).all()
+        teachers = Teacher.query.filter_by(school_id=school_id).all()
+
+    elif user.user_role == 'admin':
+        # Admin can fetch all users from all schools
+        students = Student.query.all()
+        teachers = Teacher.query.all()
+
+    else:
+        # Users with insufficient permissions
+        return jsonify(message="Access forbidden: insufficient permissions."), 403
+
+    # Serialize the data
+    user_list = [teacher.to_dict() for teacher in teachers] + [student.to_dict() for student in students]
+
+    return jsonify(user_list ), 200
+
+@user_blueprint.route('/my-school-Teachers', methods=['GET'])
+@jwt_required()
+def get_Teachers_of_my_school():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify(message="User not found."), 404
+
+    # Check user role
+    if user.user_role == 'teacher' or user.user_role == 'school_admin':
+        # Retrieve the Teacher instance to get school_id
+        teacher = Teacher.query.get(user_id)
+        if not teacher or not user.school_id:
+            return jsonify(message="Teacher is not associated with a school."), 400
+        school_id = user.school_id
+
+        # Fetch all students and teachers in the school
+        teachers = Teacher.query.filter_by(school_id=school_id).all()
+
+    elif user.user_role == 'admin':
+        # Admin can fetch all users from all schools
+        teachers = Teacher.query.all()
+
+    else:
+        # Users with insufficient permissions
+        return jsonify(message="Access forbidden: insufficient permissions."), 403
+
+    # Serialize the data
+    user_list = [teacher.to_dict() for teacher in teachers]
+
+    return jsonify(user_list ), 200
+
+
+@user_blueprint.route('/my-school-Students', methods=['GET'])
+@jwt_required()
+def get_Students_of_my_school():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify(message="User not found."), 404
+
+    # Check user role
+    if user.user_role == 'teacher' or user.user_role == 'school_admin':
+        # Retrieve the Teacher instance to get school_id
+        teacher = Teacher.query.get(user_id)
+        if not teacher or not user.school_id:
+            return jsonify(message="Teacher is not associated with a school."), 400
+        school_id = user.school_id
+
+        # Fetch all students and teachers in the school
+        students = Student.query.filter_by(school_id=school_id).order_by(Student.fullName.asc()).all()
+
+    elif user.user_role == 'admin':
+        # Admin can fetch all users from all schools
+        students = Student.query.order_by(Student.fullName.asc()).all()
+
+    else:
+        # Users with insufficient permissions
+        return jsonify(message="Access forbidden: insufficient permissions."), 403
+
+    # Serialize the data
+    user_list = [
+    {
+        "id": student.id,
+        "fullName": student.fullName,
+         "phone_number": student.phone_number,
+        "is_active": student.is_active
+    }
+    for student in students
+]
+    
+    return jsonify(user_list ), 200
+
+
+
+def deactivate_school(school_id):
+    """
+    Set is_active to False for all related tables of the given school_id.
+    """
+    try:
+        # Deactivate the school
+        # school = School.query.get(school_id)
+        # if not school:
+        #     return {"message": "School not found"}, 404
+        # school.is_active = False
+
+        # Deactivate related students
+        students = Student.query.filter_by(school_id=school_id).all()
+        for student in students:
+            student.is_active = False
+
+        # Deactivate related teachers
+        teachers = Teacher.query.filter_by(school_id=school_id).all()
+        for teacher in teachers:
+            teacher.is_active = False
+
+        # Deactivate related classes
+        classes = Class.query.filter_by(school_id=school_id).all()
+        for class_obj in classes:
+            class_obj.is_active = False
+
+        # Deactivate related subjects
+        subjects = Subject.query.filter_by(school_id=school_id).all()
+        for subject in subjects:
+            subject.is_active = False
+
+        # Commit changes to the database
+        db.session.commit()
+        return {"message": "All related records have been deactivated."}, 200
+    except Exception as e:
+        db.session.rollback()
+        return {"message": f"An error occurred: {str(e)}"}, 500
+
+
+@user_blueprint.route('/deactivate_school/<int:school_id>', methods=['POST'])
+@jwt_required()
+@log_action("تعديل ", description="تعديل حالة المدرسة")
+def deactivate_school_route(school_id):
+    response, status_code = deactivate_school(school_id)
+    return jsonify(response), status_code

@@ -1,0 +1,24 @@
+End-to-End Workflow Summary
+Teacher Registration:
+    Teacher fills out the registration form, including salary and school ID.
+    Backend creates a new Teacher instance.
+
+Student Registration:
+    Students register, providing necessary details and selecting their school.
+    Backend creates new Student instances.
+
+Teacher Logs In:
+    Teacher logs in using their credentials.
+    Backend returns a JWT token.
+
+Teacher Creates Class:
+    Teacher uses the token to authenticate and creates a new class.
+    Backend associates the class with the teacher and school.
+
+Teacher Assigns Students:
+    Teacher selects students from their school to add to the class.
+    Backend updates the many-to-many relationship between Class and Student.
+    
+Teacher Takes Attendance:
+    Teacher selects the class and marks students as present or absent.
+    Backend records attendance entries linked to the student, class, and teacher.
