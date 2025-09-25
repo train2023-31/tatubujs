@@ -1,6 +1,37 @@
 import React, { useState } from 'react';
 import { useQuery } from 'react-query';
-import { Search, Filter, Download, Printer, Eye, Calendar, User, Globe, Monitor } from 'lucide-react';
+import { 
+  Search, 
+  Filter, 
+  Download, 
+  Printer, 
+  Eye, 
+  Calendar, 
+  User, 
+  Globe, 
+  Monitor,
+  Plus,
+  Edit,
+  Trash2,
+  LogIn,
+  LogOut,
+  Settings,
+  BookOpen,
+  Users,
+  School,
+  FileText,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  Database,
+  Shield,
+  Key,
+  Mail,
+  Phone,
+  MapPin,
+  Clock,
+  Activity
+} from 'lucide-react';
 import { authAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import DataTable from '../../components/UI/DataTable';
@@ -17,6 +48,39 @@ const ViewLogs = () => {
   const [selectedAction, setSelectedAction] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  // Function to get icon based on action type
+  const getActionIcon = (actionType) => {
+    const action = actionType?.toLowerCase() || '';
+    
+    if (action.includes('تسجيل دخول') || action.includes('login')) return LogIn;
+    if (action.includes('تسجيل خروج') || action.includes('logout')) return LogOut;
+    if (action.includes('إضافة') || action.includes('add') || action.includes('create')) return Plus;
+    if (action.includes('تعديل') || action.includes('edit') || action.includes('update')) return Edit;
+    if (action.includes('حذف') || action.includes('delete') || action.includes('remove')) return Trash2;
+    if (action.includes('عرض') || action.includes('view') || action.includes('get')) return Eye;
+    if (action.includes('طباعة') || action.includes('print')) return Printer;
+    if (action.includes('تحميل') || action.includes('download') || action.includes('export')) return Download;
+    if (action.includes('إعداد') || action.includes('settings') || action.includes('config')) return Settings;
+    if (action.includes('فصل') || action.includes('class')) return BookOpen;
+    if (action.includes('طالب') || action.includes('student')) return Users;
+    if (action.includes('مدرسة') || action.includes('school')) return School;
+    if (action.includes('حضور') || action.includes('attendance')) return CheckCircle;
+    if (action.includes('غياب') || action.includes('absent')) return XCircle;
+    if (action.includes('تقرير') || action.includes('report')) return FileText;
+    if (action.includes('تحذير') || action.includes('warning') || action.includes('alert')) return AlertCircle;
+    if (action.includes('قاعدة بيانات') || action.includes('database')) return Database;
+    if (action.includes('أمان') || action.includes('security') || action.includes('auth')) return Shield;
+    if (action.includes('مفتاح') || action.includes('key') || action.includes('password')) return Key;
+    if (action.includes('بريد') || action.includes('email') || action.includes('mail')) return Mail;
+    if (action.includes('هاتف') || action.includes('phone')) return Phone;
+    if (action.includes('موقع') || action.includes('location')) return MapPin;
+    if (action.includes('وقت') || action.includes('time') || action.includes('schedule')) return Clock;
+    if (action.includes('نشاط') || action.includes('activity')) return Activity;
+    
+    // Default icon
+    return Monitor;
+  };
 
   // Fetch logs data
   const { data: logs, isLoading, error } = useQuery(
@@ -182,7 +246,7 @@ const ViewLogs = () => {
               }
               
               /* Hide elements that shouldn't print */
-              button, .btn, .no-print {
+              button, .btn, .no-print, .card, .stat-card, .grid {
                 display: none !important;
               }
               
@@ -285,21 +349,24 @@ const ViewLogs = () => {
     {
       key: 'action_type',
       header: 'نوع الإجراء',
-      render: (row) => (
-        <div className="flex items-center">
-          <Monitor className="h-4 w-4 text-gray-400 mr-2" />
-          <span className="text-sm font-medium text-gray-900">{row.action_type}</span>
-        </div>
-      ),
+      render: (row) => {
+        const IconComponent = getActionIcon(row.action_type);
+        return (
+          <div className="flex items-center">
+            <IconComponent className="h-4 w-4 text-gray-400 mr-2" />
+            <span className="text-sm font-medium text-gray-900 mr-2">{row.action_type}</span>
+          </div>
+        );
+      },
     },
     {
       key: 'endpoint',
-      header: 'المسار',
+      header: 'الإجراء',
       render: (row) => (
         <div className="flex items-center">
-          <Globe className="h-4 w-4 text-gray-400 mr-2" />
+         
           <div>
-            <p className="text-sm text-gray-900">{row.method} {row.endpoint}</p>
+           
             <p className="text-xs text-gray-500">{row.description}</p>
           </div>
         </div>
@@ -323,7 +390,7 @@ const ViewLogs = () => {
       header: 'الحالة',
       render: (row) => (
         <span className={`badge ${getStatusColor(row.status_code)}`}>
-          {row.status_code}
+          {row.status_code === 0 ? '-' : row.status_code}
         </span>
       ),
     },

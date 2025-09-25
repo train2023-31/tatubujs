@@ -250,7 +250,7 @@ const Reports = () => {
               }
               
               /* Hide elements that shouldn't print */
-              button, .btn, .no-print {
+              button, .btn, .no-print, .card, .stat-card, .grid {
                 display: none !important;
               }
               
@@ -277,23 +277,6 @@ const Reports = () => {
                 font-weight: bold;
               }
               
-              /* Card styles for print */
-              .card {
-                border: 1px solid #ddd;
-                margin-bottom: 10px;
-                page-break-inside: avoid;
-              }
-              
-              .card-header {
-                background-color: #f8f9fa;
-                padding: 8px;
-                border-bottom: 1px solid #ddd;
-                font-weight: bold;
-              }
-              
-              .card-body {
-                padding: 8px;
-              }
             }
           </style>
         </head>

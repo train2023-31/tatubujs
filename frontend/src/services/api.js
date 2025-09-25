@@ -60,11 +60,13 @@ export const usersAPI = {
   getMySchoolTeachers: () => api.get('/users/my-school-Teachers').then(res => res.data),
   getMySchoolStudents: () => api.get('/users/my-school-Students').then(res => res.data),
   deactivateSchool: (schoolId) => api.post(`/users/deactivate_school/${schoolId}`),
+  updateStudentBehaviorNote: (studentId, behaviorNote) => api.put(`/users/update-student-behavior-note/${studentId}`, { behavior_note: behaviorNote }),
 };
 
 // Classes API
 export const classesAPI = {
   addSchool: (schoolData) => api.post('/classes/addSchool', schoolData),
+  updateSchool: (schoolId, schoolData) => api.put(`/classes/updateSchool/${schoolId}`, schoolData),
   createClass: (classData) => api.post('/classes/create', classData),
   createClasses: (classesData) => api.post('/classes/createClasses', classesData),
   updateClasses: (data) => api.put('/classes/update-classes', data),

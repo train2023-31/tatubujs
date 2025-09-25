@@ -68,7 +68,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           roles: ['teacher', 'school_admin'],
         },
         {
-          name: 'تفاصيل الحضور',
+          name: 'تقارير الحضور',
           href: '/attendance-details',
           icon: Eye,
           roles: ['teacher', 'school_admin'],

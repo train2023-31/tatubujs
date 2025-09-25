@@ -21,10 +21,49 @@ def create_school():
     new_school = School(
         name=data['name'],
         address=data['address'],
+        phone_number=data.get('phone_number', ''),
         password=data['password'])
     db.session.add(new_school)
     db.session.commit()
     return jsonify(message="School added"), 201
+
+@class_blueprint.route('/updateSchool/<int:school_id>', methods=['PUT'])
+@jwt_required()
+@log_action("تعديل", description="تعديل بيانات المدرسة")
+def update_school(school_id):
+    user_id = get_jwt_identity()
+    Login_user = User.query.get(user_id)
+    
+    if Login_user.user_role != 'admin':  # Ensure only admin can update schools
+        return jsonify(message={"en": "Unauthorized to make this action.", "ar": "غير مصرح لك بتنفيذ هذا الإجراء."}, flag=1), 400
+
+    data = request.get_json()
+    
+    if not data:
+        return jsonify(message="No data provided"), 400
+
+    school = School.query.get(school_id)
+    if not school:
+        return jsonify(message="School not found"), 404
+
+    # Update school fields
+    if 'name' in data:
+        school.name = data['name']
+    if 'address' in data:
+        school.address = data['address']
+    if 'phone_number' in data:
+        school.phone_number = data['phone_number']
+    if 'password' in data and data['password']:
+        school.password = data['password']
+    if 'is_active' in data:
+        school.is_active = data['is_active']
+
+    try:
+        db.session.commit()
+        return jsonify(message="School updated successfully"), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(message="Failed to update school"), 500
 
 @class_blueprint.route('/create', methods=['POST'])
 @jwt_required()
@@ -251,9 +290,19 @@ def get_Schools():
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
     
+    # Only admin can access all schools data
+    if user.user_role != 'admin':
+        return jsonify(message={"en": "Unauthorized to access this resource.", "ar": "غير مصرح لك بالوصول إلى هذا المورد."}, flag=1), 403
   
     Schools = School.query.all()
-    SchoolList = [{"id": sls.id, "name": sls.name , "is_active": sls.is_active ,"address":sls.address} for sls in Schools]
+    SchoolList = [{
+        "id": sls.id, 
+        "name": sls.name, 
+        "is_active": sls.is_active, 
+        "address": sls.address, 
+        "phone_number": sls.phone_number,
+        "password": sls.password  # Include password for admin access
+    } for sls in Schools]
  
     return jsonify(SchoolList), 200
 
@@ -354,10 +403,15 @@ def get_class_students(class_id):
     # Ensure that only active students are returned
     active_students = [student for student in class_obj.students if student.is_active]
 
-    student_list = [
-        {"id": student.id, "fullName": student.fullName, "phone_number": student.phone_number}
-        for student in active_students
-    ]
+    student_list = []
+    for student in active_students:
+        student_list.append({
+            "id": student.id, 
+            "fullName": student.fullName, 
+            "phone_number": student.phone_number,
+            "class_name": class_obj.name,
+            "behavior_note": student.behavior_note
+        })
 
     return jsonify(student_list), 200
 
@@ -378,10 +432,20 @@ def get_students_from_my_school():
     ).all()
 
     # Prepare the student list for the response
-    student_list = [
-        {"id": student.id, "fullName": student.fullName, "phone_number": student.phone_number}
-        for student in students
-    ]
+    student_list = []
+    for student in students:
+        # Get the first class name for the student (assuming students are in one class)
+        class_name = None
+        if student.classes:
+            class_name = student.classes[0].name
+        
+        student_list.append({
+            "id": student.id, 
+            "fullName": student.fullName, 
+            "phone_number": student.phone_number,
+            "class_name": class_name,
+            "behavior_note": student.behavior_note
+        })
 
     return jsonify(student_list), 200
 

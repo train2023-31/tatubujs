@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { Plus, Building, Edit, Trash2, ToggleLeft, ToggleRight, Eye } from 'lucide-react';
 import { classesAPI, authAPI } from '../../services/api';
@@ -41,6 +41,22 @@ const Schools = () => {
       },
       onError: (error) => {
         toast.error(error.response?.data?.message || 'فشل في إنشاء المدرسة');
+      },
+    }
+  );
+
+  // Update school mutation
+  const updateSchoolMutation = useMutation(
+    (data) => classesAPI.updateSchool(data.schoolId, data.schoolData),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('schools');
+        toast.success('تم تحديث المدرسة بنجاح');
+        setIsEditModalOpen(false);
+        setSelectedSchool(null);
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message || 'فشل في تحديث المدرسة');
       },
     }
   );
@@ -107,20 +123,30 @@ const Schools = () => {
           <button
             onClick={() => {
               setSelectedSchool(row);
+              setIsEditModalOpen(true);
+            }}
+            className="text-primary-600 hover:text-primary-900 mr-2 ml-2"
+            title="تعديل المدرسة"
+          >
+            <Edit className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => {
+              setSelectedSchool(row);
               setIsLogsModalOpen(true);
             }}
-            className="text-blue-600 hover:text-blue-900"
+            className="text-blue-600 hover:text-blue-900 mr-2"
             title="عرض السجلات"
           >
             <Eye className="h-4 w-4" />
           </button>
           <button
             onClick={() => toggleSchoolStatusMutation.mutate(row.id)}
-            className={`${row.is_active ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}
+            className={`${row.is_active ? 'text-red-600 hover:text-red-900 mr-2' : 'text-green-600 hover:text-green-900 mr-2'}`}
             title={row.is_active ? 'تعطيل المدرسة' : 'تفعيل المدرسة'}
             disabled={toggleSchoolStatusMutation.isLoading}
           >
-            {row.is_active ? <ToggleLeft className="h-4 w-4" /> : <ToggleRight className="h-4 w-4" />}
+            {row.is_active ? <ToggleLeft className="h-4 w-4 mr-2" /> : <ToggleRight className="h-4 w-4 mr-2" />}
           </button>
           <button
             onClick={() => {
@@ -178,12 +204,35 @@ const Schools = () => {
         />
       </Modal>
 
+      {/* Edit School Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedSchool(null);
+        }}
+        title={`تعديل المدرسة: ${selectedSchool?.name}`}
+        size="lg"
+      >
+        {selectedSchool && (
+          <EditSchoolForm
+            school={selectedSchool}
+            onClose={() => {
+              setIsEditModalOpen(false);
+              setSelectedSchool(null);
+            }}
+            onSubmit={updateSchoolMutation.mutate}
+            loading={updateSchoolMutation.isLoading}
+          />
+        )}
+      </Modal>
+
       {/* Logs Modal */}
       <Modal
         isOpen={isLogsModalOpen}
         onClose={() => setIsLogsModalOpen(false)}
         title={`سجلات المدرسة: ${selectedSchool?.name}`}
-        size="xl"
+        size="full"
       >
         <LogsViewer
           logs={logs || []}
@@ -199,6 +248,7 @@ const AddSchoolForm = ({ onClose, onSubmit, loading }) => {
   const [formData, setFormData] = useState({
     name: '',
     address: '',
+    phone_number: '',
     password: '',
   });
 
@@ -237,6 +287,17 @@ const AddSchoolForm = ({ onClose, onSubmit, loading }) => {
             onChange={handleChange}
             className="input"
             required
+          />
+        </div>
+        <div>
+          <label className="label">رقم الهاتف</label>
+          <input
+            type="tel"
+            name="phone_number"
+            value={formData.phone_number}
+            onChange={handleChange}
+            className="input"
+            placeholder="رقم هاتف المدرسة"
           />
         </div>
         <div className="md:col-span-2">
@@ -280,6 +341,133 @@ const AddSchoolForm = ({ onClose, onSubmit, loading }) => {
   );
 };
 
+// Edit School Form Component
+const EditSchoolForm = ({ school, onClose, onSubmit, loading }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    address: '',
+    phone_number: '',
+    password: '',
+    is_active: true,
+  });
+
+  // Update form data when school prop changes
+  useEffect(() => {
+    if (school) {
+      setFormData({
+        name: school.name || '',
+        address: school.address || '',
+        phone_number: school.phone_number || '',
+        password: school.password || '',
+        is_active: school.is_active !== undefined ? school.is_active : true,
+      });
+    }
+  }, [school]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit({
+      schoolId: school.id,
+      schoolData: formData
+    });
+  };
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData({
+      ...formData,
+      [name]: type === 'checkbox' ? checked : value,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="label">اسم المدرسة</label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            className="input"
+            required
+          />
+        </div>
+        <div>
+          <label className="label">العنوان</label>
+          <input
+            type="text"
+            name="address"
+            value={formData.address}
+            onChange={handleChange}
+            className="input"
+            required
+          />
+        </div>
+        <div>
+          <label className="label">رقم الهاتف</label>
+          <input
+            type="tel"
+            name="phone_number"
+            value={formData.phone_number}
+            onChange={handleChange}
+            className="input"
+            placeholder="رقم هاتف المدرسة"
+          />
+        </div>
+        <div>
+          <label className="label">كلمة المرور الجديدة (اختياري)</label>
+          <input
+            type="text"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            className="input"
+            placeholder="اتركه فارغاً إذا كنت لا تريد تغيير كلمة المرور"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              name="is_active"
+              checked={formData.is_active}
+              onChange={handleChange}
+              className="mr-2"
+            />
+            <span className="text-sm text-gray-700">المدرسة نشطة</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end space-x-3 pt-4">
+        <button
+          type="button"
+          onClick={onClose}
+          className="btn btn-outline"
+        >
+          إلغاء
+        </button>
+        <button
+          type="submit"
+          disabled={loading}
+          className="btn btn-primary"
+        >
+          {loading ? (
+            <>
+              <LoadingSpinner size="sm" />
+              <span className="mr-2">جاري التحديث...</span>
+            </>
+          ) : (
+            'تحديث المدرسة'
+          )}
+        </button>
+      </div>
+    </form>
+  );
+};
+
 // Logs Viewer Component
 const LogsViewer = ({ logs, loading }) => {
   if (loading) {
@@ -297,12 +485,12 @@ const LogsViewer = ({ logs, loading }) => {
         <table className="table">
           <thead className="table-header">
             <tr>
-              <th className="table-header-cell">المستخدم</th>
-              <th className="table-header-cell">الدور</th>
-              <th className="table-header-cell">الإجراء</th>
-              <th className="table-header-cell">الوصف</th>
-              <th className="table-header-cell">التاريخ</th>
-              <th className="table-header-cell">IP</th>
+              <th className="table-header-cell text-right">المستخدم</th>
+              <th className="table-header-cell text-right">الدور</th>
+              <th className="table-header-cell text-right">الإجراء</th>
+              <th className="table-header-cell text-right">الوصف</th>
+              <th className="table-header-cell text-right">التاريخ</th>
+              <th className="table-header-cell text-right">IP</th>
             </tr>
           </thead>
           <tbody className="table-body">

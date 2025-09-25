@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { Plus, Search, Edit, Trash2, UserPlus, Users as UsersIcon, Eye } from 'lucide-react';
-import { usersAPI, authAPI } from '../../services/api';
+import { usersAPI, authAPI, classesAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { getRoleDisplayName, getRoleColor, formatPhoneNumber } from '../../utils/helpers';
 import DataTable from '../../components/UI/DataTable';
@@ -329,7 +329,15 @@ const AddUserForm = ({ onClose, onSuccess }) => {
     password: '',
     job_name: '',
     week_Classes_Number: '',
+    school_id: '',
   });
+
+  // Fetch schools data for admin users
+  const { data: schools } = useQuery(
+    'schools',
+    classesAPI.getAllSchools,
+    { enabled: !!user && user.role === 'admin' }
+  );
 
   const addUserMutation = useMutation(
     (userData) => {
@@ -338,6 +346,8 @@ const AddUserForm = ({ onClose, onSuccess }) => {
           return authAPI.registerTeacher(userData);
         case 'student':
           return authAPI.registerStudents([userData]);
+        case 'school_admin':
+          return authAPI.registerUser(userData);
         default:
           return authAPI.registerUser(userData);
       }
@@ -423,8 +433,28 @@ const AddUserForm = ({ onClose, onSuccess }) => {
           >
             <option value="student">طالب</option>
             <option value="teacher">معلم</option>
+            <option value="school_admin">مدير مدرسة</option>
           </select>
         </div>
+        {user?.role === 'admin' && (
+          <div>
+            <label className="label">المدرسة</label>
+            <select
+              name="school_id"
+              value={formData.school_id}
+              onChange={handleChange}
+              className="input"
+              required
+            >
+              <option value="">اختر المدرسة</option>
+              {schools?.map((school) => (
+                <option key={school.id} value={school.id}>
+                  {school.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="label">كلمة المرور</label>
           <input
@@ -436,7 +466,7 @@ const AddUserForm = ({ onClose, onSuccess }) => {
             required
           />
         </div>
-        {formData.role === 'teacher' && (
+        {(formData.role === 'teacher' || formData.role === 'school_admin') && (
           <>
             <div>
               <label className="label">الوظيفة</label>
@@ -446,6 +476,7 @@ const AddUserForm = ({ onClose, onSuccess }) => {
                 value={formData.job_name}
                 onChange={handleChange}
                 className="input"
+                placeholder={formData.role === 'school_admin' ? 'مدير مدرسة' : 'الوظيفة'}
               />
             </div>
             <div>
@@ -456,6 +487,7 @@ const AddUserForm = ({ onClose, onSuccess }) => {
                 value={formData.week_Classes_Number}
                 onChange={handleChange}
                 className="input"
+                placeholder={formData.role === 'school_admin' ? '0' : ''}
               />
             </div>
           </>

@@ -36,6 +36,9 @@ class User(db.Model):
 class Student(User):
     __tablename__ = 'students'  # Changed from 'student' to 'students'
     id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)  # Updated foreign key reference
+    
+    # Student-specific fields
+    behavior_note = db.Column(db.Text, nullable=True)  # General note for student behavior
 
     # Relationships
     school = db.relationship('School', back_populates='students')

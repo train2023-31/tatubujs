@@ -25,6 +25,7 @@ import { reportsAPI, attendanceAPI } from '../../services/api';
 import { formatDate, getTodayAPI, getRoleDisplayName } from '../../utils/helpers';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import Modal from '../../components/UI/Modal';
+import NewsWidget from '../../components/UI/NewsWidget';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import toast from 'react-hot-toast';
@@ -160,7 +161,7 @@ const Dashboard = () => {
               }
               
               /* Hide elements that shouldn't print */
-              button, .btn, .no-print {
+              button, .btn, .no-print, .card, .stat-card, .grid {
                 display: none !important;
               }
               
@@ -182,38 +183,6 @@ const Dashboard = () => {
                 font-weight: bold;
               }
               
-              /* Card styles for print */
-              .card {
-                border: 1px solid #ddd;
-                margin-bottom: 10px;
-                page-break-inside: avoid;
-              }
-              
-              .card-header {
-                background-color: #f8f9fa;
-                padding: 8px;
-                border-bottom: 1px solid #ddd;
-                font-weight: bold;
-              }
-              
-              .card-body {
-                padding: 8px;
-              }
-              
-              /* Summary cards */
-              .grid {
-                display: grid;
-                grid-template-columns: repeat(4, 1fr);
-                gap: 10px;
-                margin-bottom: 15px;
-              }
-              
-              .stat-card {
-                border: 1px solid #ddd;
-                padding: 10px;
-                text-align: center;
-                page-break-inside: avoid;
-              }
             }
           </style>
         </head>
@@ -314,13 +283,14 @@ const Dashboard = () => {
         </div>
         <div className="flex items-center space-x-4">
           <div className="text-sm text-gray-500">
-            {formatDate(new Date(), 'EEEE, dd MMMM yyyy', 'ar')}
+            {formatDate(new Date(), 'EEEE, dd MMMM yyyy', 'ar-OM')}
+           
           </div>
           {user?.role === 'school_admin' && (
             <div className="flex items-center space-x-2">
               <button
                 onClick={handlePrint}
-                className="btn btn-outline"
+                className="btn btn-outline mr-2"
               >
                 <Printer className="h-5 w-5 mr-2" />
                 طباعة
@@ -355,6 +325,7 @@ const Dashboard = () => {
 
 // Admin Dashboard Component
 const AdminDashboard = ({ schoolStats, loading }) => {
+  const navigate = useNavigate();
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -394,6 +365,12 @@ const AdminDashboard = ({ schoolStats, loading }) => {
           color="orange"
         />
       </div>
+
+      {/* News Widget */}
+      <NewsWidget 
+        limit={3} 
+        onViewAll={() => navigate('/news')}
+      />
 
       {/* Recent Activity */}
       <div className="card">
@@ -674,6 +651,13 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
           </div>
         </div>
       )}
+
+      {/* News Widget */}
+      <NewsWidget 
+        limit={3} 
+        onViewAll={() => navigate('/news')}
+      />
+
       {/* Date Selector */}
       <div className="card">
         <div className="card-body">
@@ -751,16 +735,16 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                       <td className="table-cell">{classData.class_name}</td>
                       <td className="table-cell">{classData.total_students}</td>
                       <td className="table-cell">
-                        <span className="badge badge-success">{classData.total_present || 0}</span>
+                        <span className="badge badge-success">{(classData.total_present || 0) === 0 ? '-' : (classData.total_present || 0)}</span>
                       </td>
                       <td className="table-cell">
-                        <span className="badge badge-danger">{classData.total_absent || 0}</span>
+                        <span className="badge badge-danger">{(classData.total_absent || 0) === 0 ? '-' : (classData.total_absent || 0)}</span>
                       </td>
                       <td className="table-cell">
-                        <span className="badge badge-warning">{classData.total_late || 0}</span>
+                        <span className="badge badge-warning">{(classData.total_late || 0) === 0 ? '-' : (classData.total_late || 0)}</span>
                       </td>
                       <td className="table-cell">
-                        <span className="badge badge-purple">{classData.total_excused || 0}</span>
+                        <span className="badge badge-purple">{(classData.total_excused || 0) === 0 ? '-' : (classData.total_excused || 0)}</span>
                       </td>
                       <td className="table-cell text-center">
                         <span className="badge badge-info">
@@ -792,13 +776,13 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                       <td className="table-cell">{classData.teacher_name || '-'}</td>
                       <td className="table-cell">{classData.total_students}</td>
                       <td className="table-cell">
-                        <span className="badge badge-success">{classData.number_of_presents}</span>
+                        <span className="badge badge-success">{(classData.number_of_presents || 0) === 0 ? '-' : classData.number_of_presents}</span>
                       </td>
                       <td className="table-cell">
-                        <span className="badge badge-danger">{classData.number_of_absents}</span>
+                        <span className="badge badge-danger">{(classData.number_of_absents || 0) === 0 ? '-' : classData.number_of_absents}</span>
                       </td>
                       <td className="table-cell">
-                        <span className="badge badge-warning">{classData.number_of_lates}</span>
+                        <span className="badge badge-warning">{(classData.number_of_lates || 0) === 0 ? '-' : classData.number_of_lates}</span>
                       </td>
                       <td className="table-cell">
                         <span className="badge badge-orange">-</span>
@@ -980,6 +964,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
 
 // Teacher Dashboard Component
 const TeacherDashboard = ({ teacherAttendance, loading, selectedDate, setSelectedDate, onNavigateToAttendance, onNavigateToAttendancesDetails }) => {
+  const navigate = useNavigate();
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -993,6 +978,12 @@ const TeacherDashboard = ({ teacherAttendance, loading, selectedDate, setSelecte
 
   return (
     <div className="space-y-6">
+      {/* News Widget */}
+      <NewsWidget 
+        limit={3} 
+        onViewAll={() => navigate('/news')}
+      />
+
       {/* Date Selector */}
       <div className="card">
         <div className="card-body">

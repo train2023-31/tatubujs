@@ -11,13 +11,16 @@ import {
   UserX,
   AlertCircle,
   User,
-  Printer
+  Printer,
+  Edit
 } from 'lucide-react';
 import { attendanceAPI, usersAPI } from '../../services/api';
+import { useMutation, useQueryClient } from 'react-query';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDate, getTodayAPI } from '../../utils/helpers';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import DataTable from '../../components/UI/DataTable';
+import Modal from '../../components/UI/Modal';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import toast from 'react-hot-toast';
@@ -37,6 +40,8 @@ const AttendanceDetails = () => {
     start: getTodayAPI(),
     end: getTodayAPI(),
   });
+  const [isBehaviorNoteModalOpen, setIsBehaviorNoteModalOpen] = useState(false);
+  const [behaviorNote, setBehaviorNote] = useState('');
 
   // Fetch attendance summary
   const { data: attendanceSummary, isLoading: summaryLoading } = useQuery(
@@ -69,15 +74,31 @@ const AttendanceDetails = () => {
   // Filter students based on search
   const filteredStudents = allStudents?.filter(student => 
     student.fullName?.toLowerCase().includes(studentSearch.toLowerCase()) ||
-    student.username?.toLowerCase().includes(studentSearch.toLowerCase())
+    student.phone_number?.toLowerCase().includes(studentSearch.toLowerCase())
   ) || [];
 
   // Handle student selection
   const handleStudentSelect = (student) => {
     setSelectedStudent(student);
     setStudentId(student.id.toString());
-    setStudentSearch(`${student.fullName} - ${student.username}`);
+    setStudentSearch(`${student.fullName}${student.phone_number ? ` - ${student.phone_number}` : ''}`);
     setShowStudentDropdown(false);
+  };
+
+  // Handle opening behavior note modal
+  const handleOpenBehaviorNoteModal = () => {
+    setBehaviorNote(selectedStudent?.behavior_note || '');
+    setIsBehaviorNoteModalOpen(true);
+  };
+
+  // Handle updating behavior note
+  const handleUpdateBehaviorNote = () => {
+    if (selectedStudent) {
+      updateBehaviorNoteMutation.mutate({
+        studentId: selectedStudent.id,
+        behaviorNote: behaviorNote
+      });
+    }
   };
 
   // Handle search input change
@@ -118,11 +139,29 @@ const AttendanceDetails = () => {
     { enabled: !!user && selectedTab === 'log' && !!studentId }
   );
 
+  const queryClient = useQueryClient();
+
+  // Update behavior note mutation
+  const updateBehaviorNoteMutation = useMutation(
+    (data) => usersAPI.updateStudentBehaviorNote(data.studentId, data.behaviorNote),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('allStudents');
+        toast.success('تم تحديث ملاحظة السلوك بنجاح');
+        setIsBehaviorNoteModalOpen(false);
+        setBehaviorNote('');
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message || 'فشل في تحديث ملاحظة السلوك');
+      },
+    }
+  );
+
   const tabs = [
     { id: 'summary', name: 'ملخص الحضور', icon: Users },
     { id: 'details', name: 'تفاصيل الطلاب', icon: Eye },
     { id: 'excused', name: 'الطلاب المعذورين', icon: AlertCircle },
-    { id: 'log', name: 'سجل الطالب', icon: Calendar },
+    { id: 'log', name: 'سجل ملاحظات الطالب', icon: Calendar },
   ];
 
   // PDF Export Function
@@ -234,7 +273,7 @@ const AttendanceDetails = () => {
               }
               
               /* Hide elements that shouldn't print */
-              button, .btn, .no-print {
+              button, .btn, .no-print, .card, .stat-card, .grid {
                 display: none !important;
               }
               
@@ -256,23 +295,6 @@ const AttendanceDetails = () => {
                 font-weight: bold;
               }
               
-              /* Card styles for print */
-              .card {
-                border: 1px solid #ddd;
-                margin-bottom: 10px;
-                page-break-inside: avoid;
-              }
-              
-              .card-header {
-                background-color: #f8f9fa;
-                padding: 8px;
-                border-bottom: 1px solid #ddd;
-                font-weight: bold;
-              }
-              
-              .card-body {
-                padding: 8px;
-              }
             }
           </style>
         </head>
@@ -342,35 +364,35 @@ const AttendanceDetails = () => {
       key: 'total_students',
       header: 'إجمالي الطلاب',
       render: (row) => (
-        <span className="badge badge-info">{row.total_students}</span>
+        <span className="badge badge-info">{(row.total_students || 0) === 0 ? '-' : row.total_students}</span>
       ),
     },
     {
       key: 'total_present',
       header: 'الحاضرين',
       render: (row) => (
-        <span className="badge badge-success">{row.total_present}</span>
+        <span className="badge badge-success">{(row.total_present || 0) === 0 ? '-' : row.total_present}</span>
       ),
     },
     {
       key: 'total_absent',
       header: 'الهاربين',
       render: (row) => (
-        <span className="badge badge-danger">{row.total_absent}</span>
+        <span className="badge badge-danger">{(row.total_absent || 0) === 0 ? '-' : row.total_absent}</span>
       ),
     },
     {
       key: 'total_late',
       header: 'المتأخرين',
       render: (row) => (
-        <span className="badge badge-warning">{row.total_late}</span>
+        <span className="badge badge-warning">{(row.total_late || 0) === 0 ? '-' : row.total_late}</span>
       ),
     },
     {
       key: 'total_excused',
       header: 'الغائبين',
       render: (row) => (
-        <span className="badge badge-info">{row.total_excused}</span>
+        <span className="badge badge-info">{(row.total_excused || 0) === 0 ? '-' : row.total_excused}</span>
       ),
     },
   ];
@@ -481,7 +503,7 @@ const AttendanceDetails = () => {
       key: 'class_time_num',
       header: 'رقم الحصة',
       render: (row) => (
-        <span className="badge badge-info">{row.class_time_num}</span>
+        <span className="badge badge-info">{(row.class_time_num || 0) === 0 ? '-' : row.class_time_num}</span>
       ),
     },
     {
@@ -655,7 +677,7 @@ const AttendanceDetails = () => {
                       onChange={handleSearchChange}
                       onFocus={() => setShowStudentDropdown(studentSearch.length > 0)}
                       className="input w-full"
-                      placeholder="ابحث عن الطالب بالاسم أو اسم المستخدم"
+                      placeholder="ابحث عن الطالب بالاسم أو رقم الهاتف"
                       disabled={studentsLoading}
                     />
                     {studentsLoading && (
@@ -682,7 +704,7 @@ const AttendanceDetails = () => {
                                   {student.fullName}
                                 </div>
                                 <div className="text-xs text-gray-500">
-                                  {student.username}
+                                  {student.phone_number || 'لا يوجد رقم هاتف'}
                                 </div>
                               </div>
                             </div>
@@ -770,19 +792,12 @@ const AttendanceDetails = () => {
             <h3 className="text-lg font-medium text-gray-900">تفاصيل الطالب</h3>
           </div>
           <div className="card-body">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="text-sm font-medium text-gray-500">الاسم الكامل</label>
                 <p className="text-sm text-gray-900">{selectedStudent.fullName}</p>
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500">اسم المستخدم</label>
-                <p className="text-sm text-gray-900">{selectedStudent.username}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500">البريد الإلكتروني</label>
-                <p className="text-sm text-gray-900">{selectedStudent.email || 'غير محدد'}</p>
-              </div>
+           
               <div>
                 <label className="text-sm font-medium text-gray-500">رقم الهاتف</label>
                 <p className="text-sm text-gray-900">{selectedStudent.phone_number || 'غير محدد'}</p>
@@ -797,6 +812,21 @@ const AttendanceDetails = () => {
                   {selectedStudent.is_active ? 'نشط' : 'غير نشط'}
                 </span>
               </div>
+              <div className="md:col-span-3">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-gray-500">ملاحظة السلوك</label>
+                  <button
+                    onClick={handleOpenBehaviorNoteModal}
+                    className="text-primary-600 hover:text-primary-900 flex items-center text-sm"
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    تعديل
+                  </button>
+                </div>
+                <p className="text-sm text-gray-900 mt-1 p-3 bg-gray-50 rounded-lg border">
+                  {selectedStudent.behavior_note || 'لا توجد ملاحظات'}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -809,6 +839,49 @@ const AttendanceDetails = () => {
         loading={getCurrentLoading()}
         emptyMessage="لا توجد بيانات"
       />
+
+      {/* Behavior Note Modal */}
+      <Modal
+        isOpen={isBehaviorNoteModalOpen}
+        onClose={() => setIsBehaviorNoteModalOpen(false)}
+        title="تعديل ملاحظة السلوك"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="label">ملاحظة السلوك</label>
+            <textarea
+              value={behaviorNote}
+              onChange={(e) => setBehaviorNote(e.target.value)}
+              className="input"
+              rows={6}
+              placeholder="أدخل ملاحظة حول سلوك الطالب..."
+            />
+          </div>
+          <div className="flex items-center justify-end space-x-3 pt-4">
+            <button
+              onClick={() => setIsBehaviorNoteModalOpen(false)}
+              className="btn btn-outline"
+            >
+              إلغاء
+            </button>
+            <button
+              onClick={handleUpdateBehaviorNote}
+              disabled={updateBehaviorNoteMutation.isLoading}
+              className="btn btn-primary"
+            >
+              {updateBehaviorNoteMutation.isLoading ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  <span className="mr-2">جاري الحفظ...</span>
+                </>
+              ) : (
+                'حفظ الملاحظة'
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

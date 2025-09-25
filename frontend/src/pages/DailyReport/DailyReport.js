@@ -424,7 +424,7 @@ ${attendanceStatus}
               }
               
               /* Hide elements that shouldn't print */
-              button, .btn, .no-print {
+              button, .btn, .no-print, .card, .stat-card, .grid {
                 display: none !important;
               }
               
@@ -446,38 +446,6 @@ ${attendanceStatus}
                 font-weight: bold;
               }
               
-              /* Card styles for print */
-              .card {
-                border: 1px solid #ddd;
-                margin-bottom: 10px;
-                page-break-inside: avoid;
-              }
-              
-              .card-header {
-                background-color: #f8f9fa;
-                padding: 8px;
-                border-bottom: 1px solid #ddd;
-                font-weight: bold;
-              }
-              
-              .card-body {
-                padding: 8px;
-              }
-              
-              /* Summary cards */
-              .grid {
-                display: grid;
-                grid-template-columns: repeat(4, 1fr);
-                gap: 10px;
-                margin-bottom: 15px;
-              }
-              
-              .stat-card {
-                border: 1px solid #ddd;
-                padding: 10px;
-                text-align: center;
-                page-break-inside: avoid;
-              }
               
               /* Badge styles */
               .badge {

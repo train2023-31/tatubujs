@@ -110,18 +110,63 @@ def get_Students_of_my_school():
         return jsonify(message="Access forbidden: insufficient permissions."), 403
 
     # Serialize the data
-    user_list = [
-    {
-        "id": student.id,
-        "fullName": student.fullName,
-         "phone_number": student.phone_number,
-        "is_active": student.is_active
-    }
-    for student in students
-]
+    user_list = []
+    for student in students:
+        # Get the first class name for the student (assuming students are in one class)
+        class_name = None
+        if student.classes:
+            class_name = student.classes[0].name
+        
+        user_list.append({
+            "id": student.id,
+            "fullName": student.fullName,
+            "phone_number": student.phone_number,
+            "is_active": student.is_active,
+            "class_name": class_name,
+            "behavior_note": student.behavior_note
+        })
     
     return jsonify(user_list ), 200
 
+
+@user_blueprint.route('/update-student-behavior-note/<int:student_id>', methods=['PUT'])
+@jwt_required()
+def update_student_behavior_note(student_id):
+    """Update behavior note for a specific student"""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify(message="User not found."), 404
+
+    # Check if user has permission to update student behavior notes
+    if user.user_role not in ['teacher', 'school_admin', 'admin']:
+        return jsonify(message="Access forbidden: insufficient permissions."), 403
+
+    # Get the student
+    student = Student.query.get(student_id)
+    if not student:
+        return jsonify(message="Student not found."), 404
+
+    # Check if user has access to this student's school
+    if user.user_role in ['teacher', 'school_admin']:
+        if user.school_id != student.school_id:
+            return jsonify(message="Access forbidden: cannot update student from different school."), 403
+
+    # Get the behavior note from request
+    data = request.get_json()
+    if not data or 'behavior_note' not in data:
+        return jsonify(message="Behavior note is required."), 400
+
+    # Update the behavior note
+    student.behavior_note = data['behavior_note']
+    
+    try:
+        db.session.commit()
+        return jsonify(message="Behavior note updated successfully."), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(message="Failed to update behavior note."), 500
 
 
 def deactivate_school(school_id):
