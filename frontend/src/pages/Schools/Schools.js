@@ -250,6 +250,7 @@ const AddSchoolForm = ({ onClose, onSubmit, loading }) => {
     address: '',
     phone_number: '',
     password: '',
+    is_active: true,
   });
 
   const handleSubmit = (e) => {
@@ -258,9 +259,10 @@ const AddSchoolForm = ({ onClose, onSubmit, loading }) => {
   };
 
   const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: type === 'checkbox' ? checked : value,
     });
   };
 
@@ -311,6 +313,18 @@ const AddSchoolForm = ({ onClose, onSubmit, loading }) => {
             required
             placeholder="كلمة المرور الافتراضية للمعلمين والطلاب"
           />
+        </div>
+        <div className="md:col-span-2">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              name="is_active"
+              checked={formData.is_active}
+              onChange={handleChange}
+              className="mr-2"
+            />
+            <span className="text-sm text-gray-700">المدرسة نشطة</span>
+          </div>
         </div>
       </div>
 

@@ -417,21 +417,140 @@ const Attendance = () => {
       )}
 
       {/* Validation Status */}
-      {selectedClass && selectedSubject && attendanceRecords.length > 0 && (
+      {selectedClass &&  attendanceRecords.length > 0 && (
         <div className="card">
           <div className="card-body">
             {/* Class and Subject Info */}
             <div className="mb-4 pb-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900">
-                    الحصة  {selectedTime} - {classes?.find(c => c.id === parseInt(selectedClass))?.name || 'غير محدد'}
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    مادة: {subjects?.find(s => s.id === parseInt(selectedSubject))?.name || 'غير محدد'}
-                  </p>
+      
+              
+              {/* All Class Periods with Subjects */}
+              <div className="mt-4">
+                <h4 className="text-lg font-medium text-gray-700 mb-3"> الحصص اليومية المسجلة:</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-2">
+                  {classTimeOptions.map((option) => {
+                    const isCurrentPeriod = option.value === selectedTime;
+                    // Get subject data from class_time_data
+                    const periodData = classAttendance?.class_time_data?.[option.value];
+                    const periodSubjects = periodData?.subjects || [];
+                    const firstSubject = periodSubjects[0]; // Get the first subject if multiple exist
+                    
+                    return (
+                      <div
+                        key={option.value}
+                        className={`p-2 rounded-lg border text-center ${
+                          isCurrentPeriod
+                            ? 'bg-primary-50 border-primary-200 text-primary-800'
+                            : 'bg-gray-50 border-gray-200 text-gray-600'
+                        }`}
+                      >
+                        <div className="text-xs font-medium">
+                          الحصة {option.value}
+                        </div>
+                    
+                        {firstSubject && (
+                          <div className={`text-xs font-semibold mt-1 ${
+                            isCurrentPeriod ? 'text-primary-600' : 'text-gray-700'
+                          }`}>
+                            {firstSubject.subject_name}
+                          </div>
+                        )}
+                        {periodSubjects.length > 1 && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            +{periodSubjects.length - 1} مادة أخرى
+                          </div>
+                        )}
+                        {!firstSubject && (
+                          <div className="text-xs text-gray-400 mt-1 text-red-500">
+                            لا توجد مادة
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-  
+                
+                {/* Current Period Highlight */}
+                <div className="mt-3 p-3 bg-primary-50 border border-primary-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-medium text-primary-800">
+                        الحصة الحالية: {selectedTime}
+                      </span>
+                      <span className="text-sm text-primary-600 mr-2">
+                        ({classTimeOptions.find(opt => opt.value === selectedTime)?.label})
+                      </span>
+                    </div>
+                    <div className="text-sm font-semibold text-primary-700">
+                      {(() => {
+                        // Get current period data from class_time_data
+                        const currentPeriodData = classAttendance?.class_time_data?.[selectedTime];
+                        const currentPeriodSubjects = currentPeriodData?.subjects || [];
+                        const firstCurrentSubject = currentPeriodSubjects[0];
+                        
+                        if (firstCurrentSubject) {
+                          return firstCurrentSubject.subject_name;
+                        } else if (selectedSubject) {
+                          // Fallback to selected subject if no data in class_time_data
+                          return subjects?.find(s => s.id === parseInt(selectedSubject))?.name || 'غير محدد';
+                        } else {
+                          return 'غير محدد';
+                        }
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Warning for Existing Subject */}
+                {(() => {
+                  const currentPeriodData = classAttendance?.class_time_data?.[selectedTime];
+                  const currentPeriodSubjects = currentPeriodData?.subjects || [];
+                  const firstCurrentSubject = currentPeriodSubjects[0];
+                  const selectedSubjectName = subjects?.find(s => s.id === parseInt(selectedSubject))?.name;
+                  
+                  // Show warning if there's an existing subject and user has selected a different subject
+                  if (firstCurrentSubject && selectedSubject && firstCurrentSubject.subject_id !== parseInt(selectedSubject)) {
+                    return (
+                      <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="flex items-start">
+                          <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 ml-2 flex-shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="text-sm font-medium text-yellow-800">
+                              تحذير: الحصة {selectedTime} مسجلة بالفعل
+                            </h4>
+                            <div className="mt-1 text-sm text-yellow-700">
+                              <p>هذه الحصة مسجلة بالفعل للمادة: <span className="font-semibold">{firstCurrentSubject.subject_name}</span></p>
+                              <p className="mt-1">المادة المحددة حالياً: <span className="font-semibold">{selectedSubjectName}</span></p>
+                              <p className="mt-1 text-xs">يرجى التأكد من اختيار الحصة الصحيحة أو تغيير المادة المحددة.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  // Show info if there's an existing subject and user has selected the same subject
+                  if (firstCurrentSubject && selectedSubject && firstCurrentSubject.subject_id === parseInt(selectedSubject)) {
+                    return (
+                      <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-start">
+                          <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 ml-2 flex-shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="text-sm font-medium text-green-800">
+                              متطابق: الحصة {selectedTime} صحيحة
+                            </h4>
+                            <div className="mt-1 text-sm text-green-700">
+                              <p>هذه الحصة مسجلة للمادة: <span className="font-semibold">{firstCurrentSubject.subject_name}</span></p>
+                              <p className="mt-1 text-xs">يمكنك متابعة تسجيل الحضور لهذه المادة.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  return null;
+                })()}
               </div>
             </div>
 

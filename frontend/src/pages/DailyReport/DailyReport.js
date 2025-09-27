@@ -34,6 +34,8 @@ const DailyReport = () => {
   const [isUpdatingExcuse, setIsUpdatingExcuse] = useState(false);
   const [excuseForAll, setExcuseForAll] = useState(false);
   const [updatingStudents, setUpdatingStudents] = useState(new Set());
+  const [confirmationStatus, setConfirmationStatus] = useState(null);
+  const [isConfirming, setIsConfirming] = useState(false);
   const [filters, setFilters] = useState({
     classFilter: '',
     statusFilter: '',
@@ -62,6 +64,21 @@ const DailyReport = () => {
       enabled: !!user,
       onError: (error) => {
         console.error('Failed to fetch classes:', error);
+      }
+    }
+  );
+
+  // Fetch confirmation status
+  const { data: confirmationData, isLoading: confirmationLoading } = useQuery(
+    ['confirmationStatus', selectedDate],
+    () => attendanceAPI.getConfirmationStatus({ date: selectedDate }),
+    { 
+      enabled: !!user && user.role === 'school_admin',
+      onSuccess: (data) => {
+        setConfirmationStatus(data);
+      },
+      onError: (error) => {
+        console.error('Failed to fetch confirmation status:', error);
       }
     }
   );
@@ -240,6 +257,27 @@ const DailyReport = () => {
     }
   };
 
+  const handleConfirmDayAbsents = async (isConfirm) => {
+    setIsConfirming(true);
+    
+    try {
+      await attendanceAPI.confirmDayAbsents({
+        date: selectedDate,
+        is_confirm: isConfirm
+      });
+      
+      // Invalidate and refetch the confirmation status
+      await queryClient.invalidateQueries(['confirmationStatus', selectedDate]);
+      
+      toast.success(isConfirm ? 'تم تأكيد غياب اليوم بنجاح' : 'تم إلغاء تأكيد غياب اليوم بنجاح');
+    } catch (error) {
+      console.error('Error confirming day absents:', error);
+      toast.error('فشل في تأكيد غياب اليوم');
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
   const generateWhatsAppMessage = (record) => {
     const schoolName = user?.school_name || 'المدرسة';
     const studentName = record.student_name || 'الطالب';
@@ -254,54 +292,65 @@ const DailyReport = () => {
     let attendanceStatus = '';
     
     if (haribTimes.length > 0) {
-      attendanceStatus += `🚫 هارب في الحصص: ${haribTimes.sort((a, b) => a - b).join(', ')}\n`;
+      attendanceStatus += ` هارب في الحصص: ${haribTimes.sort((a, b) => a - b).join(', ')}\n`;
     }
     
     if (lateTimes.length > 0) {
-      attendanceStatus += `⏰ متأخر في الحصص: ${lateTimes.sort((a, b) => a - b).join(', ')}\n`;
+      attendanceStatus += ` متأخر في الحصص: ${lateTimes.sort((a, b) => a - b).join(', ')}\n`;
     }
     
     if (ghaibTimes.length > 0) {
-      attendanceStatus += `📝 غائب  في الحصص: ${ghaibTimes.sort((a, b) => a - b).join(', ')}\n`;
+      attendanceStatus += ` غائب  في الحصص: ${ghaibTimes.sort((a, b) => a - b).join(', ')}\n`;
     }
     
     if (haribTimes.length === 0 && lateTimes.length === 0 && ghaibTimes.length === 0) {
-      attendanceStatus = '✅ حضر جميع الحصص';
+      attendanceStatus = ' حضر جميع الحصص';
     }
     
-    const excuseStatus = hasExcuse ? '✅ لديه عذر' : '❌ لا يوجد عذر';
+    const excuseStatus = hasExcuse ? ' لديه عذر' : ' لا يوجد عذر';
     
-    const message = `📚 *تقرير الحضور اليومي*
+    const message = ` *تقرير الحضور اليومي*
 
-🏫 *المدرسة:* ${schoolName}
-👤 *الطالب/ة:* ${studentName}
-📖 *الصف:* ${className}
-📅 *التاريخ:* ${date}
+ *المدرسة:* ${schoolName}
+ *الطالب/ة:* ${studentName}
+ *الصف:* ${className}
+ *التاريخ:* ${date}
 
-📊 *حالة الحضور:*
+ *حالة الحضور:*
 ${attendanceStatus}
 
-📋 *حالة العذر:* ${excuseStatus}
+ *حالة العذر:* ${excuseStatus}
 
----
-تم إرسال هذا التقرير من نظام إدارة الحضور`;
+--- تم إرسال هذا التقرير من نظام إدارة الحضور`;
 
-    return encodeURIComponent(message);
+    return message;
   };
 
   const handleWhatsAppClick = (record) => {
-    const message = generateWhatsAppMessage(record);
-    const phoneNumber = record.student_phone_number || '';
+    const mssg_Ar = generateWhatsAppMessage(record);
+    const phoneNumber = record.phone_number || '';
     
     if (phoneNumber) {
-      // If phone number is available, create WhatsApp link with phone number using new API format
+      // If phone number is available, create WhatsApp link with phone number using wa.me format
       const cleanPhoneNumber = phoneNumber.replace(/[^0-9]/g, '');
-      const whatsappUrl = `https://api.whatsapp.com/send/?phone=${cleanPhoneNumber}&text=${message}`;
-      window.open(whatsappUrl, '_blank');
+      
+      // Ensure phone number has country code if not present
+      let formattedPhone = cleanPhoneNumber;
+      if (!cleanPhoneNumber.startsWith('968') && cleanPhoneNumber.length === 8) {
+        formattedPhone = '+968' + cleanPhoneNumber;
+      }
+      console.log(phoneNumber );
+      console.log(formattedPhone);
+      
+      const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(mssg_Ar)}`;
+      console.log('WhatsApp URL:', url); // Debug log
+      console.log('Message:', mssg_Ar); // Debug log
+      window.open(url, "_blank");
     } else {
       // If no phone number, open WhatsApp Web with the message
-      const whatsappUrl = `https://web.whatsapp.com/send?text=${message}`;
-      window.open(whatsappUrl, '_blank');
+      const url = `https://web.whatsapp.com/send?text=${encodeURIComponent(mssg_Ar)}`;
+      console.log('WhatsApp Web URL:', url); // Debug log
+      window.open(url, "_blank");
     }
   };
 
@@ -555,15 +604,80 @@ ${attendanceStatus}
       {/* Date Selector */}
       <div className="card">
         <div className="card-body">
-          <div className="flex items-center space-x-4">
-            <Calendar className="h-5 w-5 text-gray-400" />
-            <label className="text-sm font-medium text-gray-700">تاريخ التقرير:</label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="input"
-            />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Calendar className="h-5 w-5 text-gray-400" />
+              <label className="text-sm font-medium text-gray-700">تاريخ التقرير:</label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="input"
+              />
+            </div>
+            
+            {/* Confirmation Status - Only for school_admin */}
+            {user?.role === 'school_admin' && (
+              <div className="flex items-center space-x-4">
+                {confirmationLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <LoadingSpinner size="sm" />
+                    <span className="text-sm text-gray-500">جاري تحميل حالة التأكيد...</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center space-x-2">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                        confirmationStatus?.is_confirm 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {confirmationStatus?.is_confirm ? '✅ تم التأكيد' : '⏳ في انتظار التأكيد'}
+                      </span>
+                   
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleConfirmDayAbsents(true)}
+                        disabled={isConfirming || confirmationStatus?.is_confirm}
+                        className={`btn btn-sm ${
+                          confirmationStatus?.is_confirm 
+                            ? 'btn-success opacity-50 cursor-not-allowed' 
+                            : 'btn-success'
+                        }`}
+                      >
+                        {isConfirming ? (
+                          <>
+                            <LoadingSpinner size="sm" />
+                            <span className="mr-1">جاري التأكيد...</span>
+                          </>
+                        ) : (
+                          'تأكيد الغياب'
+                        )}
+                      </button>
+                      
+                      {confirmationStatus?.is_confirm && (
+                        <button
+                          onClick={() => handleConfirmDayAbsents(false)}
+                          disabled={isConfirming}
+                          className="btn btn-sm btn-outline"
+                        >
+                          {isConfirming ? (
+                            <>
+                              <LoadingSpinner size="sm" />
+                              <span className="mr-1">جاري الإلغاء...</span>
+                            </>
+                          ) : (
+                            'إلغاء التأكيد'
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1000,14 +1114,15 @@ ${attendanceStatus}
           
           {/* Report Content */}
           <div ref={reportRef} className="bg-white p-8 print:p-4" dir="rtl" style={{ minHeight: '297mm' }}>
-            <ReportContent 
-              data={groupedData} 
-              filteredData={filteredData}
-              selectedDate={selectedDate}
-              schoolName={user?.school_name || 'المدرسة'}
-              filters={filters}
-              allClasses={allClasses}
-            />
+          <ReportContent 
+            data={groupedData} 
+            filteredData={filteredData}
+            selectedDate={selectedDate}
+            schoolName={user?.school_name || 'المدرسة'}
+            filters={filters}
+            allClasses={allClasses}
+            confirmationStatus={confirmationStatus}
+          />
           </div>
         </div>
       </Modal>
@@ -1016,7 +1131,7 @@ ${attendanceStatus}
 };
 
 // Report Content Component
-const ReportContent = ({ data, filteredData, selectedDate, schoolName, filters, allClasses }) => {
+const ReportContent = ({ data, filteredData, selectedDate, schoolName, filters, allClasses, confirmationStatus }) => {
   // Create filtered grouped data for PDF
   const filteredGroupedData = React.useMemo(() => {
     // Initialize with all classes
@@ -1091,6 +1206,23 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName, filters, 
         <p className="text-gray-600 text-lg">
           التاريخ: {new Date().toLocaleString('ar-OM')}  
         </p>
+        
+        {/* Confirmation Status */}
+        {confirmationStatus && (
+          <div className="mt-4 p-3 bg-gray-100 rounded-lg">
+            <div className="flex items-center justify-center space-x-4">
+              <span className="text-sm font-semibold text-gray-700">حالة تأكيد الغياب:</span>
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                confirmationStatus.is_confirm 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-yellow-100 text-yellow-800'
+              }`}>
+                {confirmationStatus.is_confirm ? '✅ تم التأكيد' : '⏳ في انتظار التأكيد'}
+              </span>
+             
+            </div>
+          </div>
+        )}
         
         {/* Filter Information */}
         {hasActiveFilters && (

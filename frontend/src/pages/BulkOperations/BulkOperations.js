@@ -7,7 +7,13 @@ import {
   FileText, 
   CheckCircle,
   AlertCircle,
-  X
+  X,
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  Maximize,
+  RotateCcw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { authAPI, classesAPI } from '../../services/api';
@@ -23,6 +29,9 @@ const BulkOperations = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState([]);
   const [processingStage, setProcessingStage] = useState('');
+  const [showVideoGuide, setShowVideoGuide] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [isVideoMuted, setIsVideoMuted] = useState(false);
 
   // Bulk register teachers mutation
   const bulkRegisterTeachersMutation = useMutation(
@@ -317,6 +326,50 @@ const BulkOperations = () => {
     { id: 'phones', name: 'تحديث أرقام الهواتف', icon: Upload },
   ];
 
+  // Video player functions
+  const handleVideoPlayPause = () => {
+    const video = document.getElementById('guide-video');
+    if (video) {
+      if (video.paused) {
+        video.play();
+        setIsVideoPlaying(true);
+      } else {
+        video.pause();
+        setIsVideoPlaying(false);
+      }
+    }
+  };
+
+  const handleVideoMute = () => {
+    const video = document.getElementById('guide-video');
+    if (video) {
+      video.muted = !video.muted;
+      setIsVideoMuted(video.muted);
+    }
+  };
+
+  const handleVideoRestart = () => {
+    const video = document.getElementById('guide-video');
+    if (video) {
+      video.currentTime = 0;
+      video.play();
+      setIsVideoPlaying(true);
+    }
+  };
+
+  const handleVideoFullscreen = () => {
+    const video = document.getElementById('guide-video');
+    if (video) {
+      if (video.requestFullscreen) {
+        video.requestFullscreen();
+      } else if (video.webkitRequestFullscreen) {
+        video.webkitRequestFullscreen();
+      } else if (video.msRequestFullscreen) {
+        video.msRequestFullscreen();
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -325,8 +378,101 @@ const BulkOperations = () => {
           <h1 className="text-2xl font-bold text-gray-900">رفع وتحديث البيانات</h1>
           <p className="text-gray-600">تسجيل وتحديث البيانات  </p>
         </div>
-      
+        <button
+          onClick={() => setShowVideoGuide(!showVideoGuide)}
+          className="btn btn-outline flex items-center space-x-2"
+        >
+          <Play className="h-4 w-4 ml-2" />
+          <span>{showVideoGuide ? 'إخفاء الدليل' : 'دليل الفيديو'}</span>
+        </button>
       </div>
+
+      {/* Video Guide Section */}
+      {showVideoGuide && (
+        <div className="card">
+          <div className="card-header">
+          
+            <button
+              onClick={() => setShowVideoGuide(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-5 w-5" />
+            </button>  
+            <h3 className="text-lg font-medium text-gray-900">دليل الفيديو - كيفية رفع بيانات الطلاب وارقام الهواتف</h3>
+          </div>
+          <div className="card-body">
+            <div className="space-y-4">
+              <div className="relative bg-black rounded-lg overflow-hidden">
+                <video
+                  id="guide-video"
+                  className="w-full h-auto max-h-96"
+                  controls
+                  preload="metadata"
+                  onPlay={() => setIsVideoPlaying(true)}
+                  onPause={() => setIsVideoPlaying(false)}
+                  onEnded={() => setIsVideoPlaying(false)}
+                >
+                  <source src="/1010.mp4" type="video/mp4" />
+                  متصفحك لا يدعم تشغيل الفيديو
+                </video>
+                
+                {/* Custom Video Controls Overlay */}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={handleVideoPlayPause}
+                        className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+                      >
+                        {isVideoPlaying ? (
+                          <Pause className="h-5 w-5 text-white" />
+                        ) : (
+                          <Play className="h-5 w-5 text-white" />
+                        )}
+                      </button>
+                      
+                      <button
+                        onClick={handleVideoRestart}
+                        className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+                      >
+                        <RotateCcw className="h-5 w-5 text-white" />
+                      </button>
+                      
+                      <button
+                        onClick={handleVideoMute}
+                        className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+                      >
+                        {isVideoMuted ? (
+                          <VolumeX className="h-5 w-5 text-white" />
+                        ) : (
+                          <Volume2 className="h-5 w-5 text-white" />
+                        )}
+                      </button>
+                    </div>
+                    
+                    <button
+                      onClick={handleVideoFullscreen}
+                      className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+                    >
+                      <Maximize className="h-5 w-5 text-white" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-blue-800 mb-2">نصائح مهمة:</h4>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>• شاهد الفيديو بالكامل لفهم العملية خطوة بخطوة</li>
+                  <li>• تأكد من تحضير ملف Excel بالشكل الصحيح قبل البدء</li>
+                  
+                  <li>• لا تغلق الصفحة أثناء معالجة البيانات</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
@@ -363,8 +509,19 @@ const BulkOperations = () => {
           className="btn btn-outline float-left"
           onClick={handleDownloadTemplate}
         >
-          <Download className="h-5 w-5 mr-2" />
-          تحميل نموذج
+          <Download className="h-5 w-5 mr-2 ml-2" />
+          تحميل نموذج {(() => {
+            switch (selectedTab) {
+              case 'teachers':
+                return 'المعلمين';
+              case 'assign':
+                return 'الطلبة';
+              case 'phones':
+                return 'الهواتف';
+              default:
+                return '';
+            }
+          })()}
         </button>
         </div>
         

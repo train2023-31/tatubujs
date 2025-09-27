@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     try {
-      setLoading(true);
+      // setLoading(true);
       console.log('Attempting login with credentials:', credentials);
       
       const response = await authAPI.login(credentials);
@@ -57,12 +57,12 @@ export const AuthProvider = ({ children }) => {
       setUser(userData);
       
       toast.success('تم تسجيل الدخول بنجاح');
-      return { success: true };
+      return { success: true, user: userData };
     } catch (error) {
       console.error('Login error:', error);
       console.error('Error response:', error.response);
       const message = error.response?.data?.message || error.message || 'فشل في تسجيل الدخول';
-      toast.error(message);
+      // Don't show toast here, let the component handle the error message
       return { success: false, error: message };
     } finally {
       setLoading(false);

@@ -2,13 +2,13 @@
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app.models import Teacher, Class, Attendance, Student,User,Subject
+from app.models import Teacher, Class, Attendance, Student,User,Subject,ConformAtt
 from datetime import datetime , date ,timedelta
 from app import db
 from collections import defaultdict
 from app.logger import log_action
 from app.config import get_oman_time
-from sqlalchemy import func, or_, case, and_
+from sqlalchemy import func , or_ ,case, and_
 
 
 
@@ -278,7 +278,6 @@ def get_attendance_summary_all_classes():
         class_map = {class_data[0]: {'name': class_data[1], 'teacher_name': class_data[2]} for class_data in classes_data}
 
         # Get all attendance data for all classes in one optimized query
-        # Count unique students for each status to avoid counting multiple records per student
         attendance_stats = db.session.query(
             Attendance.class_id,
             func.count(func.distinct(Attendance.student_id)).label('total_students'),
@@ -337,21 +336,21 @@ def get_attendance_summary_all_classes():
 
         # Create lookup dictionaries
         stats_dict = {stat.class_id: stat for stat in attendance_stats}
-        
+
         # Group class_time_nums by class_id
         time_nums_dict = {}
         for data in class_time_nums_data:
             if data.class_id not in time_nums_dict:
                 time_nums_dict[data.class_id] = []
             time_nums_dict[data.class_id].append(data.class_time_num)
-        
+
         absent_students_dict = {}
 
         # Group absent students by class
         for record in absent_students_data:
             if record.class_id not in absent_students_dict:
                 absent_students_dict[record.class_id] = []
-            
+
             absent_students_dict[record.class_id].append({
                 "student_id": record.student_id,
                 "student_name": record.student_name,
@@ -507,7 +506,7 @@ def get_attendance_details_by_student():
 
     # OPTIMIZATION 3: Build response efficiently
     response = []
-    
+
     # Add classes with absent/late/excused students
     for class_name, students in class_data.items():
         for student_id, data in students.items():
@@ -525,7 +524,7 @@ def get_attendance_details_by_student():
                     "excused_times": data["excused_times"],
                     "is_has_exuse": data["is_has_exuse"]
                 })
-    
+
     # Add classes with no absences/late/excused but have attendance records
     for class_id, class_name in class_ids:
         if class_id in classes_with_attendance and class_name not in class_data:
@@ -542,7 +541,7 @@ def get_attendance_details_by_student():
                 "is_has_exuse": False,
                 "status": "no absent today"
             })
-    
+
     # Add classes with no attendance records at all
     for class_id, class_name in class_ids:
         if class_id not in classes_with_attendance:
@@ -951,3 +950,169 @@ def update_excuse():
 
     return jsonify(message=f"{updated} attendance record(s) updated."), 200
 
+
+
+@attendance_blueprint.route('/confirm-day-absents', methods=['POST'])
+@jwt_required()
+@log_action("تأكيد", description="تأكيد غياب اليوم")
+def confirm_day_absents():
+    """
+    Confirm day absents for school admin.
+    """
+    # Get authenticated user
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    # Ensure only school_admin can confirm
+    if user.user_role != 'school_admin':
+        return jsonify({
+            "message": {
+                "en": "Unauthorized access. Only school admin can confirm day absents.",
+                "ar": "ليس لديك صلاحية الوصول. فقط مدير المدرسة يمكنه تأكيد غياب اليوم."
+            },
+            "flag": 1
+        }), 403
+
+    # Parse request data
+    data = request.get_json()
+    date_str = data.get('date')
+    is_confirm = data.get('is_confirm', True)
+
+    if not date_str:
+        return jsonify({
+            "message": {
+                "en": "Date is required.",
+                "ar": "التاريخ مطلوب."
+            },
+            "flag": 2
+        }), 400
+
+    try:
+        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({
+            "message": {
+                "en": "Invalid date format. Use YYYY-MM-DD.",
+                "ar": "تنسيق التاريخ غير صحيح. استخدم YYYY-MM-DD."
+            },
+            "flag": 3
+        }), 400
+
+    # Check if confirmation already exists
+    existing_confirmation = ConformAtt.query.filter_by(
+        school_id=user.school_id,
+        date=selected_date
+    ).first()
+
+    if existing_confirmation:
+        # Update existing confirmation
+        existing_confirmation.is_confirm = is_confirm
+        existing_confirmation.updated_at = get_oman_time().utcnow()
+        db.session.commit()
+
+        return jsonify({
+            "message": {
+                "en": f"Day absents confirmation updated successfully.",
+                "ar": f"تم تحديث تأكيد غياب اليوم بنجاح."
+            },
+            "confirmation": existing_confirmation.to_dict(),
+            "flag": 4
+        }), 200
+    else:
+        # Create new confirmation
+        new_confirmation = ConformAtt(
+            school_id=user.school_id,
+            date=selected_date,
+            is_confirm=is_confirm
+        )
+        db.session.add(new_confirmation)
+        db.session.commit()
+
+        return jsonify({
+            "message": {
+                "en": f"Day absents confirmation created successfully.",
+                "ar": f"تم إنشاء تأكيد غياب اليوم بنجاح."
+            },
+            "confirmation": new_confirmation.to_dict(),
+            "flag": 5
+        }), 201
+
+
+@attendance_blueprint.route('/get-confirmation-status', methods=['GET'])
+@jwt_required()
+def get_confirmation_status():
+    """
+    Get confirmation status for a specific date.
+    """
+    # Get authenticated user
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    # Ensure only authorized roles can access
+    if user.user_role not in ['admin', 'school_admin', 'teacher']:
+        return jsonify({
+            "message": {
+                "en": "Unauthorized access.",
+                "ar": "ليس لديك صلاحية الوصول."
+            },
+            "flag": 1
+        }), 403
+
+    # Parse date parameter
+    date_str = request.args.get('date')
+    if not date_str:
+        return jsonify({
+            "message": {
+                "en": "Date parameter is required.",
+                "ar": "معامل التاريخ مطلوب."
+            },
+            "flag": 2
+        }), 400
+
+    try:
+        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({
+            "message": {
+                "en": "Invalid date format. Use YYYY-MM-DD.",
+                "ar": "تنسيق التاريخ غير صحيح. استخدم YYYY-MM-DD."
+            },
+            "flag": 3
+        }), 400
+
+    # Get school_id based on user role
+    school_id = user.school_id if user.user_role != 'admin' else request.args.get('school_id')
+
+    if not school_id:
+        return jsonify({
+            "message": {
+                "en": "School ID is required for admins.",
+                "ar": "معرف المدرسة مطلوب للمسؤولين."
+            },
+            "flag": 4
+        }), 400
+
+    # Query confirmation status
+    confirmation = ConformAtt.query.filter_by(
+        school_id=school_id,
+        date=selected_date
+    ).first()
+
+    if confirmation:
+        return jsonify({
+            "date": selected_date.strftime('%Y-%m-%d'),
+            "school_id": school_id,
+            "is_confirm": confirmation.is_confirm,
+            "created_at": confirmation.created_at.isoformat() if confirmation.created_at else None,
+            "updated_at": confirmation.updated_at.isoformat() if confirmation.updated_at else None,
+            "flag": 5
+        }), 200
+    else:
+        return jsonify({
+            "date": selected_date.strftime('%Y-%m-%d'),
+            "school_id": school_id,
+            "is_confirm": False,
+            "created_at": None,
+            "updated_at": None,
+            "flag": 6
+        }), 200

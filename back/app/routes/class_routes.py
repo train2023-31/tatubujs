@@ -22,7 +22,8 @@ def create_school():
         name=data['name'],
         address=data['address'],
         phone_number=data.get('phone_number', ''),
-        password=data['password'])
+        password=data['password'],
+        is_active=data.get('is_active', True))
     db.session.add(new_school)
     db.session.commit()
     return jsonify(message="School added"), 201

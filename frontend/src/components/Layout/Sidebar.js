@@ -29,7 +29,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       items: [
         {
           name: 'لوحة التحكم',
-          href: '/dashboard',
+          href: '/app/dashboard',
           icon: Home,
           roles: ['admin', 'school_admin', 'teacher'],
         },
@@ -40,19 +40,19 @@ const Sidebar = ({ isOpen, onClose }) => {
       items: [
         {
           name: 'إدارة المدارس',
-          href: '/schools',
+          href: '/app/schools',
           icon: Building,
           roles: ['admin'],
         },
         {
           name: 'إدارة المستخدمين',
-          href: '/users',
+          href: '/app/users',
           icon: Users,
           roles: ['admin', 'school_admin'],
         },
         {
           name: 'إدارة الفصول والمواد',
-          href: '/classes',
+          href: '/app/classes',
           icon: BookOpen,
           roles: ['school_admin'],
         },
@@ -63,19 +63,19 @@ const Sidebar = ({ isOpen, onClose }) => {
       items: [
         {
           name: 'تسجيل الحضور',
-          href: '/attendance',
+          href: '/app/attendance',
           icon: ClipboardList,
           roles: ['teacher', 'school_admin'],
         },
         {
           name: 'تقارير الحضور',
-          href: '/attendance-details',
+          href: '/app/attendance-details',
           icon: Eye,
           roles: ['teacher', 'school_admin'],
         },
         {
           name: 'التقرير اليومي',
-          href: '/daily-report',
+          href: '/app/daily-report',
           icon: FileText,
           roles: [ 'school_admin'],
         },
@@ -86,7 +86,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       items: [
         {
           name: 'التقارير والإحصائيات',
-          href: '/reports',
+          href: '/app/reports',
           icon: BarChart3,
           roles: ['admin', 'school_admin'],
         },
@@ -98,31 +98,31 @@ const Sidebar = ({ isOpen, onClose }) => {
       items: [
         {
           name: 'إدارة الأخبار',
-          href: '/news',
+          href: '/app/news',
           icon: Newspaper,
           roles: ['admin', 'school_admin'],
         },
-        {
-          name: 'الرسائل النصية',
-          href: '/sms',
-          icon: MessageSquare,
-          roles: ['school_admin'],
-        },
+        // {
+        //   name: 'الرسائل النصية',
+        //   href: '/app/sms',
+        //   icon: MessageSquare,
+        //   roles: ['school_admin'],
+        // },
         {
           name: 'رفع وتحديث البيانات',
-          href: '/bulk-operations',
+          href: '/app/bulk-operations',
           icon: Upload,
           roles: ['school_admin'],
         },
         {
           name: 'حذف بيانات المدرسة',
-          href: '/delete-school-data',
+          href: '/app/delete-school-data',
           icon: Trash2,
           roles: ['school_admin'],
         },
         {
           name: 'سجلات النظام',
-          href: '/view-logs',
+          href: '/app/view-logs',
           icon: FileText,
           roles: ['admin', 'school_admin'],
         },
@@ -133,7 +133,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       items: [
         {
           name: 'الملف الشخصي',
-          href: '/profile',
+          href: '/app/profile',
           icon: User,
           roles: ['admin', 'school_admin', 'teacher'],
         },

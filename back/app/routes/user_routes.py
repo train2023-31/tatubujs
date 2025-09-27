@@ -2,7 +2,7 @@
 
 from flask import Blueprint, jsonify ,request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app.models import User, Student, Teacher, School,Class, Subject
+from app.models import User, Student, Teacher, School, Class, Subject, student_classes
 from app import db
 from werkzeug.security import generate_password_hash
 from io import StringIO
@@ -90,33 +90,36 @@ def get_Students_of_my_school():
     if not user:
         return jsonify(message="User not found."), 404
 
-    # Check user role
+    # Check user role and get school_id
     if user.user_role == 'teacher' or user.user_role == 'school_admin':
-        # Retrieve the Teacher instance to get school_id
-        teacher = Teacher.query.get(user_id)
-        if not teacher or not user.school_id:
-            return jsonify(message="Teacher is not associated with a school."), 400
+        if not user.school_id:
+            return jsonify(message="User is not associated with a school."), 400
         school_id = user.school_id
 
-        # Fetch all students and teachers in the school
-        students = Student.query.filter_by(school_id=school_id).order_by(Student.fullName.asc()).all()
+        # Optimized query with eager loading of classes
+        students = db.session.query(Student, Class.name.label('class_name')).outerjoin(
+            student_classes, Student.id == student_classes.c.student_id
+        ).outerjoin(
+            Class, student_classes.c.class_id == Class.id
+        ).filter(
+            Student.school_id == school_id
+        ).order_by(Student.fullName.asc()).all()
 
     elif user.user_role == 'admin':
-        # Admin can fetch all users from all schools
-        students = Student.query.order_by(Student.fullName.asc()).all()
+        # Admin can fetch all users from all schools with optimized query
+        students = db.session.query(Student, Class.name.label('class_name')).outerjoin(
+            student_classes, Student.id == student_classes.c.student_id
+        ).outerjoin(
+            Class, student_classes.c.class_id == Class.id
+        ).order_by(Student.fullName.asc()).all()
 
     else:
         # Users with insufficient permissions
         return jsonify(message="Access forbidden: insufficient permissions."), 403
 
-    # Serialize the data
+    # Serialize the data - no more N+1 queries
     user_list = []
-    for student in students:
-        # Get the first class name for the student (assuming students are in one class)
-        class_name = None
-        if student.classes:
-            class_name = student.classes[0].name
-        
+    for student, class_name in students:
         user_list.append({
             "id": student.id,
             "fullName": student.fullName,
@@ -126,7 +129,7 @@ def get_Students_of_my_school():
             "behavior_note": student.behavior_note
         })
     
-    return jsonify(user_list ), 200
+    return jsonify(user_list), 200
 
 
 @user_blueprint.route('/update-student-behavior-note/<int:student_id>', methods=['PUT'])

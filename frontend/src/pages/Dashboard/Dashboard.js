@@ -39,11 +39,11 @@ const Dashboard = () => {
 
   // Navigation handlers
   const handleNavigateToAttendance = () => {
-    navigate('/attendance');
+    navigate('/app/attendance');
   };
 
   const handleNavigateToAttendancesDetails = () => {
-    navigate('/attendance-details');
+    navigate('/app/attendance-details');
   };
 
   // Check if school needs setup using bulk operations status
@@ -369,7 +369,7 @@ const AdminDashboard = ({ schoolStats, loading }) => {
       {/* News Widget */}
       <NewsWidget 
         limit={3} 
-        onViewAll={() => navigate('/news')}
+        onViewAll={() => navigate('/app/news')}
       />
 
       {/* Recent Activity */}
@@ -479,7 +479,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                 </p>
                 {!bulkOpsStatus?.step_status?.step1_teachers?.completed && (
                   <button 
-                    onClick={() => navigate('/bulk-operations')}
+                    onClick={() => navigate('/app/bulk-operations')}
                     className="btn btn-sm btn-primary w-full"
                   >
                     <UserCheck className="h-4 w-4 mr-1 ml-1" />
@@ -514,7 +514,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                 </p>
                 {!bulkOpsStatus?.step_status?.step2_students_classes?.completed && (
                   <button 
-                    onClick={() => navigate('/bulk-operations')}
+                    onClick={() => navigate('/app/bulk-operations')}
                     className="btn btn-sm btn-primary w-full"
                   >
                     <Users className="h-4 w-4 mr-1 ml-1" />
@@ -549,7 +549,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                 </p>
                 {!bulkOpsStatus?.step_status?.step3_phone_numbers?.completed && (
                   <button 
-                    onClick={() => navigate('/bulk-operations')}
+                    onClick={() => navigate('/app/bulk-operations')}
                     className="btn btn-sm btn-primary w-full"
                   >
                     <Phone className="h-4 w-4 mr-1 ml-1" />
@@ -584,7 +584,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                 </p>
                 {!bulkOpsStatus?.step_status?.step4_subjects?.completed && (
                   <button 
-                    onClick={() => navigate('/classes')}
+                    onClick={() => navigate('/app/classes')}
                     className="btn btn-sm btn-primary w-full"
                   >
                     <BookOpen className="h-4 w-4 mr-1 ml-1" />
@@ -655,7 +655,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
       {/* News Widget */}
       <NewsWidget 
         limit={3} 
-        onViewAll={() => navigate('/news')}
+        onViewAll={() => navigate('/app/news')}
       />
 
       {/* Date Selector */}
@@ -981,7 +981,7 @@ const TeacherDashboard = ({ teacherAttendance, loading, selectedDate, setSelecte
       {/* News Widget */}
       <NewsWidget 
         limit={3} 
-        onViewAll={() => navigate('/news')}
+        onViewAll={() => navigate('/app/news')}
       />
 
       {/* Date Selector */}

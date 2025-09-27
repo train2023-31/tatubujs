@@ -7,6 +7,7 @@ import { getRoleDisplayName, getRoleColor, formatPhoneNumber } from '../../utils
 import DataTable from '../../components/UI/DataTable';
 import Modal from '../../components/UI/Modal';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
+import SearchableSelect from '../../components/UI/SearchableSelect';
 import toast from 'react-hot-toast';
 
 const Users = () => {
@@ -437,23 +438,21 @@ const AddUserForm = ({ onClose, onSuccess }) => {
           </select>
         </div>
         {user?.role === 'admin' && (
-          <div>
-            <label className="label">المدرسة</label>
-            <select
-              name="school_id"
-              value={formData.school_id}
-              onChange={handleChange}
-              className="input"
-              required
-            >
-              <option value="">اختر المدرسة</option>
-              {schools?.map((school) => (
-                <option key={school.id} value={school.id}>
-                  {school.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SearchableSelect
+            name="school_id"
+            value={formData.school_id}
+            onChange={handleChange}
+            options={schools?.map(school => ({
+              value: school.id,
+              label: school.name
+            })) || []}
+            placeholder="اختر المدرسة"
+            searchPlaceholder="البحث في المدارس..."
+            emptyMessage="لا توجد مدارس"
+            noResultsMessage="لا توجد مدارس تطابق البحث"
+            required
+            label="المدرسة"
+          />
         )}
         <div>
           <label className="label">كلمة المرور</label>
@@ -523,6 +522,7 @@ const AddUserForm = ({ onClose, onSuccess }) => {
 
 // Edit User Form Component
 const EditUserForm = ({ user, onClose, onSuccess }) => {
+  const { user: currentUser } = useAuth();
   const [formData, setFormData] = useState({
     username: user.username || '',
     email: user.email || '',
@@ -533,6 +533,13 @@ const EditUserForm = ({ user, onClose, onSuccess }) => {
     is_active: user.is_active !== undefined ? user.is_active : true,
     password: '', // Password field for updates
   });
+
+  // Fetch schools data for admin users
+  const { data: schools } = useQuery(
+    'schools',
+    classesAPI.getAllSchools,
+    { enabled: !!currentUser && currentUser.role === 'admin' }
+  );
 
   const editUserMutation = useMutation(
     (userData) => authAPI.updateUser(user.id, userData),
@@ -631,6 +638,23 @@ const EditUserForm = ({ user, onClose, onSuccess }) => {
             <option value="student">طالب</option>
           </select>
         </div>
+        {currentUser?.role === 'admin' && (
+          <SearchableSelect
+            name="school_id"
+            className="h-full"
+            value={formData.school_id}
+            onChange={handleChange}
+            options={schools?.map(school => ({
+              value: school.id,
+              label: school.name
+            })) || []}
+            placeholder="اختر المدرسة"
+            searchPlaceholder="البحث في المدارس..."
+            emptyMessage="لا توجد مدارس"
+            noResultsMessage="لا توجد مدارس تطابق البحث"
+            label="المدرسة"
+          />
+        )}
         <div>
           <label className="label">كلمة المرور الجديدة (اختياري)</label>
           <input

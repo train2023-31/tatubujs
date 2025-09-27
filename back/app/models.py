@@ -243,6 +243,30 @@ class News(db.Model):
     
 
 
+class ConformAtt(db.Model):
+    __tablename__ = 'conform_att'
+
+    id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    is_confirm = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
+    updated_at = db.Column(db.DateTime, default=get_oman_time().utcnow, onupdate=get_oman_time().utcnow)
+
+    # Relationships
+    school = db.relationship('School', backref='confirmations')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'school_id': self.school_id,
+            'date': self.date.isoformat(),
+            'is_confirm': self.is_confirm,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
 class ActionLog(db.Model):
     __tablename__ = 'action_logs'
 

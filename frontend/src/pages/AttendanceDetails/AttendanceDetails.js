@@ -81,18 +81,26 @@ const AttendanceDetails = () => {
   const handleStudentSelect = (student) => {
     setSelectedStudent(student);
     setStudentId(student.id.toString());
-    setStudentSearch(`${student.fullName}${student.phone_number ? ` - ${student.phone_number}` : ''}`);
+    setStudentSearch(`${student.fullName}${student.phone_number ? `` : ''}`);
     setShowStudentDropdown(false);
   };
 
-  // Handle opening behavior note modal
+  // Handle opening behavior note modal (only for school admins)
   const handleOpenBehaviorNoteModal = () => {
+    if (user?.role !== 'school_admin') {
+      toast.error('غير مصرح لك بتعديل ملاحظات السلوك');
+      return;
+    }
     setBehaviorNote(selectedStudent?.behavior_note || '');
     setIsBehaviorNoteModalOpen(true);
   };
 
-  // Handle updating behavior note
+  // Handle updating behavior note (only for school admins)
   const handleUpdateBehaviorNote = () => {
+    if (user?.role !== 'school_admin') {
+      toast.error('غير مصرح لك بتعديل ملاحظات السلوك');
+      return;
+    }
     if (selectedStudent) {
       updateBehaviorNoteMutation.mutate({
         studentId: selectedStudent.id,
@@ -141,7 +149,7 @@ const AttendanceDetails = () => {
 
   const queryClient = useQueryClient();
 
-  // Update behavior note mutation
+  // Update behavior note mutation (only for school admins)
   const updateBehaviorNoteMutation = useMutation(
     (data) => usersAPI.updateStudentBehaviorNote(data.studentId, data.behaviorNote),
     {
@@ -157,11 +165,19 @@ const AttendanceDetails = () => {
     }
   );
 
+  // Redirect non-admin users away from log tab
+  useEffect(() => {
+    if (selectedTab === 'log' && user?.role !== 'school_admin') {
+      setSelectedTab('summary');
+    }
+  }, [selectedTab, user?.role]);
+
   const tabs = [
     { id: 'summary', name: 'ملخص الحضور', icon: Users },
     { id: 'details', name: 'تفاصيل الطلاب', icon: Eye },
     { id: 'excused', name: 'الطلاب المعذورين', icon: AlertCircle },
-    { id: 'log', name: 'سجل ملاحظات الطالب', icon: Calendar },
+    // Only show behavior notes log for school admins
+    ...(user?.role === 'school_admin' ? [{ id: 'log', name: 'سجل ملاحظات الطالب', icon: Calendar }] : []),
   ];
 
   // PDF Export Function
@@ -815,13 +831,15 @@ const AttendanceDetails = () => {
               <div className="md:col-span-3">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-gray-500">ملاحظة السلوك</label>
-                  <button
-                    onClick={handleOpenBehaviorNoteModal}
-                    className="text-primary-600 hover:text-primary-900 flex items-center text-sm"
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    تعديل
-                  </button>
+                  {user?.role === 'school_admin' && (
+                    <button
+                      onClick={handleOpenBehaviorNoteModal}
+                      className="text-primary-600 hover:text-primary-900 flex items-center text-sm"
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      تعديل
+                    </button>
+                  )}
                 </div>
                 <p className="text-sm text-gray-900 mt-1 p-3 bg-gray-50 rounded-lg border">
                   {selectedStudent.behavior_note || 'لا توجد ملاحظات'}

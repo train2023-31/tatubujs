@@ -1292,10 +1292,24 @@ def view_logs():
     if not user:
         return jsonify(message="Unauthorized"), 403
 
-    # 🔍 Calculate the date 2 months ago from today
-    two_months_ago = get_oman_time() - timedelta(days=30)
+    # Get pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    
+    # Limit per_page to prevent excessive data loading
+    per_page = min(per_page, 100)
+    
+    # Get date filter parameter (optional)
+    days_back = request.args.get('days', 30, type=int)
+    days_back = min(days_back, 90)  # Limit to 90 days max
+    
+    # 🔍 Calculate the date filter
+    date_filter = get_oman_time() - timedelta(days=days_back)
 
-    query = db.session.query(ActionLog).join(User, ActionLog.user_id == User.id)
+    # Build optimized query with proper joins and eager loading
+    query = db.session.query(ActionLog, User.fullName, User.user_role).join(
+        User, ActionLog.user_id == User.id
+    )
 
     if user.user_role == 'school_admin':
         query = query.filter(User.school_id == user.school_id)
@@ -1304,10 +1318,18 @@ def view_logs():
     else:
         return jsonify(message="Access denied"), 403
 
-    # ⏳ Filter logs from the last 2 months
-    query = query.filter(ActionLog.timestamp >= two_months_ago)
+    # ⏳ Filter logs from the specified date range
+    query = query.filter(ActionLog.timestamp >= date_filter)
 
-    logs = query.order_by(ActionLog.timestamp.desc()).all()
+    # Get total count for pagination info
+    total_count = query.count()
+    
+    # Apply pagination and ordering
+    logs_data = query.order_by(ActionLog.timestamp.desc()).paginate(
+        page=page, 
+        per_page=per_page, 
+        error_out=False
+    )
 
     role_map = {
         "teacher": "tch",
@@ -1315,12 +1337,13 @@ def view_logs():
         "school_admin": "Asch"
     }
 
-    return jsonify([
+    # Build response with pagination info
+    response_data = [
         {
             "id": log.id,
             "user_id": log.user_id,
-            "user_name": user_obj.fullName if (user_obj := User.query.get(log.user_id)) else None,
-            "role": role_map.get(user_obj.user_role) if user_obj else None,
+            "user_name": user_fullName,
+            "role": role_map.get(user_role),
             "endpoint": log.endpoint,
             "method": log.method,
             "ip_address": log.ip_address,
@@ -1331,5 +1354,17 @@ def view_logs():
             "timestamp": log.timestamp.strftime('%d-%m-%Y %I:%M %p'),
             "status_code": log.status_code
         }
-        for log in logs
-    ]), 200
+        for log, user_fullName, user_role in logs_data.items
+    ]
+
+    return jsonify({
+        "logs": response_data,
+        "pagination": {
+            "page": page,
+            "per_page": per_page,
+            "total": total_count,
+            "pages": logs_data.pages,
+            "has_next": logs_data.has_next,
+            "has_prev": logs_data.has_prev
+        }
+    }), 200

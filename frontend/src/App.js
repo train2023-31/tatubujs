@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import Layout from './components/Layout/Layout';
+import Home from './pages/Home/Home';
 import Login from './pages/Auth/Login';
 import Dashboard from './pages/Dashboard/Dashboard';
 import Users from './pages/Users/Users';
@@ -49,7 +50,7 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/app/dashboard" replace />;
   }
 
   return children;
@@ -68,7 +69,7 @@ const PublicRoute = ({ children }) => {
   }
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/app/dashboard" replace />;
   }
 
   return children;
@@ -107,6 +108,7 @@ function App() {
             
             <Routes>
               {/* Public Routes */}
+              <Route path="/" element={<Home />} />
               <Route 
                 path="/login" 
                 element={
@@ -118,14 +120,14 @@ function App() {
 
               {/* Protected Routes */}
               <Route 
-                path="/" 
+                path="/app" 
                 element={
                   <ProtectedRoute>
                     <Layout />
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route index element={<Navigate to="/app/dashboard" replace />} />
                 <Route path="dashboard" element={<Dashboard />} />
                 
                 {/* User Management - Admin and School Admin only */}
@@ -250,7 +252,7 @@ function App() {
               </Route>
 
               {/* Catch all route */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
         </Router>

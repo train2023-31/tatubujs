@@ -51,7 +51,10 @@ export const authAPI = {
   getUserById: (userId) => api.get(`/auth/getUser/${userId}`).then(res => res.data),
   deleteSchoolData: (options) => api.delete('/auth/delete_school_data', { data: { delete_options: options } }),
   toggleSchoolStatus: (schoolId) => api.put(`/auth/toggle_school_status/${schoolId}`),
-  viewLogs: () => api.get('/auth/view_logs').then(res => res.data),
+  viewLogs: (page = 1, per_page = 50, days = 30) => 
+    api.get('/auth/view_logs', { 
+      params: { page, per_page, days } 
+    }).then(res => res.data),
 };
 
 // Users API
@@ -94,6 +97,8 @@ export const attendanceAPI = {
   updateExcuseNote: (data) => api.put('/attendance/update_excuse_note', data),
   getStudentAttendanceLog: (params) => api.get('/attendance/student_attendance_log', { params }).then(res => res.data),
   updateExcuseForStudent: (data) => api.post('/attendance/update-excuse-for-student', data),
+  confirmDayAbsents: (data) => api.post('/attendance/confirm-day-absents', data),
+  getConfirmationStatus: (params) => api.get('/attendance/get-confirmation-status', { params }).then(res => res.data),
 };
 
 // Static/Reports API

@@ -82,15 +82,23 @@ const ViewLogs = () => {
     return Monitor;
   };
 
-  // Fetch logs data
-  const { data: logs, isLoading, error } = useQuery(
-    'viewLogs',
-    authAPI.viewLogs,
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [daysFilter, setDaysFilter] = useState(30);
+
+  // Fetch logs data with pagination
+  const { data: logsResponse, isLoading, error } = useQuery(
+    ['viewLogs', currentPage, pageSize, daysFilter],
+    () => authAPI.viewLogs(currentPage, pageSize, daysFilter),
     {
       enabled: !!user && (user.role === 'school_admin' || user.role === 'admin'),
       refetchInterval: 30000, // Refetch every 30 seconds
     }
   );
+
+  const logs = logsResponse?.logs || [];
+  const pagination = logsResponse?.pagination || {};
 
   // Filter logs based on search and filters
   const filteredLogs = logs?.filter(log => {
@@ -490,6 +498,21 @@ const ViewLogs = () => {
             ))}
           </select>
 
+          {/* Days Filter */}
+          <select
+            value={daysFilter}
+            onChange={(e) => {
+              setDaysFilter(parseInt(e.target.value));
+              setCurrentPage(1); // Reset to first page when changing date filter
+            }}
+            className="input"
+          >
+            <option value={7}>آخر 7 أيام</option>
+            <option value={30}>آخر 30 يوم</option>
+            <option value={60}>آخر 60 يوم</option>
+            <option value={90}>آخر 90 يوم</option>
+          </select>
+
           {/* Clear Filters */}
           <button
             onClick={() => {
@@ -514,7 +537,7 @@ const ViewLogs = () => {
             </div>
             <div className="mr-3">
               <p className="text-sm font-medium text-gray-500">إجمالي السجلات</p>
-              <p className="text-2xl font-bold text-gray-900">{logs?.length || 0}</p>
+              <p className="text-2xl font-bold text-gray-900">{pagination.total || 0}</p>
             </div>
           </div>
         </div>
@@ -574,14 +597,82 @@ const ViewLogs = () => {
               <span className="mr-3 text-gray-500">جاري تحميل السجلات...</span>
             </div>
           ) : (
-            <DataTable
-              data={filteredLogs}
-              columns={columns}
-              searchable={false}
-              sortable={true}
-              pagination={true}
-              pageSize={20}
-            />
+            <>
+              <DataTable
+                data={filteredLogs}
+                columns={columns}
+                searchable={false}
+                sortable={true}
+                pagination={false}
+                pageSize={20}
+              />
+              
+              {/* Custom Pagination Controls */}
+              {pagination.pages > 1 && (
+                <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-700">
+                      عرض {((currentPage - 1) * pageSize) + 1} إلى {Math.min(currentPage * pageSize, pagination.total)} من {pagination.total} سجل
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    {/* Page Size Selector */}
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPageSize(parseInt(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="input text-sm"
+                    >
+                      <option value={25}>25 لكل صفحة</option>
+                      <option value={50}>50 لكل صفحة</option>
+                      <option value={100}>100 لكل صفحة</option>
+                    </select>
+                    
+                    {/* Pagination Buttons */}
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                        className="btn btn-sm btn-outline disabled:opacity-50"
+                      >
+                        الأولى
+                      </button>
+                      
+                      <button
+                        onClick={() => setCurrentPage(currentPage - 1)}
+                        disabled={!pagination.has_prev}
+                        className="btn btn-sm btn-outline disabled:opacity-50"
+                      >
+                        السابقة
+                      </button>
+                      
+                      <span className="px-3 py-1 text-sm text-gray-700">
+                        صفحة {currentPage} من {pagination.pages}
+                      </span>
+                      
+                      <button
+                        onClick={() => setCurrentPage(currentPage + 1)}
+                        disabled={!pagination.has_next}
+                        className="btn btn-sm btn-outline disabled:opacity-50"
+                      >
+                        التالية
+                      </button>
+                      
+                      <button
+                        onClick={() => setCurrentPage(pagination.pages)}
+                        disabled={currentPage === pagination.pages}
+                        className="btn btn-sm btn-outline disabled:opacity-50"
+                      >
+                        الأخيرة
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

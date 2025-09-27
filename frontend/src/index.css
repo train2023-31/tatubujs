@@ -4,7 +4,7 @@
 
 @layer base {
   html {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'PT Sans', 'Cairo', system-ui, sans-serif;
     direction: rtl;
   }
   
@@ -12,6 +12,7 @@
     @apply bg-gray-50 text-gray-900;
     direction: rtl;
     text-align: right;
+    font-family: 'Cairo', 'PT Sans', system-ui, sans-serif;
   }
 }
 
@@ -142,9 +143,29 @@
   }
   
   .arabic-text {
-    font-family: 'Cairo', Arial, sans-serif;
+    font-family: 'Cairo', 'PT Sans', Arial, sans-serif;
     direction: rtl;
     text-align: right;
+  }
+  
+  .arabic-heading {
+    font-family: 'Cairo', 'PT Sans', Arial, sans-serif;
+    font-weight: 700;
+    direction: rtl;
+    text-align: right;
+  }
+  
+  .arabic-body {
+    font-family: 'Cairo', 'PT Sans', Arial, sans-serif;
+    font-weight: 400;
+    direction: rtl;
+    text-align: right;
+  }
+  
+  .english-text {
+    font-family: 'PT Sans', 'Space Grotesk', system-ui, sans-serif;
+    direction: ltr;
+    text-align: left;
   }
 }
 
