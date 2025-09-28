@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import { 
   Home, 
   Users, 
@@ -164,7 +164,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       `} dir="rtl">
         <div className="flex items-center justify-between h-12 sm:h-16 px-4 sm:px-6 border-b border-gray-200">
           {/* Logo and System Name */}
-          <div className="flex items-center">
+          <Link to="/app/home" className="flex items-center hover:opacity-80 transition-opacity duration-200">
             <img 
               src="/logo.png" 
               alt="تتبع" 
@@ -174,7 +174,7 @@ const Sidebar = ({ isOpen, onClose }) => {
               <h2 className="text-sm sm:text-base zain-font">تتبع</h2>
               <p className="text-xs text-gray-500">نظام إدارة الحضور والغياب</p>
             </div>
-          </div>
+          </Link>
           
           <button
             onClick={onClose}

@@ -37,7 +37,13 @@ export const AuthProvider = ({ children }) => {
       // setLoading(true);
       console.log('Attempting login with credentials:', credentials);
       
-      const response = await authAPI.login(credentials);
+      // Convert username to lowercase for case-insensitive login
+      const normalizedCredentials = {
+        ...credentials,
+        username: credentials.username.toLowerCase()
+      };
+      
+      const response = await authAPI.login(normalizedCredentials);
       console.log('Login response:', response);
       
       const access_token = response.data.access_token;

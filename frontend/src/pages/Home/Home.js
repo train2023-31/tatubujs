@@ -55,6 +55,35 @@ const Home = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+
+  // System preview images data
+  const systemImages = [
+    {
+      src: "/t1.png",
+      alt: "لوحة التحكم الرئيسية",
+      title: "لوحة التحكم الرئيسية",
+      description: "واجهة شاملة تعرض إحصائيات الحضور والإعدادات"
+    },
+    {
+      src: "/t2.png", 
+      alt: "تسجيل الحضور",
+      title: "تسجيل الحضور",
+      description: "نظام تسجيل حضور سريع ودقيق للطلاب والمعلمين"
+    },
+    {
+      src: "/t3.png",
+      alt: "التقارير اليومية", 
+      title: "التقارير اليومية",
+      description: "تقارير مفصلة وإحصائيات شاملة للحضور والغياب"
+    },
+    {
+      src: "/t4.png",
+      alt: "التقارير والإحصائيات",
+      title: "التقارير والإحصائيات",
+      description: "تقارير مفصلة وإحصائيات شاملة للحضور والغياب"
+    }
+  ];
 
   // Hero section slides
   const heroSlides = [
@@ -64,7 +93,7 @@ const Home = () => {
       description: "نظام تتبع متطور يوفر إدارة شاملة للحضور والغياب مع تقارير مفصلة وإشعارات فورية",
       image: "🎓",
       color: "from-blue-600 to-purple-600",
-      backgroundImage: "https://i.pinimg.com/736x/d3/fd/30/d3fd3075a906198427ea0d7112c2f797.jpg"
+      backgroundImage: "/home1.png"
     },
     {
       title: "تقارير وإحصائيات متقدمة",
@@ -72,7 +101,7 @@ const Home = () => {
       description: "احصل على تقارير مفصلة وإحصائيات دقيقة تساعدك في اتخاذ القرارات الصحيحة",
       image: "📊",
       color: "from-green-600 to-teal-600",
-      backgroundImage: "https://www.aljazeera.net/wp-content/uploads/2019/01/56718ca6-3b9b-4fb8-acc9-b1651a5d74b8.jpeg?resize=770%2C513&quality=80"
+      backgroundImage: "/qw.jpg"
     },
     {
       title: "إشعارات فورية للآباء",
@@ -80,7 +109,7 @@ const Home = () => {
       description: "إرسال رسائل نصية فورية للآباء عند غياب أو تأخر أبنائهم",
       image: "📱",
       color: "from-orange-600 to-red-600",
-      backgroundImage: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80"
+      backgroundImage: "/we.jpg"
     }
   ];
 
@@ -102,7 +131,7 @@ const Home = () => {
     },
     {
       icon: MessageSquare,
-      title: "الرسائل النصية",
+      title: "إشعار ولي الأمر",
       description: "إرسال رسائل نصية فورية للآباء عند غياب أو تأخر أبنائهم",
       color: "purple",
       benefits: ["إشعارات فورية", "رسائل مخصصة", "تتبع الرسائل", "قوالب جاهزة"]
@@ -204,6 +233,7 @@ const Home = () => {
 
   // Navigation sections
   const navigationSections = [
+    { id: 'system-preview', label: 'معاينة النظام' },
     { id: 'features', label: 'المميزات' },
     { id: 'capabilities', label: 'القدرات' },
     { id: 'dashboard-preview', label: 'لوحة التحكم' },
@@ -256,7 +286,7 @@ const Home = () => {
             <div className="hidden md:flex items-center space-x-4">
               {isAuthenticated ? (
                 <div className="flex items-center space-x-4">
-                  <div className="text-right ml-2">
+                  <div className="text-right ml-4">
                     <p className="text-sm text-gray-600">مرحباً</p>
                     <p className="text-sm font-semibold text-gray-900">
                       {user?.name || user?.username || 'المستخدم'}
@@ -405,7 +435,7 @@ const Home = () => {
                 <button
                   key={index}
                   onClick={() => setCurrentSlide(index)}
-                  className={`w-2 h-2 md:w-3 md:h-3 rounded-full transition-colors mx-1 md:mx-2 ${
+                  className={`w-2 h-2 md:w-3 md:h-3 rounded-full transition-colors mx-2 md:mx-2 ${
                     index === currentSlide ? 'bg-white' : 'bg-white bg-opacity-50'
                   }`}
                 />
@@ -422,13 +452,24 @@ const Home = () => {
                   <span className="text-sm md:text-base">انتقل إلى لوحة التحكم</span>
                 </button>
               ) : (
-                <button
-                  onClick={() => navigate('/login')}
-                  className="btn btn-primary btn-lg w-full sm:w-auto shadow-lg hover:shadow-xl transition-shadow mt-20"
-                >
-                  <Play className="h-4 w-4 md:h-5 md:w-5 mr-2" />
-                  <span className="text-sm md:text-base">ابدأ الآن</span>
-                </button>
+                <>
+                  <button
+                    onClick={() => navigate('/login')}
+                    className="btn btn-primary btn-lg w-full sm:w-auto shadow-lg hover:shadow-xl transition-shadow"
+                  >
+                    <Play className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+                    <span className="text-sm md:text-base">ابدأ الآن</span>
+                  </button>
+                  <a 
+                    href="https://wa.me/96876002642?text=مرحباً، أود الاشتراك في نظام تتبع الحضور والغياب الذكي." 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="btn btn-outline-white btn-lg w-full sm:w-auto shadow-lg hover:shadow-xl transition-shadow border-white text-white hover:bg-white hover:text-gray-900"
+                  >
+                    <MessageCircle className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+                    <span className="text-sm md:text-base">اشترك الآن</span>
+                  </a>
+                </>
               )}
          
             </div>
@@ -438,9 +479,40 @@ const Home = () => {
 
 
 
-      {/* Features Section */}
-      <section id="features" className="py-8 md:py-16 bg-gray-50">
+      {/* System Preview Images */}
+      <section id="system-preview" className="py-8 md:py-16 bg-white bg-gradient-to-br from-sky-100 via-gray-100 to-sky-200 animate-gradient-x">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8 md:mb-12">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 md:mb-4">
+              معاينة النظام
+            </h2>
+            <p className="text-base md:text-lg text-gray-600 px-4">
+              شاهد كيف يبدو نظام تتبع في الواقع (بعض الميزات المتاحة)
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+            {systemImages.map((image, index) => (
+              <div 
+                key={index}
+                className="rounded-xl  transition-all   hover:scale-105"
+                onClick={() => setSelectedImage(image)}
+              >
+                <img 
+                  src={image.src} 
+                  alt={image.alt} 
+                  className="w-full h-auto object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section id="features" className="py-8 md:py-16 ">
+      
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
           <div className="text-center mb-8 md:mb-12">
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 md:mb-4">
               مميزات النظام
@@ -452,8 +524,8 @@ const Home = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
             {features.map((feature, index) => (
-              <div key={index} className="card feature-card">
-                <div className="card-body p-4 md:p-6">
+              <div key={index} className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30">
+                <div className="p-4 md:p-6 text-center">
                   <div className={`inline-flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-lg mb-3 md:mb-4 ${getColorClasses(feature.color)}`}>
                     <feature.icon className="h-5 w-5 md:h-6 md:w-6" />
                   </div>
@@ -463,14 +535,16 @@ const Home = () => {
                   <p className="text-sm md:text-base text-gray-600 mb-3 md:mb-4 leading-relaxed">
                     {feature.description}
                   </p>
-                  <ul className="space-y-1 md:space-y-2">
+                  <div className="grid grid-cols-1 gap-2 mt-4">
                     {feature.benefits.map((benefit, benefitIndex) => (
-                      <li key={benefitIndex} className="flex items-center text-xs md:text-sm text-gray-500">
-                        <CheckCircle className="h-3 w-3 md:h-4 md:w-4 text-green-500 mr-2 flex-shrink-0" />
-                        {benefit}
-                      </li>
+                      <div key={benefitIndex} className="backdrop-blur-sm rounded-lg p-0 border border-white/20 ">
+                        <div className="flex items-center text-xs md:text-sm text-gray-700">
+                          <CheckCircle className="h-3 w-3 md:h-4 md:w-4 text-green-500 mr-2 flex-shrink-0 ml-2" />
+                          {benefit}
+                        </div>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               </div>
             ))}
@@ -479,7 +553,7 @@ const Home = () => {
       </section>
 
       {/* System Capabilities */}
-      <section id="capabilities" className="py-8 md:py-16 bg-white">
+      <section id="capabilities" className="py-8 md:py-16 bg-white bg-gradient-to-br from-sky-100 via-gray-100 to-sky-200 animate-gradient-x">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8 md:mb-12">
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 md:mb-4">
@@ -509,7 +583,7 @@ const Home = () => {
       </section>
 
       {/* Dashboard Preview */}
-      <section id="dashboard-preview" className="py-8 md:py-16 bg-gray-50">
+      <section id="dashboard-preview" className="py-8 md:py-16 ">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8 md:mb-12">
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 md:mb-4">
@@ -523,8 +597,8 @@ const Home = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             {/* Dashboard Features */}
             <div className="space-y-4 md:space-y-6">
-              <div className="card">
-                <div className="card-body p-4 md:p-6">
+              <div className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30">
+                <div className="p-4 md:p-6">
                   <div className="flex items-center mb-3 md:mb-4">
                     <BarChart3 className="h-5 w-5 md:h-6 md:w-6 text-blue-600 mr-2 md:mr-3" />
                     <h3 className="text-base md:text-lg font-semibold text-gray-900">إحصائيات فورية</h3>
@@ -545,8 +619,8 @@ const Home = () => {
                 </div>
               </div>
 
-              <div className="card">
-                <div className="card-body p-4 md:p-6">
+              <div className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30">
+                <div className="p-4 md:p-6">
                   <div className="flex items-center mb-3 md:mb-4">
                     <ClipboardList className="h-5 w-5 md:h-6 md:w-6 text-green-600 mr-2 md:mr-3" />
                     <h3 className="text-base md:text-lg font-semibold text-gray-900">تسجيل الحضور</h3>
@@ -570,9 +644,9 @@ const Home = () => {
             </div>
 
             {/* Reports Preview */}
-            <div className="space-y-4 md:space-y-6">
-              <div className="card">
-                <div className="card-body p-4 md:p-6">
+            <div className="space-y-4 md:space-y-6 ">
+              <div className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30">
+                <div className="p-4 md:p-6">
                   <div className="flex items-center mb-3 md:mb-4">
                     <FileText className="h-5 w-5 md:h-6 md:w-6 text-purple-600 mr-2 md:mr-3" />
                     <h3 className="text-base md:text-lg font-semibold text-gray-900">التقارير المفصلة</h3>
@@ -597,8 +671,8 @@ const Home = () => {
                 </div>
               </div>
 
-              <div className="card">
-                <div className="card-body p-4 md:p-6">
+              <div className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30">
+                <div className="p-4 md:p-6">
                   <div className="flex items-center mb-3 md:mb-4">
                     <MessageSquare className="h-5 w-5 md:h-6 md:w-6 text-orange-600 mr-2 md:mr-3" />
                     <h3 className="text-base md:text-lg font-semibold text-gray-900">الإشعارات</h3>
@@ -609,6 +683,10 @@ const Home = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
                       <span className="text-xs md:text-sm">إشعار الغياب</span>
+                      <span className="text-xs text-green-600">مرسل</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <span className="text-xs md:text-sm">إشعار هروب</span>
                       <span className="text-xs text-green-600">مرسل</span>
                     </div>
                     <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
@@ -628,8 +706,9 @@ const Home = () => {
         </div>
       </section>
 
+
       {/* User Roles Section */}
-      <section id="user-roles" className="py-8 md:py-16 bg-white">
+      <section id="user-roles" className="py-8 md:py-16 bg-white bg-gradient-to-br from-sky-100 via-gray-100 to-sky-200 animate-gradient-x">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8 md:mb-12">
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 md:mb-4">
@@ -644,8 +723,8 @@ const Home = () => {
   
 
             {/* School Admin */}
-            <div className="card text-center">
-              <div className="card-body p-4 md:p-6">
+            <div className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30 text-center">
+              <div className="p-4 md:p-6">
                 <div className="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 bg-blue-100 text-blue-600 rounded-full mb-3 md:mb-4">
                   <School className="h-6 w-6 md:h-8 md:w-8" />
                 </div>
@@ -653,18 +732,26 @@ const Home = () => {
                 <p className="text-sm md:text-base text-gray-600 mb-3 md:mb-4 leading-relaxed">
                   إدارة مدرسة واحدة مع صلاحيات شاملة لجميع العمليات
                 </p>
-                <ul className="text-xs md:text-sm text-gray-500 space-y-1">
-                  <li>• إدارة المعلمين والطلاب</li>
-                  <li>• إدارة الفصول والمواد</li>
-                  <li>• التقارير والإحصائيات</li>
-                  <li>• الرسائل النصية</li>
-                </ul>
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">إدارة المعلمين والطلاب</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">إدارة الفصول والمواد</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">التقارير والإحصائيات</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">إشعار ولي الأمر</div>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Teacher */}
-            <div className="card text-center">
-              <div className="card-body p-4 md:p-6">
+            <div className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30 text-center">
+              <div className="p-4 md:p-6">
                 <div className="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 bg-green-100 text-green-600 rounded-full mb-3 md:mb-4">
                   <UserCheck className="h-6 w-6 md:h-8 md:w-8" />
                 </div>
@@ -672,12 +759,18 @@ const Home = () => {
                 <p className="text-sm md:text-base text-gray-600 mb-3 md:mb-4 leading-relaxed">
                   تسجيل الحضور وعرض التقارير للفصول المخصصة
                 </p>
-                <ul className="text-xs md:text-sm text-gray-500 space-y-1">
-                  <li>• تسجيل الحضور</li>
-                  <li>• عرض تقارير الفصول</li>
-                  <li>• إدارة الطلاب</li>
-                  <li>• الملف الشخصي</li>
-                </ul>
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">تسجيل الحضور</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">عرض تقارير الفصول</div>
+                  </div>
+                  
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">الملف الشخصي</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -685,7 +778,7 @@ const Home = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-8 md:py-16 bg-primary-400">
+      <section className="py-8 md:py-16 bg-sky-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-2xl md:text-3xl font-bold text-white mb-3 md:mb-4">
             ابدأ رحلتك مع نظام تتبع اليوم
@@ -750,7 +843,7 @@ const Home = () => {
               <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-400">
                 <li>تسجيل الحضور الذكي</li>
                 <li>التقارير والإحصائيات</li>
-                <li>الرسائل النصية</li>
+                <li>إشعار ولي الأمر</li>
                 <li>إدارة المستخدمين</li>
               </ul>
             </div>
@@ -758,7 +851,6 @@ const Home = () => {
             <div>
               <h4 className="text-base md:text-lg font-semibold mb-3 md:mb-4">الدعم</h4>
               <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-400">
-                <li>مركز المساعدة</li>
                 <li>التوثيق</li>
                 <li>الدعم الفني</li>
                 <li>التدريب</li>
@@ -793,7 +885,11 @@ const Home = () => {
                   سلطنة عمان
                 </div>
                 <div className="flex items-center">
-                  <Globe className="h-3 w-3 md:h-4 md:w-4 mr-2 flex-shrink-0 ml-2" />
+                  <img 
+                    src="/PD.png" 
+                    alt="PD" 
+                    className="h-3 w-3 md:h-4 md:w-4 mr-2 flex-shrink-0 ml-2 object-contain"
+                  />
                   <a 
                     href="https://pathtodev.com/" 
                     target="_blank" 
@@ -812,6 +908,44 @@ const Home = () => {
           </div>
         </div>
       </footer>
+
+      {/* Image Modal/Lightbox */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div className="relative max-w-6xl mt-24 mb-24">
+           
+            
+            {/* Image container */}
+            <div className="bg-white rounded-lg overflow-hidden shadow-2xl ">
+               {/* Close button */}
+            <button
+              onClick={() => setSelectedImage(null)}
+              className=" -top-12 right-0 hover:text-gray-300 transition-colors"
+            >
+              <X className="h-8 w-8 mx-2 my-2" />
+            </button>
+              <img 
+                src={selectedImage.src} 
+                alt={selectedImage.alt}
+                className="w-full h-auto scale-90 object-contain md:mt-0  "
+              />
+              
+              {/* Image info */}
+              <div className="p-6 bg-white">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  {selectedImage.title}
+                </h3>
+                <p className="text-gray-600">
+                  {selectedImage.description}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

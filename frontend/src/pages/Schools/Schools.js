@@ -484,6 +484,18 @@ const EditSchoolForm = ({ school, onClose, onSubmit, loading }) => {
 
 // Logs Viewer Component
 const LogsViewer = ({ logs, loading }) => {
+  // Handle different data structures - logs might be an object with nested array
+  let safeLogs = [];
+  
+  if (Array.isArray(logs)) {
+    safeLogs = logs;
+  } else if (logs && typeof logs === 'object') {
+    // Check common nested structures
+    safeLogs = logs.data || logs.logs || logs.results || logs.items || [];
+  }
+  
+
+  
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -495,6 +507,8 @@ const LogsViewer = ({ logs, loading }) => {
 
   return (
     <div className="space-y-4">
+   
+      
       <div className="overflow-x-auto">
         <table className="table">
           <thead className="table-header">
@@ -508,7 +522,7 @@ const LogsViewer = ({ logs, loading }) => {
             </tr>
           </thead>
           <tbody className="table-body">
-            {logs.map((log, index) => (
+            {safeLogs.map((log, index) => (
               <tr key={index}>
                 <td className="table-cell">{log.user_name}</td>
                 <td className="table-cell">
@@ -524,7 +538,7 @@ const LogsViewer = ({ logs, loading }) => {
         </table>
       </div>
       
-      {logs.length === 0 && (
+      {safeLogs.length === 0 && (
         <div className="text-center py-12">
           <p className="text-gray-500">لا توجد سجلات</p>
         </div>

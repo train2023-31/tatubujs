@@ -61,7 +61,7 @@ const Login = () => {
               className="h-20 w-20 object-contain"
             />
           </div>
-          <h2 className="mt-6 text-3xl zain-font">
+          <h2 className="mt-6 text-3xl font-bold">
             تتبع
           </h2>
           <p className="mt-2 text-sm text-gray-600">
