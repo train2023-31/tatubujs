@@ -12,7 +12,7 @@ import {
   Clock,
   FileText,
   AlertCircle,
-  Eye,
+  Eye,EyeOff ,
   CheckCircle,
   ArrowRight,
   Settings,
@@ -391,9 +391,6 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClassData, setSelectedClassData] = useState(null);
 
-  // Debug logging
-  console.log('needsSetup type:', typeof needsSetup);
-  console.log('needsSetup value:', needsSetup);
 
   // Local function to safely call needsSetup
   const checkNeedsSetup = (status) => {
@@ -716,7 +713,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
           <div className="card-body">
             <div className="overflow-x-auto">
               <table className="table">
-                <thead className="table-header">
+                <thead className="table-header shadow-md sticky top-0 z-10">
                   <tr>
                     <th className="table-header-cell text-right">اسم الفصل</th>
                     <th className="table-header-cell text-right">إجمالي الطلاب</th>
@@ -735,7 +732,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                       <td className="table-cell">{classData.class_name}</td>
                       <td className="table-cell">{classData.total_students}</td>
                       <td className="table-cell">
-                        <span className="badge badge-success">{(classData.total_present || 0) === 0 ? '-' : (classData.total_present || 0)}</span>
+                        <span className="badge badge-success">{(classData.total_present || 0) === 0 ? '-' : (classData.total_students - (classData.total_absent + classData.total_excused) || 0)}</span>
                       </td>
                       <td className="table-cell">
                         <span className="badge badge-danger">{(classData.total_absent || 0) === 0 ? '-' : (classData.total_absent || 0)}</span>
@@ -744,10 +741,10 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                         <span className="badge badge-warning">{(classData.total_late || 0) === 0 ? '-' : (classData.total_late || 0)}</span>
                       </td>
                       <td className="table-cell">
-                        <span className="badge badge-purple">{(classData.total_excused || 0) === 0 ? '-' : (classData.total_excused || 0)}</span>
+                        <span className="badge badge-info">{(classData.total_excused || 0) === 0 ? '-' : (classData.total_excused || 0)}</span>
                       </td>
                       <td className="table-cell text-center">
-                        <span className="badge badge-info">
+                        <span className="badge badge-success">
                           {Array.isArray(classData.class_time_nums) 
                             ? classData.class_time_nums.join(', ') 
                             : (classData.class_time_nums || 0)}
@@ -761,12 +758,19 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                         </span>
                       </td>
                       <td className="table-cell text-center">
+                        
                         <button
+                          disabled={classData.total_present === 0 || classData.total_present === classData.total_students}
+                          
                           onClick={() => handleViewAbsentStudents(classData)}
-                          className="inline-flex items-center justify-center w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                          className="inline-flex items-center justify-center w-8 h-8  hover:bg-blue-200  rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                           title="عرض الطلاب الغائبين"
                         >
-                          <Eye className="h-4 w-4" />
+                          {classData.total_present === 0 || classData.total_present === classData.total_students ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-blue-600" />
+                          )}
                         </button>
                       </td>
                     </tr>
@@ -823,7 +827,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
           <div className="card-body">
             <div className="overflow-x-auto">
               <table className="table">
-                <thead className="table-header">
+                <thead className="table-header shadow-md sticky top-0 z-10">
                   <tr>
                     <th className="table-header-cell text-right">اسم المعلم</th>
                     <th className="table-header-cell text-right">الوظيفة</th>

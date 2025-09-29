@@ -40,10 +40,10 @@ const DataTable = ({
       {/* Desktop Table View */}
       <div className="hidden md:block overflow-x-auto">
         <table className="table">
-          <thead className="table-header">
+          <thead className="table-header sticky top-0 z-10 bg-white shadow-md">
             <tr>
               {columns.map((column, index) => (
-                <th key={index} className="table-header-cell text-right">
+                <th key={index} className="table-header-cell text-right bg-gray-50">
                   {column.header}
                 </th>
               ))}

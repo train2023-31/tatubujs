@@ -339,17 +339,11 @@ ${attendanceStatus}
       if (!cleanPhoneNumber.startsWith('968') && cleanPhoneNumber.length === 8) {
         formattedPhone = '+968' + cleanPhoneNumber;
       }
-      console.log(phoneNumber );
-      console.log(formattedPhone);
-      
       const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(mssg_Ar)}`;
-      console.log('WhatsApp URL:', url); // Debug log
-      console.log('Message:', mssg_Ar); // Debug log
       window.open(url, "_blank");
     } else {
       // If no phone number, open WhatsApp Web with the message
       const url = `https://web.whatsapp.com/send?text=${encodeURIComponent(mssg_Ar)}`;
-      console.log('WhatsApp Web URL:', url); // Debug log
       window.open(url, "_blank");
     }
   };
@@ -896,7 +890,7 @@ ${attendanceStatus}
           <div className="card-body p-0">
             <div className="overflow-x-auto scrollbar-hide overflow-hidden">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-gray-50 border-b sticky top-0 z-10 shadow-md">
                   <tr>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                       الصف ↕
@@ -1255,7 +1249,7 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName, filters, 
       {/* Report Table */}
       <div className="">
         <table className="report-table w-full">
-          <thead className="bg-blue-600 text-white">
+          <thead className="bg-blue-600 text-white sticky top-0 z-10 shadow-md">
             <tr>
               <th className="px-6 py-4 text-right font-bold text-lg">الطالب/ة</th>
               <th className="px-6 py-4 text-center font-bold text-lg">هارب</th>

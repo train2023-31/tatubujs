@@ -1,6 +1,6 @@
 {
   "name": "tatubu-frontend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "dependencies": {
     "@testing-library/jest-dom": "^5.16.4",
@@ -28,6 +28,14 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "build:versioned": "npm run generate-version && react-scripts build",
+    "build:secure": "npm run build:versioned && npm run post-build && npm run secure-build",
+    "generate-version": "node scripts/generate-version.js",
+    "deploy": "node scripts/deploy.js",
+    "deploy:simple": "npm run build:versioned && npm run post-build",
+    "deploy:secure": "npm run build:secure",
+    "post-build": "node scripts/post-build.js",
+    "secure-build": "node scripts/secure-build.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

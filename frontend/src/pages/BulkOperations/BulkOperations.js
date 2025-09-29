@@ -213,7 +213,6 @@ const BulkOperations = () => {
         .filter(className => className && className.trim() !== '') // Remove empty strings
         .sort(); // Sort alphabetically
       
-      console.log('Classes to create:', uniqueClasses);
       
       // Format for API request - array of class names
       const classesToCreate = uniqueClasses;

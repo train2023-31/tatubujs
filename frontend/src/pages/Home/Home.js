@@ -634,7 +634,7 @@ const Home = () => {
                       <span className="text-xs text-green-600">25/30 حاضر</span>
                     </div>
                     <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <span className="text-xs md:text-sm"> السابع 4 - العلوم</span>
+                      <span className="text-xs md:text-sm"> الثاني عشر 4 - فيزياء</span>
                       <span className="text-xs text-green-600">28/30 حاضر</span>
                     </div>
                   </div>

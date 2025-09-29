@@ -50,7 +50,6 @@ const SMS = () => {
     {
       onSuccess: (response) => {
         toast.success('تم إرسال الرسائل بنجاح');
-        console.log('SMS Response:', response);
       },
       onError: (error) => {
         toast.error(error.response?.data?.message || 'فشل في إرسال الرسائل');

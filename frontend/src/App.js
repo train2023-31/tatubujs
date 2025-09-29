@@ -21,6 +21,7 @@ import BulkOperations from './pages/BulkOperations/BulkOperations';
 import DailyReport from './pages/DailyReport/DailyReport';
 import DeleteSchoolData from './pages/DeleteSchoolData/DeleteSchoolData';
 import ViewLogs from './pages/ViewLogs/ViewLogs';
+import VersionFeatures from './pages/VersionFeatures/VersionFeatures';
 import LoadingSpinner from './components/UI/LoadingSpinner';
 
 // Create a client
@@ -79,7 +80,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router>
+        <Router
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true
+          }}
+        >
           <div className="App" dir="rtl">
             <Toaster 
               position="top-center"
@@ -246,6 +252,9 @@ function App() {
                     </ProtectedRoute>
                   } 
                 />
+                
+                {/* Version Features - All roles */}
+                <Route path="version-features" element={<VersionFeatures />} />
                 
                 {/* Profile - All roles */}
                 <Route path="profile" element={<Profile />} />

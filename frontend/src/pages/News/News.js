@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { Plus, Newspaper, Edit, Trash2, Eye, EyeOff, Calendar } from 'lucide-react';
+import { Plus, Newspaper, Edit, Trash2, Eye, EyeOff, Calendar, Shield } from 'lucide-react';
 import { reportsAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
+import { hasRole } from '../../utils/helpers';
 import DataTable from '../../components/UI/DataTable';
 import Modal from '../../components/UI/Modal';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
@@ -72,9 +73,14 @@ const News = () => {
       key: 'type',
       header: 'النوع',
       render: (row) => (
-        <span className={`badge ${row.type === 'global' ? 'badge-info' : 'badge-warning'}`}>
-          {row.type === 'global' ? 'عام' : 'مدرسي'}
-        </span>
+        <div className="flex items-center">
+          <span className={`badge ${row.type === 'global' ? 'badge-info' : 'badge-warning'}`}>
+            {row.type === 'global' ? 'عام' : 'مدرسي'}
+          </span>
+          {row.type === 'global' && !hasRole(user, ['admin']) && (
+            <Shield className="h-4 w-4 text-gray-400 mr-1" title="يتطلب صلاحيات مدير عام" />
+          )}
+        </div>
       ),
     },
     {
@@ -111,32 +117,51 @@ const News = () => {
     {
       key: 'actions',
       header: 'الإجراءات',
-      render: (row) => (
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => {
-              setSelectedNews(row);
-              setIsEditModalOpen(true);
-            }}
-            className="text-primary-600 hover:text-primary-900"
-            title="تعديل"
-          >
-            <Edit className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => {
-              if (window.confirm('هل أنت متأكد من حذف هذا الخبر؟')) {
-                deleteNewsMutation.mutate(row.id);
-              }
-            }}
-            className="text-red-600 hover:text-red-900"
-            title="حذف"
-            disabled={deleteNewsMutation.isLoading}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      ),
+      render: (row) => {
+        // Only admin can edit/delete general news
+        const canEdit = row.type === 'global' ? hasRole(user, ['admin']) : hasRole(user, ['admin', 'school_admin']);
+        const canDelete = row.type === 'global' ? hasRole(user, ['admin']) : hasRole(user, ['admin', 'school_admin']);
+        
+        if (!canEdit && !canDelete) {
+          return (
+            <div className="flex items-center text-gray-400">
+              <Shield className="h-4 w-4" />
+              <span className="text-xs mr-1">غير مسموح</span>
+            </div>
+          );
+        }
+        
+        return (
+          <div className="flex items-center space-x-2">
+            {canEdit && (
+              <button
+                onClick={() => {
+                  setSelectedNews(row);
+                  setIsEditModalOpen(true);
+                }}
+                className="text-primary-600 hover:text-primary-900"
+                title="تعديل"
+              >
+                <Edit className="h-4 w-4" />
+              </button>
+            )}
+            {canDelete && (
+              <button
+                onClick={() => {
+                  if (window.confirm('هل أنت متأكد من حذف هذا الخبر؟')) {
+                    deleteNewsMutation.mutate(row.id);
+                  }
+                }}
+                className="text-red-600 hover:text-red-900"
+                title="حذف"
+                disabled={deleteNewsMutation.isLoading}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -148,14 +173,31 @@ const News = () => {
           <h1 className="text-2xl font-bold text-gray-900">إدارة الأخبار</h1>
           <p className="text-gray-600">إدارة الأخبار والإعلانات</p>
         </div>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="btn btn-primary"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          إضافة خبر جديد
-        </button>
+        {hasRole(user, ['admin', 'school_admin']) && (
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="btn btn-primary"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            إضافة خبر جديد
+          </button>
+        )}
       </div>
+
+      {/* Permissions Info */}
+      {!hasRole(user, ['admin']) && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <Shield className="h-5 w-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-medium text-blue-900">معلومات الصلاحيات</h3>
+              <p className="text-sm text-blue-700 mt-1">
+                يمكنك فقط إضافة وتعديل وحذف الأخبار المدرسية. الأخبار العامة (المميزة بالدرع) تتطلب صلاحيات مدير عام.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Data Table */}
       <DataTable
@@ -256,20 +298,24 @@ const NewsForm = ({ news, onClose, onSubmit, loading }) => {
           />
         </div>
 
-        {user?.role === 'admin' && (
-          <div>
-            <label className="label">نوع الخبر</label>
-            <select
-              name="type"
-              value={formData.type}
-              onChange={handleChange}
-              className="input"
-            >
-              <option value="global">عام (لجميع المدارس)</option>
-              <option value="school">مدرسي (للمدرسة فقط)</option>
-            </select>
-          </div>
-        )}
+        <div>
+          <label className="label">نوع الخبر</label>
+          <select
+            name="type"
+            value={formData.type}
+            onChange={handleChange}
+            className="input"
+            disabled={!hasRole(user, ['admin'])}
+          >
+            <option value="global">عام (لجميع المدارس)</option>
+            <option value="school">مدرسي (للمدرسة فقط)</option>
+          </select>
+          {!hasRole(user, ['admin']) && (
+            <p className="text-sm text-gray-500 mt-1">
+              يمكن للمدير العام فقط إنشاء أخبار عامة
+            </p>
+          )}
+        </div>
 
         <div>
           <label className="label">تاريخ الانتهاء (اختياري)</label>

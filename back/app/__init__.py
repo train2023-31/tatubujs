@@ -28,7 +28,9 @@ def create_app():
              "https://sultan00095.pythonanywhere.com",  # Your PythonAnywhere domain
              "https://*.pythonanywhere.com",  # PythonAnywhere subdomains
              "https://tatubu.com",  # Your production domain
-             "https://www.tatubu.com"  # Your production domain with www
+             "https://www.tatubu.com",  # Your production domain with www
+             "https://*.hostinger.com",  # Hostinger domains
+             "https://*.000webhostapp.com"  # Hostinger free hosting
          ],
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          allow_headers=["Content-Type", "Authorization", "X-Requested-With", "content_type"],
@@ -66,7 +68,7 @@ def create_app():
         response.headers['X-Frame-Options'] = 'DENY'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://sultan00095.pythonanywhere.com https://*.pythonanywhere.com;"
         return response
 
     @app.route('/', defaults={'path': ''})

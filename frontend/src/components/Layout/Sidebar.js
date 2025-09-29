@@ -14,7 +14,8 @@ import {
   Eye,
   Upload,
   FileText,
-  Trash2
+  Trash2,
+  Star
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasRole } from '../../utils/helpers';
@@ -135,6 +136,12 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'الملف الشخصي',
           href: '/app/profile',
           icon: User,
+          roles: ['admin', 'school_admin', 'teacher'],
+        },
+        {
+          name: 'ميزات الإصدارات',
+          href: '/app/version-features',
+          icon: Star,
           roles: ['admin', 'school_admin', 'teacher'],
         },
       ]

@@ -27,57 +27,88 @@ MAX_ATTEMPTS = 5
 BLOCK_TIME_SECONDS = 300  # 5 minutes
 
 @auth_blueprint.route('/login', methods=['POST'])
-@limiter.limit("5 per minute")  # Rate limiting: 5 requests per minute per IP
+@limiter.limit("10 per minute")  # Increased rate limiting: 10 requests per minute per IP
 @log_action("تسجيل ", description="تسجيل الدخول للموقع " , content='')
 def login():
-    ip = request.remote_addr
-    now = time()
+    try:
+        ip = request.remote_addr
+        now = time()
 
-    # Parse login data
-    data = request.get_json()
-    username_or_email = data.get('username')
-    password = data.get('password')
+        # Parse login data with error handling
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify(message="Invalid JSON data"), 400
+        except Exception as e:
+            return jsonify(message="Invalid request data"), 400
 
-    if not username_or_email or not password:
-        return jsonify(message="اسم المستخدم/رمز المرور مطلوب. Username/email and password are required."), 400
+        username_or_email = data.get('username')
+        password = data.get('password')
 
-    # 🔐 Check if IP is blocked
-    if ip in FAILED_LOGINS:
-        if now - FAILED_LOGINS[ip]['first_try'] < BLOCK_TIME_SECONDS:
-            if FAILED_LOGINS[ip]['count'] >= MAX_ATTEMPTS:
-                return jsonify(message=" تم حظر المحاولة مؤقتاً بسبب عدد محاولات خاطئة كثيرة. الرجاء الانتظار والمحاولة بعد 5 دقائق."), 429
-        else:
-            FAILED_LOGINS.pop(ip)  # Reset expired block
+        if not username_or_email or not password:
+            return jsonify(message="اسم المستخدم/رمز المرور مطلوب. Username/email and password are required."), 400
 
-    # Find user by username or email
-    user = User.query.filter(
-        (User.username == username_or_email) | (User.email == username_or_email)
-    ).first()
+        # 🔐 Check if IP is blocked
+        if ip in FAILED_LOGINS:
+            if now - FAILED_LOGINS[ip]['first_try'] < BLOCK_TIME_SECONDS:
+                if FAILED_LOGINS[ip]['count'] >= MAX_ATTEMPTS:
+                    return jsonify(message=" تم حظر المحاولة مؤقتاً بسبب عدد محاولات خاطئة كثيرة. الرجاء الانتظار والمحاولة بعد 5 دقائق."), 429
+            else:
+                FAILED_LOGINS.pop(ip)  # Reset expired block
 
-    # 🔒 Basic delay (slows brute force bots)
-    sleep(1)
+        # Find user by username or email (case-insensitive) with error handling
+        try:
+            user = User.query.filter(
+                (User.username.ilike(username_or_email)) | (User.email.ilike(username_or_email))
+            ).first()
+        except Exception as e:
+            print(f"Database query error: {str(e)}")
+            return jsonify(message="Database connection error. Please try again."), 500
 
-    if not user:
-        # Track failed login
-        FAILED_LOGINS[ip] = FAILED_LOGINS.get(ip, {"count": 0, "first_try": now})
-        FAILED_LOGINS[ip]['count'] += 1
-        return jsonify(message="لا يوجد مستخدم بهذا الإسم. Username not found."), 400
+        # Check if user exists and is active
+        if not user:
+            # Track failed login
+            FAILED_LOGINS[ip] = FAILED_LOGINS.get(ip, {"count": 0, "first_try": now})
+            FAILED_LOGINS[ip]['count'] += 1
+            sleep(1)  # Delay for failed attempts
+            return jsonify(message="لا يوجد مستخدم بهذا الإسم. Username not found."), 400
 
-    if not user.is_active:
-        return jsonify(message="الحساب غير مفعل. الرجاء التواصل مع الإدارة. Account is inactive."), 400
+        if not user.is_active:
+            # Track failed login for inactive accounts
+            FAILED_LOGINS[ip] = FAILED_LOGINS.get(ip, {"count": 0, "first_try": now})
+            FAILED_LOGINS[ip]['count'] += 1
+            sleep(1)  # Delay for failed attempts
+            return jsonify(message="الحساب غير مفعل. الرجاء التواصل مع الإدارة. Account is inactive."), 400
 
-    if not check_password_hash(user.password, password):
-        # Track failed login
-        FAILED_LOGINS[ip] = FAILED_LOGINS.get(ip, {"count": 0, "first_try": now})
-        FAILED_LOGINS[ip]['count'] += 1
-        return jsonify(message="اسم المستخدم أو كلمة المرور غير صحيحة. Incorrect username or password."), 401
+        # Check password with error handling
+        try:
+            password_valid = check_password_hash(user.password, password)
+        except Exception as e:
+            print(f"Password check error: {str(e)}")
+            return jsonify(message="Authentication error. Please try again."), 500
 
-    # ✅ Success — Clear failed attempts for this IP
-    if ip in FAILED_LOGINS:
-        FAILED_LOGINS.pop(ip)
+        if not password_valid:
+            # Track failed login
+            FAILED_LOGINS[ip] = FAILED_LOGINS.get(ip, {"count": 0, "first_try": now})
+            FAILED_LOGINS[ip]['count'] += 1
+            sleep(1)  # Delay for failed attempts
+            return jsonify(message="اسم المستخدم أو كلمة المرور غير صحيحة. Incorrect username or password."), 401
 
-    access_token = create_access_token(identity=user.id)
-    return jsonify(access_token=access_token), 200
+        # ✅ Success — Clear failed attempts for this IP
+        if ip in FAILED_LOGINS:
+            FAILED_LOGINS.pop(ip)
+
+        # Create access token with error handling
+        try:
+            access_token = create_access_token(identity=user.id)
+            return jsonify(access_token=access_token), 200
+        except Exception as e:
+            print(f"Token creation error: {str(e)}")
+            return jsonify(message="Token generation error. Please try again."), 500
+
+    except Exception as e:
+        print(f"Unexpected login error: {str(e)}")
+        return jsonify(message="Internal server error. Please try again."), 500
 
 
 @auth_blueprint.route('/register', methods=['POST'])

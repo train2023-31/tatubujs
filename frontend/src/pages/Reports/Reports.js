@@ -307,14 +307,14 @@ const Reports = () => {
         </div>
         {user?.role === 'school_admin' && (
           <div className="flex flex-wrap items-center gap-2">
-            <button
+            {/* <button
               onClick={handlePrint}
               className="btn btn-outline btn-sm sm:btn-sm"
             >
               <Printer className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">طباعة</span>
               <span className="sm:hidden">طباعة</span>
-            </button>
+            </button> */}
             <button
               onClick={handleDownloadPDF}
               disabled={isGeneratingPDF}

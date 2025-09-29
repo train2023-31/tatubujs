@@ -98,6 +98,27 @@
     @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
   }
   
+  /* Sticky table headers */
+  .sticky-table-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: white;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  }
+  
+  /* Ensure sticky headers work properly in scrollable containers */
+  .table-container {
+    position: relative;
+  }
+  
+  .table-container thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: inherit;
+  }
+  
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }

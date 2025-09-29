@@ -91,7 +91,6 @@ const Attendance = () => {
     { 
       enabled: !!selectedClass,
       onSuccess: (data) => {
-        console.log('Class attendance data:', data);
         // You can process the class attendance data here
       },
       onError: (error) => {
@@ -607,7 +606,7 @@ const Attendance = () => {
                 {/* Desktop/Tablet Table View */}
                 <div className="hidden md:block overflow-x-auto">
                   <table className="table text-right">
-                    <thead className="table-header text-right">
+                    <thead className="table-header text-right sticky top-0 z-10 bg-white shadow-md">
                       <tr>
                         <th className="table-header-cell text-right">اسم الطالب</th>
                        

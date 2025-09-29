@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, Bell, User, LogOut } from 'lucide-react';
+import { Menu, Bell, User, LogOut, Star } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { getRoleDisplayName } from '../../utils/helpers';
 
 const Header = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
@@ -55,7 +57,16 @@ const Header = ({ onMenuClick }) => {
         </div>
 
         {/* Left side - User menu */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 space-x-reverse">
+          <button
+            onClick={() => navigate('/app/version-features')}
+            className="p-1.5 lg:p-2 text-gray-400 hover:text-yellow-500 hover:bg-yellow-50 rounded-full focus:outline-none focus:ring-2 focus:ring-yellow-500 flex items-center gap-1.5 transition-colors duration-200"
+            title="ميزات الإصدارات"
+          > 
+            <Star className="h-4 w-4 lg:h-5 lg:w-5" />
+            <span className="text-xs lg:text-sm hidden sm:inline">ميزات الإصدارات</span>
+          </button>
+          
           <button
             onClick={logout}
             className="p-1.5 lg:p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 flex items-center gap-1.5"
