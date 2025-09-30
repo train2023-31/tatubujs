@@ -25,6 +25,7 @@ const Attendance = () => {
   const [selectedTime, setSelectedTime] = useState(1);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [isViewMode, setIsViewMode] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   // Update attendance records when subject or time changes
   useEffect(() => {
@@ -230,6 +231,11 @@ const Attendance = () => {
       return;
     }
 
+    // Show confirmation dialog
+    setShowConfirmDialog(true);
+  };
+
+  const confirmSubmit = () => {
     const attendanceData = {
       class_id: parseInt(selectedClass),
       subject_id: parseInt(selectedSubject),
@@ -239,6 +245,7 @@ const Attendance = () => {
     };
 
     takeAttendanceMutation.mutate(attendanceData);
+    setShowConfirmDialog(false);
   };
 
   const getAttendanceStatus = (record) => {
@@ -460,8 +467,8 @@ const Attendance = () => {
                           </div>
                         )}
                         {!firstSubject && (
-                          <div className="text-xs text-gray-400 mt-1 text-red-500">
-                            لا توجد مادة
+                          <div className="text-xs mt-1 text-red-500">
+                           غير مسجلة
                           </div>
                         )}
                       </div>
@@ -510,11 +517,11 @@ const Attendance = () => {
                   // Show warning if there's an existing subject and user has selected a different subject
                   if (firstCurrentSubject && selectedSubject && firstCurrentSubject.subject_id !== parseInt(selectedSubject)) {
                     return (
-                      <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                         <div className="flex items-start">
-                          <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 ml-2 flex-shrink-0" />
+                          <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 ml-2 flex-shrink-0" />
                           <div className="flex-1">
-                            <h4 className="text-sm font-medium text-yellow-800">
+                            <h4 className="text-sm font-medium text-yellow-900">
                               تحذير: الحصة {selectedTime} مسجلة بالفعل
                             </h4>
                             <div className="mt-1 text-sm text-yellow-700">
@@ -927,6 +934,170 @@ const Attendance = () => {
         </div>
       )}
 
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center mb-4">
+              <AlertCircle className="h-6 w-6 text-blue-600 ml-3" />
+              <h3 className="text-lg font-semibold text-gray-900">تأكيد تسجيل الحضور</h3>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-600 mb-3">هل أنت متأكد من تسجيل الحضور للبيانات التالية؟</p>
+              
+              {/* Warning for Subject Mismatch */}
+              {(() => {
+                const currentPeriodData = classAttendance?.class_time_data?.[selectedTime];
+                const currentPeriodSubjects = currentPeriodData?.subjects || [];
+                const firstCurrentSubject = currentPeriodSubjects[0];
+                const selectedSubjectName = subjects?.find(s => s.id === parseInt(selectedSubject))?.name;
+                
+                // Show warning if there's an existing subject and user has selected a different subject
+                if (firstCurrentSubject && selectedSubject && firstCurrentSubject.subject_id !== parseInt(selectedSubject)) {
+                  return (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start">
+                        <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 ml-2 flex-shrink-0" />
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium text-red-900">
+                            تحذير: الحصة {selectedTime} مسجلة بالفعل
+                          </h4>
+                          <div className="mt-1 text-sm text-red-700">
+                            <p>هذه الحصة مسجلة بالفعل للمادة: <span className="font-semibold">{firstCurrentSubject.subject_name}</span></p>
+                            <p className="mt-1">المادة المحددة حالياً: <span className="font-semibold">{selectedSubjectName}</span></p>
+                            <p className="mt-1 text-xs">يرجى التأكد من اختيار الحصة الصحيحة أو تغيير المادة المحددة.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+              
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-700">التاريخ:</span>
+                  <span className="text-sm text-gray-900">{selectedDate}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-700">الفصل:</span>
+                  <span className="text-sm text-gray-900">
+                    {classes?.find(c => c.id === parseInt(selectedClass))?.name || 'غير محدد'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-700">المادة:</span>
+                  <span className="text-sm text-gray-900">
+                    {subjects?.find(s => s.id === parseInt(selectedSubject))?.name || 'غير محدد'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-700">الحصة:</span>
+                  <span className="text-sm text-gray-900">{selectedTime}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-700">عدد الطلاب:</span>
+                  <span className="text-sm text-gray-900">{attendanceRecords.length}</span>
+                </div>
+              </div>
+              
+              {/* Validation Status */}
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center mb-3">
+                  <CheckCircle className="h-4 w-4 text-blue-600 ml-2" />
+                  <h4 className="text-sm font-medium text-blue-900">حالة التحقق</h4>
+                </div>
+                
+                {/* Mobile-friendly compact layout */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                  {(() => {
+                    const unmarkedStudents = attendanceRecords.filter(record => {
+                      const hasStatus = record.is_present || record.is_Acsent || record.is_Excus || record.is_late;
+                      return !hasStatus;
+                    });
+                    
+                    const presentCount = attendanceRecords.filter(r => r.is_present).length;
+                    const absentCount = attendanceRecords.filter(r => r.is_Acsent).length;
+                    const excusedCount = attendanceRecords.filter(r => r.is_Excus).length;
+                    const lateCount = attendanceRecords.filter(r => r.is_late).length;
+                    
+                    return (
+                      <>
+                        <div className="text-center p-2 bg-green-100 rounded">
+                          <div className="text-lg font-bold text-green-700">{presentCount}</div>
+                          <div className="text-xs text-green-600">حاضر</div>
+                        </div>
+                        <div className="text-center p-2 bg-red-100 rounded">
+                          <div className="text-lg font-bold text-red-700">{absentCount}</div>
+                          <div className="text-xs text-red-600">غائب</div>
+                        </div>
+                        <div className="text-center p-2 bg-yellow-100 rounded">
+                          <div className="text-lg font-bold text-yellow-700">{lateCount}</div>
+                          <div className="text-xs text-yellow-600">متأخر</div>
+                        </div>
+                        <div className="text-center p-2 bg-blue-100 rounded">
+                          <div className="text-lg font-bold text-blue-700">{excusedCount}</div>
+                          <div className="text-xs text-blue-600">معذور</div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+                
+                {/* Summary row */}
+                <div className="flex justify-between items-center text-xs text-blue-800 pt-2 border-t border-blue-300">
+                  <span>إجمالي الطلاب:</span>
+                  <span className="font-semibold text-lg">{attendanceRecords.length}</span>
+                </div>
+                
+                {/* Unmarked students warning */}
+                {(() => {
+                  const unmarkedStudents = attendanceRecords.filter(record => {
+                    const hasStatus = record.is_present || record.is_Acsent || record.is_Excus || record.is_late;
+                    return !hasStatus;
+                  });
+                  
+                  if (unmarkedStudents.length > 0) {
+                    return (
+                      <div className="mt-2 p-2 bg-orange-100 border border-orange-200 rounded text-center">
+                        <span className="text-xs text-orange-700">
+                          ⚠️ {unmarkedStudents.length} طالب غير محدد
+                        </span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between space-x-3">
+              <button
+                onClick={() => setShowConfirmDialog(false)}
+                className="btn btn-outline ml-2"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={confirmSubmit}
+                disabled={takeAttendanceMutation.isLoading}
+                className="btn btn-primary"
+              >
+                {takeAttendanceMutation.isLoading ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    <span className="mr-2">جاري التسجيل...</span>
+                  </>
+                ) : (
+                  'تأكيد التسجيل'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     
     </div>
   );

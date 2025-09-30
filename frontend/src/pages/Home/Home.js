@@ -56,6 +56,21 @@ const Home = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0);
+  const [displayedText, setDisplayedText] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [showCursor, setShowCursor] = useState(true);
+
+  // Feature titles for rotating text
+  const featureTitles = [
+    "نظام إدارة الحضور والغياب",
+    "تتبع حضور الطلاب والمعلمين",
+    "تقارير مفصلة وإحصائيات",
+    "إدارة الفصول والمواد",
+    "نظام إشعارات ذكي",
+    "تقارير يومية وأسبوعية",
+    "إدارة المستخدمين والصلاحيات",
+  ];
 
   // System preview images data
   const systemImages = [
@@ -209,6 +224,48 @@ const Home = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Typewriter effect for feature titles
+  useEffect(() => {
+    const currentText = featureTitles[currentFeatureIndex];
+    let currentIndex = 0;
+    let isDeleting = false;
+    
+    const typeWriter = () => {
+      if (isDeleting) {
+        // Deleting text
+        setDisplayedText(currentText.substring(0, currentIndex - 1));
+        currentIndex--;
+        
+        if (currentIndex === 0) {
+          isDeleting = false;
+          setCurrentFeatureIndex((prev) => (prev + 1) % featureTitles.length);
+        }
+      } else {
+        // Typing text
+        setDisplayedText(currentText.substring(0, currentIndex + 1));
+        currentIndex++;
+        
+        if (currentIndex === currentText.length) {
+          // Wait before starting to delete
+          setTimeout(() => {
+            isDeleting = true;
+          }, 1000);
+        }
+      }
+    };
+
+    const interval = setInterval(typeWriter, isDeleting ? 30 : 30);
+    return () => clearInterval(interval);
+  }, [currentFeatureIndex]);
+
+  // Cursor blinking effect
+  useEffect(() => {
+    const cursorInterval = setInterval(() => {
+      setShowCursor(prev => !prev);
+    }, 500);
+    return () => clearInterval(cursorInterval);
+  }, []);
+
   const getColorClasses = (color) => {
     const colors = {
       blue: 'bg-blue-500 text-white',
@@ -254,7 +311,7 @@ const Home = () => {
     <div className="min-h-screen bg-gray-50" dir="rtl">
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-3 md:py-4">
             {/* Logo */}
             <div className="flex items-center">
@@ -265,7 +322,13 @@ const Home = () => {
               />
               <div className="mr-2 md:mr-3">
                 <h1 className="text-lg md:text-xl font-bold text-gray-900">تتبع</h1>
-                <p className="text-xs md:text-sm text-gray-500 hidden sm:block">نظام إدارة الحضور والغياب</p>
+                <p className="text-xs md:text-sm text-gray-500 hidden sm:block typewriter-container ">
+                  <span className="inline-block typewriter-text">
+                    {displayedText}
+                    <span className="inline-block w-0.5 h-4 bg-blue-500 ml-1 typewriter-cursor">
+                    </span>
+                  </span>
+                </p>
               </div>
             </div>
             
@@ -322,7 +385,7 @@ const Home = () => {
                 <div className="text-right ml-2">
                   <p className="text-xs text-gray-600">مرحباً</p>
                   <p className="text-xs font-semibold text-gray-900">
-                    {user?.name || user?.username || 'المستخدم'}
+                    {user?.name || user?.username || 'المستخدم'} 
                   </p>
                 </div>
               )}

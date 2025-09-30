@@ -106,3 +106,62 @@
   background: #a8a8a8;
 }
 
+/* Typewriter effect animations */
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes typewriter-cursor {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+@keyframes text-glow {
+  0% {
+    text-shadow: 0 0 5px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    text-shadow: 0 0 10px rgba(59, 130, 246, 0.6);
+  }
+  100% {
+    text-shadow: 0 0 5px rgba(59, 130, 246, 0.3);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-in-out;
+}
+
+.typewriter-cursor {
+  animation: typewriter-cursor 1s infinite;
+}
+
+.typewriter-text {
+  animation: text-glow 2s ease-in-out infinite;
+}
+
+/* Fixed width container for typewriter text to prevent layout shifts */
+.typewriter-container {
+  width: 10rem; /* w-64 */
+  min-width: 10rem;
+  max-width: 20rem; /* md:w-80 */
+}
+
+@media (min-width: 768px) {
+  .typewriter-container {
+    width: 20rem; /* md:w-80 */
+    min-width: 20rem;
+  }
+}
+
