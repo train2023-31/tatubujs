@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { Plus, Search, Edit, Trash2, UserPlus, Users as UsersIcon, Eye } from 'lucide-react';
 import { usersAPI, authAPI, classesAPI } from '../../services/api';
@@ -9,6 +9,42 @@ import Modal from '../../components/UI/Modal';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import SearchableSelect from '../../components/UI/SearchableSelect';
 import toast from 'react-hot-toast';
+
+// Email validation function
+const validateEmailFormat = (email) => {
+  if (!email) return { isValid: true, suggestion: null };
+  
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const isValidFormat = emailRegex.test(email);
+  
+  if (!isValidFormat) {
+    // Extract the part before @ if it exists
+    const atIndex = email.indexOf('@');
+    if (atIndex > 0) {
+      const localPart = email.substring(0, atIndex);
+      return {
+        isValid: false,
+        suggestion: `${localPart}@tatubu.com`
+      };
+    } else {
+      return {
+        isValid: false,
+        suggestion: `${email}@tatubu.com`
+      };
+    }
+  }
+  
+  // Check if it ends with @tatubu.com
+  if (!email.endsWith('@tatubu.com')) {
+    const localPart = email.split('@')[0];
+    return {
+      isValid: false,
+      suggestion: `${localPart}@tatubu.com`
+    };
+  }
+  
+  return { isValid: true, suggestion: null };
+};
 
 const Users = () => {
   const { user } = useAuth();
@@ -97,7 +133,8 @@ const Users = () => {
   const filteredData = getCurrentData().filter((user) =>
     user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.job_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Table columns configuration
@@ -133,9 +170,14 @@ const Users = () => {
       key: 'role',
       header: 'الدور',
       render: (row) => (
-        <span className={`badge ${getRoleColor(row.role)}`}>
-          {getRoleDisplayName(row.role)}
-        </span>
+        <div>
+          <span className={`badge ${getRoleColor(row.role)}`}>
+            {getRoleDisplayName(row.role)}
+          </span>
+          {row.role === 'teacher' && row.job_name && (
+            <p className="text-xs text-gray-500 mt-1">{row.job_name}</p>
+          )}
+        </div>
       ),
     },
     {
@@ -152,7 +194,7 @@ const Users = () => {
       header: 'الإجراءات',
       render: (row) => (
         <div className="flex items-center space-x-2">
-          <button
+          {/* <button
             onClick={() => {
               setSelectedUser(row);
               setIsViewModalOpen(true);
@@ -161,7 +203,7 @@ const Users = () => {
             title="عرض التفاصيل"
           >
             <Eye className="h-4 w-4" />
-          </button>
+          </button> */}
           <button
             onClick={() => {
               setSelectedUser(row);
@@ -170,7 +212,7 @@ const Users = () => {
             className="text-primary-600 hover:text-primary-900"
             title="تعديل"
           >
-            <Edit className="h-4 w-4" />
+            <Edit className="h-4 w-4 ml-2" />
           </button>
           <button
             onClick={() => {
@@ -332,6 +374,7 @@ const AddUserForm = ({ onClose, onSuccess }) => {
     week_Classes_Number: '',
     school_id: '',
   });
+  const [emailValidation, setEmailValidation] = useState({ isValid: true, suggestion: null });
 
   // Fetch schools data for admin users
   const { data: schools } = useQuery(
@@ -367,14 +410,30 @@ const AddUserForm = ({ onClose, onSuccess }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    // Validate email before submission
+    const emailValidation = validateEmailFormat(formData.email);
+    if (!emailValidation.isValid) {
+      setEmailValidation(emailValidation);
+      toast.error('يرجى إدخال بريد إلكتروني صحيح ينتهي بـ @tatubu.com');
+      return;
+    }
+    
     addUserMutation.mutate(formData);
   };
 
   const handleChange = (e) => {
+    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     });
+    
+    // Validate email when it changes
+    if (name === 'email') {
+      const validation = validateEmailFormat(value);
+      setEmailValidation(validation);
+    }
   };
 
   return (
@@ -398,9 +457,27 @@ const AddUserForm = ({ onClose, onSuccess }) => {
             name="email"
             value={formData.email}
             onChange={handleChange}
-            className="input"
+            className={`input ${!emailValidation.isValid ? 'border-red-500 focus:border-red-500' : ''}`}
             required
           />
+          {!emailValidation.isValid && emailValidation.suggestion && (
+            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-800">
+                <strong>اقتراح:</strong> هل تقصد{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({ ...formData, email: emailValidation.suggestion });
+                    setEmailValidation({ isValid: true, suggestion: null });
+                  }}
+                  className="text-blue-600 underline hover:text-blue-800 font-medium"
+                >
+                  {emailValidation.suggestion}
+                </button>
+                ؟
+              </p>
+            </div>
+          )}
         </div>
         <div>
           <label className="label">الاسم الكامل</label>
@@ -497,7 +574,7 @@ const AddUserForm = ({ onClose, onSuccess }) => {
         <button
           type="button"
           onClick={onClose}
-          className="btn btn-outline"
+          className="btn btn-outline mr-2 ml-2"
         >
           إلغاء
         </button>
@@ -532,7 +609,18 @@ const EditUserForm = ({ user, onClose, onSuccess }) => {
     school_id: user.school_id || '',
     is_active: user.is_active !== undefined ? user.is_active : true,
     password: '', // Password field for updates
+    job_name: user.job_name || '',
+    week_Classes_Number: user.week_Classes_Number || '',
   });
+  const [emailValidation, setEmailValidation] = useState({ isValid: true, suggestion: null });
+
+  // Validate email when component mounts or user changes
+  useEffect(() => {
+    if (user?.email) {
+      const validation = validateEmailFormat(user.email);
+      setEmailValidation(validation);
+    }
+  }, [user]);
 
   // Fetch schools data for admin users
   const { data: schools } = useQuery(
@@ -558,6 +646,14 @@ const EditUserForm = ({ user, onClose, onSuccess }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     
+    // Validate email before submission
+    const emailValidation = validateEmailFormat(formData.email);
+    if (!emailValidation.isValid) {
+      setEmailValidation(emailValidation);
+      toast.error('يرجى إدخال بريد إلكتروني صحيح ينتهي بـ @tatubu.com');
+      return;
+    }
+    
     // Prepare data for submission
     const submitData = { ...formData };
     
@@ -575,6 +671,12 @@ const EditUserForm = ({ user, onClose, onSuccess }) => {
       ...formData,
       [name]: type === 'checkbox' ? checked : value,
     });
+    
+    // Validate email when it changes
+    if (name === 'email') {
+      const validation = validateEmailFormat(value);
+      setEmailValidation(validation);
+    }
   };
 
   return (
@@ -598,9 +700,27 @@ const EditUserForm = ({ user, onClose, onSuccess }) => {
             name="email"
             value={formData.email}
             onChange={handleChange}
-            className="input"
+            className={`input ${!emailValidation.isValid ? 'border-red-500 focus:border-red-500' : ''}`}
             required
           />
+          {!emailValidation.isValid && emailValidation.suggestion && (
+            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-800">
+                <strong>اقتراح:</strong> هل تقصد{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({ ...formData, email: emailValidation.suggestion });
+                    setEmailValidation({ isValid: true, suggestion: null });
+                  }}
+                  className="text-blue-600 underline hover:text-blue-800 font-medium"
+                >
+                  {emailValidation.suggestion}
+                </button>
+                ؟
+              </p>
+            </div>
+          )}
         </div>
         <div>
           <label className="label">الاسم الكامل</label>
@@ -666,6 +786,32 @@ const EditUserForm = ({ user, onClose, onSuccess }) => {
             placeholder="اتركه فارغاً إذا كنت لا تريد تغيير كلمة المرور"
           />
         </div>
+        {(formData.user_role === 'teacher' || formData.user_role === 'school_admin') && (
+          <>
+            <div>
+              <label className="label">المادة التدرسية</label>
+              <input
+                type="text"
+                name="job_name"
+                value={formData.job_name}
+                onChange={handleChange}
+                className="input"
+                placeholder={formData.user_role === 'school_admin' ? 'مدير مدرسة' : 'المادة التدرسية'}
+              />
+            </div>
+            <div>
+              <label className="label">عدد الحصص الأسبوعية</label>
+              <input
+                type="number"
+                name="week_Classes_Number"
+                value={formData.week_Classes_Number}
+                onChange={handleChange}
+                className="input"
+                placeholder={formData.user_role === 'school_admin' ? '0' : ''}
+              />
+            </div>
+          </>
+        )}
         <div className="md:col-span-2">
           <label className="flex items-center">
             <input
@@ -684,7 +830,7 @@ const EditUserForm = ({ user, onClose, onSuccess }) => {
         <button
           type="button"
           onClick={onClose}
-          className="btn btn-outline"
+          className="btn btn-outline ml-2"
         >
           إلغاء
         </button>
@@ -719,6 +865,8 @@ const ViewUserDetails = ({ user, userDetails, loading, onClose }) => {
       </div>
     );
   }
+  console.log(displayData);
+  
 
   return (
     <div className="space-y-6">
@@ -752,7 +900,7 @@ const ViewUserDetails = ({ user, userDetails, loading, onClose }) => {
           <div>
             <label className="text-sm font-medium text-gray-500">الحالة</label>
             <span className={`badge ${displayData.is_active ? 'badge-success' : 'badge-danger'}`}>
-              {displayData.is_active ? 'نشط' : 'غير نشط'}
+              {displayData.is_active ? 'نشط' : 'غير نشط'} {displayData.role}
             </span>
           </div>
         </div>
@@ -761,7 +909,7 @@ const ViewUserDetails = ({ user, userDetails, loading, onClose }) => {
           {displayData.role === 'teacher' && (
             <>
               <div>
-                <label className="text-sm font-medium text-gray-500">الوظيفة</label>
+                <label className="text-sm font-medium text-gray-500">المادة التدرسية</label>
                 <p className="text-sm text-gray-900">{displayData.job_name || 'غير محدد'}</p>
               </div>
               <div>
