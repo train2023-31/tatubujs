@@ -406,6 +406,293 @@ def get_attendance_summary_all_classes():
         return jsonify(message=f"Internal server error: {str(e)}"), 500
 
 
+@attendance_blueprint.route('/teacherReport', methods=['GET'])
+@jwt_required()
+def get_teacher_report():
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+
+        # Authorization validation
+        if user.user_role not in ['admin', 'school_admin', 'teacher', 'data_analyst']:
+            return jsonify(message="Unauthorized access."), 403
+
+        # Parse requested date; default to today if not provided
+        selected_date_str = request.args.get('date', default=date.today().isoformat())
+        try:
+            selected_date = datetime.strptime(selected_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify(message="Invalid date format. Use YYYY-MM-DD."), 400
+
+        # Get all teachers in the school
+        if user.user_role == 'admin':
+            teachers = Teacher.query.all()
+        else:
+            teachers = Teacher.query.filter_by(school_id=user.school_id).all()
+
+        if not teachers:
+            return jsonify({
+                "date": selected_date.strftime('%Y-%m-%d'),
+                "teacher_summary": [],
+                "total_teachers": 0,
+                "total_classes_taught": 0,
+                "total_attendance_records": 0
+            }), 200
+
+        teacher_summary = []
+        total_classes_taught = 0
+        total_attendance_records = 0
+
+        for teacher in teachers:
+            # Get classes taught by this teacher
+            classes_taught = Class.query.filter_by(teacher_id=teacher.id).all()
+            class_names = [cls.name for cls in classes_taught]
+            
+            # Get attendance records for this teacher on the selected date
+            attendance_records = db.session.query(
+                Attendance.id,
+                Attendance.class_id,
+                Attendance.subject_id,
+                Attendance.class_time_num,
+                Attendance.date,
+                Class.name.label('class_name'),
+                Subject.name.label('subject_name'),
+                func.count(Attendance.student_id).label('total_students'),
+                func.count(case((Attendance.is_present == True, Attendance.student_id), else_=None)).label('present_students'),
+                func.count(case((Attendance.is_Acsent == True, Attendance.student_id), else_=None)).label('absent_students'),
+                func.count(case((Attendance.is_late == True, Attendance.student_id), else_=None)).label('late_students'),
+                func.count(case((Attendance.is_Excus == True, Attendance.student_id), else_=None)).label('excused_students')
+            ).join(
+                Class, Class.id == Attendance.class_id
+            ).join(
+                Subject, Subject.id == Attendance.subject_id
+            ).filter(
+                and_(
+                    Attendance.teacher_id == teacher.id,
+                    Attendance.date == selected_date
+                )
+            ).group_by(
+                Attendance.class_id,
+                Attendance.subject_id,
+                Attendance.class_time_num
+            ).all()
+
+            # Calculate totals for this teacher
+            teacher_total_students = sum(record.total_students for record in attendance_records)
+            teacher_present_students = sum(record.present_students for record in attendance_records)
+            teacher_absent_students = sum(record.absent_students for record in attendance_records)
+            teacher_late_students = sum(record.late_students for record in attendance_records)
+            teacher_excused_students = sum(record.excused_students for record in attendance_records)
+
+            # Calculate teacher attendance based on weekly class number
+            teacher_weekly_classes = teacher.week_Classes_Number or 0
+            teacher_actual_classes = len(attendance_records)
+            teacher_attendance_percentage = round((teacher_actual_classes / teacher_weekly_classes * 100) if teacher_weekly_classes > 0 else 0, 2)
+
+            # Update global counters
+            total_classes_taught += len(classes_taught)
+            total_attendance_records += len(attendance_records)
+
+            teacher_summary.append({
+                "teacher_id": teacher.id,
+                "teacher_name": teacher.fullName,
+                "job_name": teacher.job_name,
+                "classes_taught": class_names,
+                "total_classes": len(classes_taught),
+                "weekly_classes": teacher_weekly_classes,
+                "actual_classes": teacher_actual_classes,
+                "teacher_attendance_percentage": teacher_attendance_percentage,
+                "attendance_records": [
+                    {
+                        "class_name": record.class_name,
+                        "subject_name": record.subject_name,
+                        "class_time_num": record.class_time_num,
+                        "total_students": record.total_students,
+                        "present_students": record.present_students,
+                        "absent_students": record.absent_students,
+                        "late_students": record.late_students,
+                        "excused_students": record.excused_students
+                    } for record in attendance_records
+                ],
+                "total_students": teacher_total_students,
+                "present_students": teacher_present_students,
+                "absent_students": teacher_absent_students,
+                "late_students": teacher_late_students,
+                "excused_students": teacher_excused_students,
+                "attendance_percentage": round((teacher_present_students / teacher_total_students * 100) if teacher_total_students > 0 else 0, 2)
+            })
+
+        return jsonify({
+            "date": selected_date.strftime('%Y-%m-%d'),
+            "teacher_summary": teacher_summary,
+            "total_teachers": len(teachers),
+            "total_classes_taught": total_classes_taught,
+            "total_attendance_records": total_attendance_records
+        }), 200
+
+    except Exception as e:
+        print(f"Error in teacherReport: {str(e)}")
+        return jsonify(message=f"Internal server error: {str(e)}"), 500
+
+
+@attendance_blueprint.route('/teacherHistory/<int:teacher_id>', methods=['GET'])
+@jwt_required()
+def get_teacher_history(teacher_id):
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+
+        # Authorization validation
+        if user.user_role not in ['admin', 'school_admin', 'teacher', 'data_analyst']:
+            return jsonify(message="Unauthorized access."), 403
+
+        # Get teacher details
+        teacher = Teacher.query.get(teacher_id)
+        if not teacher:
+            return jsonify(message="Teacher not found."), 404
+
+        # Check if user has access to this teacher's data
+        if user.user_role != 'admin' and teacher.school_id != user.school_id:
+            return jsonify(message="Unauthorized access to teacher data."), 403
+
+        # Parse date range parameters
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify(message="Invalid start_date format. Use YYYY-MM-DD."), 400
+        else:
+            # Default to last 30 days
+            start_date = date.today() - timedelta(days=30)
+
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify(message="Invalid end_date format. Use YYYY-MM-DD."), 400
+        else:
+            end_date = date.today()
+
+        # Get teacher's classes
+        classes_taught = Class.query.filter_by(teacher_id=teacher_id).all()
+        class_ids = [cls.id for cls in classes_taught]
+
+        # Get detailed attendance history
+        attendance_history = db.session.query(
+            Attendance.date,
+            Attendance.class_id,
+            Attendance.subject_id,
+            Attendance.class_time_num,
+            Class.name.label('class_name'),
+            Subject.name.label('subject_name'),
+            func.count(Attendance.student_id).label('total_students'),
+            func.count(case((Attendance.is_present == True, Attendance.student_id), else_=None)).label('present_students'),
+            func.count(case((Attendance.is_Acsent == True, Attendance.student_id), else_=None)).label('absent_students'),
+            func.count(case((Attendance.is_late == True, Attendance.student_id), else_=None)).label('late_students'),
+            func.count(case((Attendance.is_Excus == True, Attendance.student_id), else_=None)).label('excused_students')
+        ).join(
+            Class, Class.id == Attendance.class_id
+        ).join(
+            Subject, Subject.id == Attendance.subject_id
+        ).filter(
+            and_(
+                Attendance.teacher_id == teacher_id,
+                Attendance.date >= start_date,
+                Attendance.date <= end_date
+            )
+        ).group_by(
+            Attendance.date,
+            Attendance.class_id,
+            Attendance.subject_id,
+            Attendance.class_time_num
+        ).order_by(
+            Attendance.date.desc(),
+            Attendance.class_time_num
+        ).all()
+
+        # Group by date for easier frontend consumption
+        history_by_date = {}
+        for record in attendance_history:
+            date_key = record.date.strftime('%Y-%m-%d')
+            if date_key not in history_by_date:
+                history_by_date[date_key] = {
+                    "date": date_key,
+                    "total_classes": 0,
+                    "total_students": 0,
+                    "present_students": 0,
+                    "absent_students": 0,
+                    "late_students": 0,
+                    "excused_students": 0,
+                    "classes": []
+                }
+            
+            history_by_date[date_key]["total_classes"] += 1
+            history_by_date[date_key]["total_students"] += record.total_students
+            history_by_date[date_key]["present_students"] += record.present_students
+            history_by_date[date_key]["absent_students"] += record.absent_students
+            history_by_date[date_key]["late_students"] += record.late_students
+            history_by_date[date_key]["excused_students"] += record.excused_students
+            
+            history_by_date[date_key]["classes"].append({
+                "class_name": record.class_name,
+                "subject_name": record.subject_name,
+                "class_time_num": record.class_time_num,
+                "total_students": record.total_students,
+                "present_students": record.present_students,
+                "absent_students": record.absent_students,
+                "late_students": record.late_students,
+                "excused_students": record.excused_students,
+                "attendance_percentage": round((record.present_students / record.total_students * 100) if record.total_students > 0 else 0, 2)
+            })
+
+        # Calculate overall statistics
+        total_days = len(history_by_date)
+        total_classes = sum(day["total_classes"] for day in history_by_date.values())
+        total_students = sum(day["total_students"] for day in history_by_date.values())
+        total_present = sum(day["present_students"] for day in history_by_date.values())
+        overall_attendance_percentage = round((total_present / total_students * 100) if total_students > 0 else 0, 2)
+
+        # Calculate teacher attendance based on weekly class number
+        teacher_weekly_classes = teacher.week_Classes_Number or 0
+        total_expected_classes = teacher_weekly_classes * total_days
+        teacher_attendance_percentage = round((total_classes / total_expected_classes * 100) if total_expected_classes > 0 else 0, 2)
+
+        return jsonify({
+            "teacher": {
+                "id": teacher.id,
+                "name": teacher.fullName,
+                "job_name": teacher.job_name,
+                "classes_taught": [cls.name for cls in classes_taught],
+                "weekly_classes": teacher_weekly_classes
+            },
+            "date_range": {
+                "start_date": start_date.strftime('%Y-%m-%d'),
+                "end_date": end_date.strftime('%Y-%m-%d')
+            },
+            "summary": {
+                "total_days": total_days,
+                "total_classes": total_classes,
+                "total_students": total_students,
+                "total_present": total_present,
+                "total_absent": sum(day["absent_students"] for day in history_by_date.values()),
+                "total_late": sum(day["late_students"] for day in history_by_date.values()),
+                "total_excused": sum(day["excused_students"] for day in history_by_date.values()),
+                "overall_attendance_percentage": overall_attendance_percentage,
+                "teacher_weekly_classes": teacher_weekly_classes,
+                "total_expected_classes": total_expected_classes,
+                "teacher_attendance_percentage": teacher_attendance_percentage
+            },
+            "history": list(history_by_date.values())
+        }), 200
+
+    except Exception as e:
+        print(f"Error in teacherHistory: {str(e)}")
+        return jsonify(message=f"Internal server error: {str(e)}"), 500
+
+
 @attendance_blueprint.route('/attendanceDetailsByStudent', methods=['GET'])
 @jwt_required()
 def get_attendance_details_by_student():

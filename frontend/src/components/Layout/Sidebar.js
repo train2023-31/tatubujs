@@ -80,6 +80,12 @@ const Sidebar = ({ isOpen, onClose }) => {
           icon: FileText,
           roles: ['school_admin', 'data_analyst'],
         },
+        {
+          name: 'تقرير المعلمين',
+          href: '/app/teacher-report',
+          icon: Users,
+          roles: ['school_admin', 'data_analyst'],
+        },
       ]
     },
     {

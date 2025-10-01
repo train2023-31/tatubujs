@@ -19,6 +19,7 @@ import News from './pages/News/News';
 import SMS from './pages/SMS/SMS';
 import BulkOperations from './pages/BulkOperations/BulkOperations';
 import DailyReport from './pages/DailyReport/DailyReport';
+import TeacherReport from './pages/TeacherReport/TeacherReport';
 import DeleteSchoolData from './pages/DeleteSchoolData/DeleteSchoolData';
 import ViewLogs from './pages/ViewLogs/ViewLogs';
 import VersionFeatures from './pages/VersionFeatures/VersionFeatures';
@@ -189,6 +190,16 @@ function App() {
                   element={
                     <ProtectedRoute allowedRoles={['school_admin', 'data_analyst']}>
                       <DailyReport />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Teacher Report - School Admin and Data Analyst */}
+                <Route 
+                  path="teacher-report" 
+                  element={
+                    <ProtectedRoute allowedRoles={['school_admin', 'data_analyst']}>
+                      <TeacherReport />
                     </ProtectedRoute>
                   } 
                 />

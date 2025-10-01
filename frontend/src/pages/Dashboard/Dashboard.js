@@ -905,13 +905,11 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                           اسم الطالب
                         </th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          حصص الغياب
-                        </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          حصص التأخير
-                        </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           حصص الهروب
+                        </th>
+           
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          حصص الغياب
                         </th>
                         {/* <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           حالة العذر
@@ -970,11 +968,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                                   {sortedAbsentPeriods.join(', ')}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-center">
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                  {sortedLatePeriods.join(', ')}
-                                </span>
-                              </td>
+                            
                               <td className="px-4 py-3 whitespace-nowrap text-center">
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                   {sortedExcusedPeriods.join(', ')}

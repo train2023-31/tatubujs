@@ -109,6 +109,9 @@ export const attendanceAPI = {
   getMyProfile: () => api.get('/attendance/student/my-profile').then(res => res.data),
   confirmDayAbsents: (data) => api.post('/attendance/confirm-day-absents', data),
   getConfirmationStatus: (params) => api.get('/attendance/get-confirmation-status', { params }).then(res => res.data),
+  // Teacher Report APIs
+  getTeacherReport: (params) => api.get('/attendance/teacherReport', { params }).then(res => res.data),
+  getTeacherHistory: (teacherId, params) => api.get(`/attendance/teacherHistory/${teacherId}`, { params }).then(res => res.data),
 };
 
 // Static/Reports API
