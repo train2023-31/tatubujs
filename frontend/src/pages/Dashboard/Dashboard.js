@@ -905,7 +905,13 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                           اسم الطالب
                         </th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          الحصص الغائبة
+                          حصص الغياب
+                        </th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          حصص التأخير
+                        </th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          حصص الهروب
                         </th>
                         {/* <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           حالة العذر
@@ -923,13 +929,25 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                               student_id: studentId,
                               student_name: student.student_name,
                               is_has_excuse: student.is_has_excuse || student.is_has_exuse || false,
-                              class_time_nums: []
+                              class_time_nums: [],
+                              late_time_nums: [],
+                              excused_time_nums: [],
+                              absent_time_nums: []
                             };
                           }
                           
                           // Add class_time_num to the array
                           if (student.class_time_num) {
                             acc[studentId].class_time_nums.push(student.class_time_num);
+                          }
+                          if (student.is_late) {
+                            acc[studentId].late_time_nums.push(student.class_time_num);
+                          }
+                          if (student.is_excused) {
+                            acc[studentId].excused_time_nums.push(student.class_time_num);
+                          }
+                          if (student.is_absent) {
+                            acc[studentId].absent_time_nums.push(student.class_time_num);
                           }
                           
                           return acc;
@@ -938,6 +956,9 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                         // Convert to array and sort class_time_nums
                         return Object.values(groupedStudents).map((student, index) => {
                           const sortedPeriods = student.class_time_nums.sort((a, b) => a - b);
+                          const sortedLatePeriods = student.late_time_nums.sort((a, b) => a - b);
+                          const sortedExcusedPeriods = student.excused_time_nums.sort((a, b) => a - b);
+                          const sortedAbsentPeriods = student.absent_time_nums.sort((a, b) => a - b);
                           
                           return (
                             <tr key={student.student_id || index} className="hover:bg-gray-50">
@@ -946,7 +967,17 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-center">
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                  {sortedPeriods.join(', ')}
+                                  {sortedAbsentPeriods.join(', ')}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-center">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                  {sortedLatePeriods.join(', ')}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-center">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  {sortedExcusedPeriods.join(', ')}
                                 </span>
                               </td>
                               {/* <td className="px-4 py-3 whitespace-nowrap text-center">

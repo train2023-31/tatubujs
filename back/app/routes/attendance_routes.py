@@ -301,6 +301,8 @@ def get_attendance_summary_all_classes():
             Attendance.class_time_num,
             Attendance.ExcusNote,
             Attendance.is_Acsent,
+            Attendance.is_Excus,
+            Attendance.is_late,
             Student.fullName.label('student_name'),
             Teacher.fullName.label('teacher_name'),
             Subject.name.label('subject_name')
@@ -358,7 +360,9 @@ def get_attendance_summary_all_classes():
                 "subject_name": record.subject_name,
                 "class_time_num": record.class_time_num,
                 "excus_note": record.ExcusNote,
-                "is_absent": record.is_Acsent
+                "is_absent": record.is_Acsent,
+                "is_excused": record.is_Excus,
+                "is_late": record.is_late
             })
 
         # Build response for each class
