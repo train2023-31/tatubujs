@@ -21,7 +21,7 @@ import {
   Phone
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { reportsAPI, attendanceAPI } from '../../services/api';
+import { reportsAPI, attendanceAPI, authAPI } from '../../services/api';
 import { formatDate, getTodayAPI, getRoleDisplayName } from '../../utils/helpers';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import Modal from '../../components/UI/Modal';
@@ -203,22 +203,22 @@ const Dashboard = () => {
     };
   };
 
-  // Fetch school statistics
+  // Fetch school statistics (only for non-student users)
   const { data: schoolStats, isLoading: statsLoading } = useQuery(
     ['schoolStats', selectedDate],
     () => reportsAPI.getSchoolStatistics({ date: selectedDate }),
     {
-      enabled: !!user,
+      enabled: !!user && user.role !== 'student',
       refetchInterval: 30000, // Refetch every 30 seconds
     }
   );
 
-  // Fetch bulk operations status
+  // Fetch bulk operations status (only for non-student users)
   const { data: bulkOpsStatus, isLoading: bulkOpsLoading } = useQuery(
     ['bulkOpsStatus'],
     () => reportsAPI.getBulkOperationsStatus(),
     {
-      enabled: !!user,
+      enabled: !!user && user.role !== 'student',
       refetchInterval: 30000, // Refetch every 30 seconds
     }
   );
@@ -228,7 +228,7 @@ const Dashboard = () => {
     ['teacherAttendance', selectedDate],
     () => reportsAPI.getTeacherAttendanceThisWeek({ date: selectedDate }),
     {
-      enabled: !!user && (user.role === 'teacher' || user.role === 'school_admin'),
+      enabled: !!user && (user.role === 'teacher' || user.role === 'school_admin' || user.role === 'data_analyst'),
       refetchInterval: 30000,
     }
   );
@@ -239,6 +239,21 @@ const Dashboard = () => {
       case 'admin':
         return <AdminDashboard schoolStats={schoolStats} loading={statsLoading} />;
       case 'school_admin':
+        return (
+          <SchoolAdminDashboard 
+            schoolStats={schoolStats} 
+            teacherAttendance={teacherAttendance}
+            loading={statsLoading || teacherLoading}
+            selectedDate={selectedDate}
+            setSelectedDate={setSelectedDate}
+            onNavigateToAttendance={handleNavigateToAttendance}
+            onNavigateToAttendancesDetails={handleNavigateToAttendancesDetails}
+            needsSetup={needsSetup}
+            bulkOpsStatus={bulkOpsStatus}
+            bulkOpsLoading={bulkOpsLoading}
+          />
+        );
+      case 'data_analyst':
         return (
           <SchoolAdminDashboard 
             schoolStats={schoolStats} 
@@ -264,6 +279,13 @@ const Dashboard = () => {
             onNavigateToAttendancesDetails={ handleNavigateToAttendancesDetails}
           />
         );
+      case 'student':
+        return (
+          <StudentDashboard 
+            selectedDate={selectedDate}
+            setSelectedDate={setSelectedDate}
+          />
+        );
       default:
         return <div>دور غير معروف</div>;
     }
@@ -286,7 +308,7 @@ const Dashboard = () => {
             {formatDate(new Date(), 'EEEE, dd MMMM yyyy', 'ar-OM')}
            
           </div>
-          {user?.role === 'school_admin' && (
+          {(user?.role === 'school_admin' || user?.role === 'data_analyst') && (
             <div className="flex items-center space-x-2">
               <button
                 onClick={handlePrint}
@@ -760,17 +782,12 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                       <td className="table-cell text-center">
                         
                         <button
-                          disabled={classData.total_present === 0 || classData.total_present === classData.total_students}
                           
                           onClick={() => handleViewAbsentStudents(classData)}
                           className="inline-flex items-center justify-center w-8 h-8  hover:bg-blue-200  rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                           title="عرض الطلاب الغائبين"
-                        >
-                          {classData.total_present === 0 || classData.total_present === classData.total_students ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
+                        >            
                             <Eye className="h-4 w-4 text-blue-600" />
-                          )}
                         </button>
                       </td>
                     </tr>
@@ -1060,17 +1077,382 @@ const StatCard = ({ title, value, icon: Icon, color }) => {
 
   return (
     <div className="card">
-      <div className="card-body">
+      <div className="card-body p-3 sm:p-4">
         <div className="flex items-center">
-          <div className={`p-3 rounded-lg ${colorClasses[color]}`}>
-            <Icon className="h-6 w-6" />
+          <div className={`p-2 sm:p-3 rounded-lg ${colorClasses[color]} flex-shrink-0`}>
+            <Icon className="h-4 w-4 sm:h-6 sm:w-6" />
           </div>
-          <div className="mr-4">
-            <p className="text-sm font-medium text-gray-600">{title}</p>
-            <p className="text-2xl font-bold text-gray-900">{value}</p>
+          <div className="mr-2 sm:mr-4 min-w-0 flex-1">
+            <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">{title}</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">{value}</p>
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+// Student Dashboard Component
+const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Debug logging
+  console.log('StudentDashboard - User object:', user);
+  console.log('StudentDashboard - User ID:', user?.user_id);
+  console.log('StudentDashboard - User role:', user?.role);
+  console.log('StudentDashboard - Enabled condition for queries:', !!user?.user_id);
+
+  // Fetch student attendance history (all data, no date range)
+  const { data: studentAttendanceHistory, isLoading: attendanceLoading } = useQuery(
+    ['studentAttendanceHistory', user?.user_id],
+    () => {
+      console.log('StudentDashboard - Query function called for attendance history');
+      return attendanceAPI.getMyAttendanceHistory();
+    },
+    {
+      enabled: !!user?.user_id,
+      refetchInterval: 30000,
+      onSuccess: (data) => {
+        console.log('StudentDashboard - Attendance history data loaded:', data);
+      },
+      onError: (error) => {
+        console.error('StudentDashboard - Attendance history error:', error);
+      }
+    }
+  );
+
+  // Fetch student attendance statistics
+  const { data: studentAttendanceStats, isLoading: statsLoading } = useQuery(
+    ['studentAttendanceStats', user?.user_id],
+    () => {
+      console.log('StudentDashboard - Query function called for stats');
+      return attendanceAPI.getMyAttendanceStats();
+    },
+    {
+      enabled: !!user?.user_id,
+      refetchInterval: 30000,
+      onSuccess: (data) => {
+        console.log('StudentDashboard - Stats data loaded:', data);
+      },
+      onError: (error) => {
+        console.error('StudentDashboard - Stats error:', error);
+      }
+    }
+  );
+
+  // Fetch student profile data
+  const { data: studentProfile, isLoading: profileLoading } = useQuery(
+    ['studentProfile', user?.user_id],
+    () => {
+      console.log('StudentDashboard - Query function called for profile');
+      return attendanceAPI.getMyProfile();
+    },
+    {
+      enabled: !!user?.user_id,
+      onSuccess: (data) => {
+        console.log('StudentDashboard - Profile data loaded:', data);
+      },
+      onError: (error) => {
+        console.error('StudentDashboard - Profile error:', error);
+      }
+    }
+  );
+
+  if (attendanceLoading || profileLoading || statsLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  const attendanceHistory = studentAttendanceHistory?.attendance_history || [];
+  const attendanceStats = studentAttendanceStats?.statistics || {};
+  
+  // Show all attendance data, not filtered by date
+  const allAttendance = attendanceHistory;
+  
+  // Group attendance records by date
+  const groupedAttendance = allAttendance.reduce((groups, record) => {
+    const date = record.date;
+    if (!groups[date]) {
+      groups[date] = [];
+    }
+    groups[date].push(record);
+    return groups;
+  }, {});
+  
+  // Sort dates in descending order (newest first)
+  const sortedDates = Object.keys(groupedAttendance).sort((a, b) => new Date(b) - new Date(a));
+
+  // Use API stats if available, otherwise calculate from records
+  const totalAbsentDays = attendanceStats.absent_count || 0;
+  const totalLateDays = attendanceStats.late_count || 0;
+  const totalExcusedDays = attendanceStats.excused_count || 0;
+  const totalRecords = attendanceStats.total_records || 0;
+  const attendanceRate = attendanceStats.attendance_rate || 0;
+  const behaviorNote = attendanceStats.behavior_note || "";
+
+  return (
+    <div className="space-y-6">
+  
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
+        <StatCard
+          title="معدل الحضور"
+          value={`${attendanceRate}%`}
+          icon={TrendingUp}
+          color="blue"
+        />
+        <StatCard
+          title="أيام الهروب"
+          value={totalAbsentDays}
+          icon={AlertCircle}
+          color="red"
+        />
+        <StatCard
+          title="أيام التأخر"
+          value={totalLateDays}
+          icon={Clock}
+          color="orange"
+        />
+        <StatCard
+          title="أيام الغياب"
+          value={totalExcusedDays}
+          icon={CheckCircle}
+          color="green"
+        />
+        <StatCard
+          title="إجمالي السجلات"
+          value={totalRecords}
+          icon={FileText}
+          color="purple"
+        />
+      </div>
+
+      {/* Behavior Note */}
+      {behaviorNote && (
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">ملاحظة السلوك</h3>
+          </div>
+          <div className="card-body">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600" />
+                </div>
+                <div className="mr-2 sm:mr-3">
+                  <h4 className="text-xs sm:text-sm font-medium text-yellow-800 mb-1 sm:mb-2">
+                    ملاحظة من المعلم
+                  </h4>
+                  <p className="text-xs sm:text-sm text-yellow-700 leading-relaxed">
+                    {behaviorNote}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Information */}
+      <div className="card">
+        <div className="card-header">
+          <h3 className="card-title">معلوماتي الشخصية</h3>
+        </div>
+        <div className="card-body">
+          <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <label className="label">الاسم الكامل</label>
+              <p className="text-gray-900">{studentProfile?.fullName || 'غير محدد'}</p>
+            </div>
+            <div>
+              <label className="label">اسم المستخدم</label>
+              <p className="text-gray-900">{studentProfile?.username || 'غير محدد'}</p>
+            </div>
+            <div>
+              <label className="label">البريد الإلكتروني</label>
+              <p className="text-gray-900">{studentProfile?.email || 'غير محدد'}</p>
+            </div>
+            <div>
+              <label className="label">رقم الهاتف</label>
+              <p className="text-gray-900">{studentProfile?.phone_number || 'غير محدد'}</p>
+            </div>
+            <div>
+              <label className="label">عدد الفصول</label>
+              <p className="text-gray-900">{studentProfile?.total_classes || 0}</p>
+            </div>
+            <div>
+              <label className="label">الفصول المسجلة</label>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {studentProfile?.classes?.map((classItem, idx) => (
+                  <span key={idx} className="badge badge-outline text-xs">
+                    {classItem.class_name}
+                  </span>
+                )) || <span className="text-gray-500">لا توجد فصول</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* All Attendance Records */}
+      <div className="card">
+        <div className="card-header">
+          <h3 className="card-title">سجل الحضور الكامل</h3>
+        </div>
+        <div className="card-body">
+          {allAttendance.length > 0 ? (
+            <div className="space-y-4 sm:space-y-6">
+              {sortedDates.map((date) => (
+                <div key={date} className="border rounded-lg p-3 sm:p-4">
+                  <div className="mb-3 sm:mb-4">
+                    <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
+                      {formatDate(date, 'EEEE, dd MMMM yyyy', 'ar')}
+                    </h4>
+                    <div className="border-t pt-3 sm:pt-4">
+                      {/* Desktop Table View */}
+                      <div className="hidden md:block overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-2 text-right text-sm font-medium text-gray-700">الحصة</th>
+                              <th className="px-4 py-2 text-right text-sm font-medium text-gray-700">الفصل</th>
+                              <th className="px-4 py-2 text-right text-sm font-medium text-gray-700">المادة</th>
+                              <th className="px-4 py-2 text-right text-sm font-medium text-gray-700">المعلم</th>
+                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-700">الحالة</th>
+                              <th className="px-4 py-2 text-right text-sm font-medium text-gray-700">ملاحظة العذر</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {groupedAttendance[date].map((record, index) => (
+                              <tr key={index} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 text-sm text-gray-900">
+                                  {record.class_time_num}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-900">
+                                  {record.class_name}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-900">
+                                  {record.subject_name}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-900">
+                                  {record.teacher_name}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  {record.is_absent && (
+                                    <span className="badge badge-danger">
+                                      هارب
+                                    </span>
+                                  )}
+                                  {record.is_late && (
+                                    <span className="badge badge-warning">
+                                      متأخر
+                                    </span>
+                                  )}
+                                  {record.is_excused && (
+                                    <span className="badge badge-success">
+                                      غائب
+                                    </span>
+                                  )}
+                                  {record.is_present && !record.is_absent && !record.is_late && !record.is_excused && (
+                                    <span className="badge badge-info">
+                                      حاضر
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-900">
+                                  {record.excuse_note && record.excuse_note.trim() ? (
+                                    <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                      {record.excuse_note}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      
+                      {/* Mobile Card View */}
+                      <div className="md:hidden space-y-3">
+                        {groupedAttendance[date].map((record, index) => (
+                          <div key={index} className="bg-gray-50 rounded-lg p-3 border">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center space-x-2 space-x-reverse">
+                                <span className="text-sm font-medium text-gray-600">الحصة:</span>
+                                <span className="text-sm font-semibold text-gray-900">{record.class_time_num}</span>
+                              </div>
+                              <div>
+                                {record.is_absent && (
+                                  <span className="badge badge-danger text-xs">
+                                    هارب
+                                  </span>
+                                )}
+                                {record.is_late && (
+                                  <span className="badge badge-warning text-xs">
+                                    متأخر
+                                  </span>
+                                )}
+                                {record.is_excused && (
+                                  <span className="badge badge-success text-xs">
+                                    غائب
+                                  </span>
+                                )}
+                                {record.is_present && !record.is_absent && !record.is_late && !record.is_excused && (
+                                  <span className="badge badge-info text-xs">
+                                    حاضر
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="space-y-1 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">الفصل:</span>
+                                <span className="text-gray-900">{record.class_name}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">المادة:</span>
+                                <span className="text-gray-900">{record.subject_name}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">المعلم:</span>
+                                <span className="text-gray-900">{record.teacher_name}</span>
+                              </div>
+                              {record.excuse_note && record.excuse_note.trim() && (
+                                <div className="mt-2 pt-2 border-t">
+                                  <span className="text-gray-600 text-xs">ملاحظة العذر:</span>
+                                  <p className="text-xs bg-gray-100 px-2 py-1 rounded mt-1">
+                                    {record.excuse_note}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">لا توجد سجلات حضور</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      
+
+  
     </div>
   );
 };

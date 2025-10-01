@@ -177,7 +177,7 @@ const AttendanceDetails = () => {
     { id: 'details', name: 'تفاصيل الطلاب', icon: Eye },
     { id: 'excused', name: 'الطلاب المعذورين', icon: AlertCircle },
     // Only show behavior notes log for school admins
-    ...(user?.role === 'school_admin' ? [{ id: 'log', name: 'سجل ملاحظات الطالب', icon: Calendar }] : []),
+    ...(user?.role === 'school_admin' || user?.role === 'data_analyst' ? [{ id: 'log', name: 'سجل ملاحظات الطالب', icon: Calendar }] : []),
   ];
 
   // PDF Export Function
@@ -613,7 +613,7 @@ const AttendanceDetails = () => {
           <h1 className="text-2xl font-bold text-gray-900">تفاصيل الحضور</h1>
           <p className="text-gray-600">عرض تفصيلي لسجلات الحضور والغياب</p>
         </div>
-        {user?.role === 'school_admin' && (
+        {(user?.role === 'school_admin' || user?.role === 'data_analyst') && (
           <div className="flex items-center space-x-2">
             <button
               onClick={handlePrint}
@@ -831,7 +831,7 @@ const AttendanceDetails = () => {
               <div className="md:col-span-3">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-gray-500">ملاحظة السلوك</label>
-                  {user?.role === 'school_admin' && (
+                  {(user?.role === 'school_admin' || user?.role === 'data_analyst') && (
                     <button
                       onClick={handleOpenBehaviorNoteModal}
                       className="text-primary-600 hover:text-primary-900 flex items-center text-sm"

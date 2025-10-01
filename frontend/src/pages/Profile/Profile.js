@@ -44,8 +44,8 @@ const Profile = () => {
   );
 
   const tabs = [
-    { id: 'profile', name: 'الملف الشخصي' },
-    { id: 'password', name: 'تغيير كلمة المرور' },
+    { id: 'profile', name: 'الملف الشخصي'}, // not show for student profile 
+    { id: 'password', name: 'تغيير كلمة المرور' } ,
   ];
 
   return (

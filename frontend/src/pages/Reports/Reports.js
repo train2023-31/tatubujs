@@ -39,7 +39,7 @@ const Reports = () => {
   const { data: teacherAttendance, isLoading: teacherLoading } = useQuery(
     ['teacherAttendance', dateRange.start],
     () => reportsAPI.getTeacherAttendanceThisWeek({ date: dateRange.start }),
-    { enabled: !!user && (user.role === 'school_admin' || user.role === 'admin') }
+    { enabled: !!user && (user.role === 'school_admin' || user.role === 'admin' || user.role === 'data_analyst') }
   );
 
   // Fetch absence statistics
@@ -59,7 +59,7 @@ const Reports = () => {
       start_date: dateRange.start,
       end_date: dateRange.end,
     }),
-    { enabled: !!user && (user.role === 'school_admin' || user.role === 'admin') }
+    { enabled: !!user && (user.role === 'school_admin' || user.role === 'admin' || user.role === 'data_analyst') }
   );
 
   const tabs = [
@@ -305,7 +305,7 @@ const Reports = () => {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">التقارير والإحصائيات</h1>
           <p className="text-sm sm:text-base text-gray-600">عرض وتحليل بيانات الحضور والغياب</p>
         </div>
-        {user?.role === 'school_admin' && (
+        {(user?.role === 'school_admin' || user?.role === 'data_analyst') && (
           <div className="flex flex-wrap items-center gap-2">
             {/* <button
               onClick={handlePrint}

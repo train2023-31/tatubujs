@@ -247,7 +247,7 @@ def get_attendance_summary_all_classes():
         user = User.query.get(teacher_id)
 
         # Authorization validation
-        if user.user_role not in ['admin', 'school_admin', 'teacher']:
+        if user.user_role not in ['admin', 'school_admin', 'teacher', 'data_analyst']:
             return jsonify(message="Unauthorized access."), 403
 
         # Parse requested date; default to today if not provided
@@ -409,7 +409,7 @@ def get_attendance_details_by_student():
     user = User.query.get(teacher_id)
 
     # Authorization validation
-    if user.user_role not in ['admin', 'school_admin', 'teacher']:
+    if user.user_role not in ['admin', 'school_admin', 'teacher', 'data_analyst']:
         return jsonify(message="Unauthorized access."), 403
 
     # Parse requested date; default to today if not provided
@@ -575,7 +575,7 @@ def get_attendance_details_by_students():
     user = User.query.get(teacher_id)
 
     # Authorization validation
-    if user.user_role not in ['admin', 'school_admin', 'teacher']:
+    if user.user_role not in ['admin', 'school_admin', 'teacher', 'data_analyst']:
         return jsonify(message="Unauthorized access."), 403
 
     # Parse requested date; default to today if not provided
@@ -640,7 +640,7 @@ def get_students_with_excused_attendance():
     user = User.query.get(user_id)
 
     # Ensure only authorized roles can access this endpoint
-    if user.user_role not in ['admin', 'school_admin', 'teacher']:
+    if user.user_role not in ['admin', 'school_admin', 'teacher', 'data_analyst']:
         return jsonify({
             "message": {
                 "en": "Unauthorized access.",
@@ -734,7 +734,7 @@ def update_excuse_note():
     user = User.query.get(user_id)
 
     # Ensure only authorized roles can update attendance
-    if user.user_role not in ['admin', 'school_admin', 'teacher']:
+    if user.user_role not in ['admin', 'school_admin', 'teacher', 'data_analyst']:
         return jsonify({
             "message": {
                 "en": "Unauthorized access.",
@@ -919,7 +919,7 @@ def update_excuse():
     user = User.query.get(user_id)
 
     # Ensure only authorized roles can update attendance
-    if user.user_role not in ['school_admin']:
+    if user.user_role not in ['school_admin', 'data_analyst']:
         return jsonify({
             "message": {
                 "en": "Unauthorized access.",
@@ -1049,7 +1049,7 @@ def get_confirmation_status():
     user = User.query.get(user_id)
 
     # Ensure only authorized roles can access
-    if user.user_role not in ['admin', 'school_admin', 'teacher']:
+    if user.user_role not in ['admin', 'school_admin', 'teacher', 'data_analyst']:
         return jsonify({
             "message": {
                 "en": "Unauthorized access.",
@@ -1116,3 +1116,195 @@ def get_confirmation_status():
             "updated_at": None,
             "flag": 6
         }), 200
+
+
+@attendance_blueprint.route('/student/my-attendance-history', methods=['GET'])
+@jwt_required()
+def get_my_attendance_history():
+    """
+    Get complete attendance history for the authenticated student.
+    """
+    # Get the authenticated user
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    # Ensure only students can access this endpoint
+    if user.user_role != 'student':
+        return jsonify({
+            "message": {
+                "en": "Unauthorized access. Only students can access this endpoint.",
+                "ar": "ليس لديك صلاحية الوصول. فقط الطلاب يمكنهم الوصول لهذا الم endpoint."
+            },
+            "flag": 1
+        }), 403
+
+    # Get all attendance records for this student (excluding present records)
+    attendance_records = db.session.query(
+        Attendance.date,
+        Attendance.class_time_num,
+        Attendance.is_present,
+        Attendance.is_Acsent,
+        Attendance.is_Excus,
+        Attendance.is_late,
+        Attendance.ExcusNote,
+        Class.name.label('class_name'),
+        Class.id.label('class_id'),
+        Subject.name.label('subject_name'),
+        Teacher.fullName.label('teacher_name')
+    ).join(
+        Class, Class.id == Attendance.class_id
+    ).join(
+        Subject, Subject.id == Attendance.subject_id
+    ).join(
+        Teacher, Teacher.id == Attendance.teacher_id
+    ).filter(
+        Attendance.student_id == user_id,
+        or_(
+            Attendance.is_Acsent == True,
+            Attendance.is_Excus == True,
+            Attendance.is_late == True
+        )
+    ).order_by(Attendance.date.desc()).all()
+
+    # Process the data
+    attendance_data = []
+    for record in attendance_records:
+        attendance_data.append({
+            "date": record.date.strftime('%Y-%m-%d'),
+            "class_time_num": record.class_time_num,
+            "class_name": record.class_name,
+            "class_id": record.class_id,
+            "subject_name": record.subject_name,
+            "teacher_name": record.teacher_name,
+            "is_present": record.is_present,
+            "is_absent": record.is_Acsent,
+            "is_excused": record.is_Excus,
+            "is_late": record.is_late,
+            "excuse_note": record.ExcusNote
+        })
+
+    return jsonify({
+        "student_id": user_id,
+        "student_name": user.fullName,
+        "total_records": len(attendance_data),
+        "attendance_history": attendance_data
+    }), 200
+
+
+@attendance_blueprint.route('/student/my-attendance-stats', methods=['GET'])
+@jwt_required()
+def get_my_attendance_stats():
+    """
+    Get attendance statistics for the authenticated student.
+    """
+    # Get the authenticated user
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    # Ensure only students can access this endpoint
+    if user.user_role != 'student':
+        return jsonify({
+            "message": {
+                "en": "Unauthorized access. Only students can access this endpoint.",
+                "ar": "ليس لديك صلاحية الوصول. فقط الطلاب يمكنهم الوصول لهذا الم endpoint."
+            },
+            "flag": 1
+        }), 403
+
+    # Get attendance statistics
+    stats = db.session.query(
+        func.count(Attendance.id).label('total_records'),
+        func.count(func.distinct(Attendance.date)).label('total_days'),
+        func.count(case((Attendance.is_present == True, Attendance.id), else_=None)).label('present_count'),
+        func.count(case((Attendance.is_Acsent == True, Attendance.id), else_=None)).label('absent_count'),
+        func.count(case((Attendance.is_Excus == True, Attendance.id), else_=None)).label('excused_count'),
+        func.count(case((Attendance.is_late == True, Attendance.id), else_=None)).label('late_count')
+    ).filter(
+        Attendance.student_id == user_id
+    ).first()
+
+    # Get student behavior note
+    student = Student.query.get(user_id)
+    behavior_note = student.behavior_note if student and student.behavior_note else ""
+
+    # Calculate percentages
+    total_records = stats.total_records or 0
+    present_count = stats.present_count or 0
+    absent_count = stats.absent_count or 0
+    excused_count = stats.excused_count or 0
+    late_count = stats.late_count or 0
+
+    attendance_rate = (present_count / total_records * 100) if total_records > 0 else 0
+    absence_rate = (absent_count / total_records * 100) if total_records > 0 else 0
+    excuse_rate = (excused_count / total_records * 100) if total_records > 0 else 0
+    late_rate = (late_count / total_records * 100) if total_records > 0 else 0
+
+    return jsonify({
+        "student_id": user_id,
+        "student_name": user.fullName,
+        "statistics": {
+            "total_records": total_records,
+            "total_days": stats.total_days or 0,
+            "present_count": present_count,
+            "absent_count": absent_count,
+            "excused_count": excused_count,
+            "late_count": late_count,
+            "attendance_rate": round(attendance_rate, 2),
+            "absence_rate": round(absence_rate, 2),
+            "excuse_rate": round(excuse_rate, 2),
+            "late_rate": round(late_rate, 2),
+            "behavior_note": behavior_note
+        }
+    }), 200
+
+
+@attendance_blueprint.route('/student/my-profile', methods=['GET'])
+@jwt_required()
+def get_my_profile():
+    """
+    Get profile information for the authenticated student.
+    """
+    # Get the authenticated user
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    # Ensure only students can access this endpoint
+    if user.user_role != 'student':
+        return jsonify({
+            "message": {
+                "en": "Unauthorized access. Only students can access this endpoint.",
+                "ar": "ليس لديك صلاحية الوصول. فقط الطلاب يمكنهم الوصول لهذا الم endpoint."
+            },
+            "flag": 1
+        }), 403
+
+    # Get student's classes
+    student_classes = db.session.query(
+        Class.id,
+        Class.name,
+        Teacher.fullName.label('teacher_name')
+    ).join(
+        Teacher, Teacher.id == Class.teacher_id
+    ).filter(
+        Class.students.any(Student.id == user_id)
+    ).all()
+
+    classes_data = []
+    for class_obj in student_classes:
+        classes_data.append({
+            "class_id": class_obj.id,
+            "class_name": class_obj.name,
+            "teacher_name": class_obj.teacher_name
+        })
+
+    return jsonify({
+        "student_id": user_id,
+        "username": user.username,
+        "fullName": user.fullName,
+        "email": user.email,
+        "phone_number": user.phone_number,
+        "user_role": user.user_role,
+        "school_id": user.school_id,
+        "classes": classes_data,
+        "total_classes": len(classes_data)
+    }), 200

@@ -82,7 +82,7 @@ def create_class():
   
     user = User.query.get(user_id)
 
-    if not user.user_role == 'school_admin':
+    if not user.user_role == 'school_admin' and not user.user_role == 'data_analyst':
         return jsonify(message="Only admin can create classes."), 403
 
     new_class = Class(
@@ -253,7 +253,7 @@ def create_subject():
   
     user = User.query.get(user_id)
 
-    if not user.user_role == 'school_admin':
+    if not user.user_role == 'school_admin' and not user.user_role == 'data_analyst':
         return jsonify(message="Only admin can create classes."), 403
 
     new_class = Subject(

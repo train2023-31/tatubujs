@@ -32,7 +32,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'لوحة التحكم',
           href: '/app/dashboard',
           icon: Home,
-          roles: ['admin', 'school_admin', 'teacher'],
+          roles: ['admin', 'school_admin', 'teacher', 'data_analyst','student'],
         },
       ]
     },
@@ -49,13 +49,13 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'إدارة المستخدمين',
           href: '/app/users',
           icon: Users,
-          roles: ['admin', 'school_admin'],
+          roles: ['admin', 'school_admin', ],
         },
         {
           name: 'إدارة الفصول والمواد',
           href: '/app/classes',
           icon: BookOpen,
-          roles: ['school_admin'],
+          roles: ['school_admin',],
         },
       ]
     },
@@ -66,19 +66,19 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'تسجيل الحضور',
           href: '/app/attendance',
           icon: ClipboardList,
-          roles: ['teacher', 'school_admin'],
+          roles: ['teacher', 'school_admin', 'data_analyst'],
         },
         {
           name: 'تقارير الحضور',
           href: '/app/attendance-details',
           icon: Eye,
-          roles: ['teacher', 'school_admin'],
+          roles: ['teacher', 'school_admin', 'data_analyst'],
         },
         {
           name: 'التقرير اليومي',
           href: '/app/daily-report',
           icon: FileText,
-          roles: [ 'school_admin'],
+          roles: ['school_admin', 'data_analyst'],
         },
       ]
     },
@@ -89,7 +89,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'التقارير والإحصائيات',
           href: '/app/reports',
           icon: BarChart3,
-          roles: ['admin', 'school_admin'],
+          roles: ['admin', 'school_admin', 'data_analyst'],
         },
         
       ]
@@ -101,7 +101,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'إدارة الأخبار',
           href: '/app/news',
           icon: Newspaper,
-          roles: ['admin', 'school_admin'],
+          roles: ['admin', 'school_admin', 'data_analyst'],
         },
         // {
         //   name: 'الرسائل النصية',
@@ -125,7 +125,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'سجلات النظام',
           href: '/app/view-logs',
           icon: FileText,
-          roles: ['admin', 'school_admin'],
+          roles: ['admin', 'school_admin', 'data_analyst'],
         },
       ]
     },
@@ -136,13 +136,13 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'الملف الشخصي',
           href: '/app/profile',
           icon: User,
-          roles: ['admin', 'school_admin', 'teacher'],
+          roles: ['admin', 'school_admin', 'teacher', 'data_analyst','student'],
         },
         {
           name: 'ميزات الإصدارات',
           href: '/app/version-features',
           icon: Star,
-          roles: ['admin', 'school_admin', 'teacher'],
+          roles: ['admin', 'school_admin', 'teacher', 'data_analyst'],
         },
       ]
     },

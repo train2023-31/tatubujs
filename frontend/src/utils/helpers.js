@@ -19,8 +19,6 @@ export const formatDate = (date, format = 'dd/MM/yyyy', locale = 'ar-OM') => {
     month: '2-digit',
     day: '2-digit',
     weekday: 'long',
-    hour: '2-digit',
-    minute: '2-digit',
     timeZone: 'Asia/Muscat', // Muscat, Oman timezone
   };
   
@@ -161,6 +159,7 @@ export const getRoleDisplayName = (role) => {
     school_admin: 'مدير المدرسة',
     teacher: 'معلم',
     student: 'طالب',
+    data_analyst: 'محلل بيانات',
   };
   
   return roleNames[role] || role || 'غير محدد';
@@ -177,6 +176,7 @@ export const getRoleColor = (role) => {
     school_admin: 'badge-warning',
     teacher: 'badge-info',
     student: 'badge-success',
+    data_analyst: 'badge-primary',
   };
   
   return roleColors[role] || 'badge-info';

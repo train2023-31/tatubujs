@@ -92,7 +92,7 @@ const ViewLogs = () => {
     ['viewLogs', currentPage, pageSize, daysFilter],
     () => authAPI.viewLogs(currentPage, pageSize, daysFilter),
     {
-      enabled: !!user && (user.role === 'school_admin' || user.role === 'admin'),
+      enabled: !!user && (user.role === 'school_admin' || user.role === 'admin' || user.role === 'data_analyst'),
       refetchInterval: 30000, // Refetch every 30 seconds
     }
   );
@@ -429,7 +429,7 @@ const ViewLogs = () => {
           <p className="text-gray-600">عرض جميع أنشطة المستخدمين في النظام</p>
         </div>
         
-        {user?.role === 'school_admin' && (
+        {(user?.role === 'school_admin' || user?.role === 'data_analyst') && (
           <div className="flex items-center space-x-2">
             <button
               onClick={handlePrint}

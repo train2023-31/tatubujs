@@ -782,7 +782,7 @@ const Home = () => {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
   
 
             {/* School Admin */}
@@ -812,6 +812,33 @@ const Home = () => {
               </div>
             </div>
 
+            {/* Data Analyst */}
+            <div className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30 text-center">
+              <div className="p-4 md:p-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 bg-purple-100 text-purple-600 rounded-full mb-3 md:mb-4">
+                  <BarChart3 className="h-6 w-6 md:h-8 md:w-8" />
+                </div>
+                <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">محلل البيانات</h3>
+                <p className="text-sm md:text-base text-gray-600 mb-3 md:mb-4 leading-relaxed">
+                  تحليل البيانات والتقارير مع صلاحيات متقدمة للتقارير والإحصائيات
+                </p>
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">تحليل البيانات</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">التقارير المتقدمة</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">إحصائيات مفصلة</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">تتبع الأداء</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Teacher */}
             <div className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30 text-center">
               <div className="p-4 md:p-6">
@@ -829,9 +856,38 @@ const Home = () => {
                   <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
                     <div className="text-xs md:text-sm text-gray-700 text-right">عرض تقارير الفصول</div>
                   </div>
-                  
                   <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
                     <div className="text-xs md:text-sm text-gray-700 text-right">الملف الشخصي</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">إدارة الطلاب</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Student */}
+            <div className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30 text-center">
+              <div className="p-4 md:p-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 bg-orange-100 text-orange-600 rounded-full mb-3 md:mb-4">
+                  <BookOpen className="h-6 w-6 md:h-8 md:w-8" />
+                </div>
+                <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">الطالب</h3>
+                <p className="text-sm md:text-base text-gray-600 mb-3 md:mb-4 leading-relaxed">
+                  عرض معلومات الحضور والغياب والملف الشخصي
+                </p>
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">عرض سجل الحضور</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">إحصائيات الحضور</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">الملف الشخصي</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">ملاحظات السلوك</div>
                   </div>
                 </div>
               </div>

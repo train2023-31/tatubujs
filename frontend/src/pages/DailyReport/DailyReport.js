@@ -73,7 +73,7 @@ const DailyReport = () => {
     ['confirmationStatus', selectedDate],
     () => attendanceAPI.getConfirmationStatus({ date: selectedDate }),
     { 
-      enabled: !!user && user.role === 'school_admin',
+      enabled: !!user && (user.role === 'school_admin' || user.role === 'data_analyst'),
       onSuccess: (data) => {
         setConfirmationStatus(data);
       },
@@ -611,7 +611,7 @@ ${attendanceStatus}
             </div>
             
             {/* Confirmation Status - Only for school_admin */}
-            {user?.role === 'school_admin' && (
+            {(user?.role === 'school_admin' || user?.role === 'data_analyst') && (
               <div className="flex items-center space-x-4">
                 {confirmationLoading ? (
                   <div className="flex items-center space-x-2">

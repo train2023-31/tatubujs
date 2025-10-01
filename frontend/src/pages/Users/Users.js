@@ -392,6 +392,8 @@ const AddUserForm = ({ onClose, onSuccess }) => {
           return authAPI.registerStudents([userData]);
         case 'school_admin':
           return authAPI.registerUser(userData);
+        case 'data_analyst':
+          return authAPI.registerUser(userData);
         default:
           return authAPI.registerUser(userData);
       }
@@ -512,7 +514,36 @@ const AddUserForm = ({ onClose, onSuccess }) => {
             <option value="student">طالب</option>
             <option value="teacher">معلم</option>
             <option value="school_admin">مدير مدرسة</option>
+            <option value="data_analyst">محلل بيانات</option>
           </select>
+          
+          {/* Role Description */}
+          {formData.role && (
+            <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="text-sm text-gray-700">
+                {formData.role === 'student' && (
+                  <div>
+                    <strong className="text-blue-600">طالب:</strong> يمكن للطالب تسجيل الدخول لعرض معلوماته الشخصية وتاريخ حضوره وغيابه.
+                  </div>
+                )}
+                {formData.role === 'teacher' && (
+                  <div>
+                    <strong className="text-green-600">معلم:</strong> يمكن للمعلم تسجيل حضور الطلاب في فصوله، وعرض التقارير المتعلقة بفصوله، وإدارة ملفه الشخصي.
+                  </div>
+                )}
+                {formData.role === 'school_admin' && (
+                  <div>
+                    <strong className="text-orange-600">مدير مدرسة:</strong> صلاحيات شاملة لإدارة المدرسة بما في ذلك إدارة المعلمين والطلاب والفصول، وعرض جميع التقارير والإحصائيات، وإرسال الإشعارات.
+                  </div>
+                )}
+                {formData.role === 'data_analyst' && (
+                  <div>
+                    <strong className="text-purple-600">محلل بيانات:</strong> صلاحيات متقدمة لتحليل البيانات وعرض التقارير المفصلة والإحصائيات، مع إمكانية الوصول لجميع بيانات الحضور والغياب في المدرسة.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
         {user?.role === 'admin' && (
           <SearchableSelect
@@ -542,7 +573,7 @@ const AddUserForm = ({ onClose, onSuccess }) => {
             required
           />
         </div>
-        {(formData.role === 'teacher' || formData.role === 'school_admin') && (
+        {(formData.role === 'teacher' || formData.role === 'school_admin' || formData.role === 'data_analyst') && (
           <>
             <div>
               <label className="label">الوظيفة</label>
@@ -552,7 +583,7 @@ const AddUserForm = ({ onClose, onSuccess }) => {
                 value={formData.job_name}
                 onChange={handleChange}
                 className="input"
-                placeholder={formData.role === 'school_admin' ? 'مدير مدرسة' : 'الوظيفة'}
+                placeholder={formData.role === 'school_admin' ? 'مدير مدرسة' : formData.role === 'data_analyst' ? 'محلل بيانات' : 'الوظيفة'}
               />
             </div>
             <div>
@@ -570,7 +601,7 @@ const AddUserForm = ({ onClose, onSuccess }) => {
         )}
       </div>
 
-      <div className="flex items-center justify-end space-x-3 pt-4">
+      <div className="flex items-center justify-between space-x-3 pt-4">
         <button
           type="button"
           onClick={onClose}
@@ -756,7 +787,36 @@ const EditUserForm = ({ user, onClose, onSuccess }) => {
             <option value="school_admin">مدير المدرسة</option>
             <option value="teacher">معلم</option>
             <option value="student">طالب</option>
+            <option value="data_analyst">محلل بيانات</option>
           </select>
+          
+          {/* Role Description */}
+          {formData.user_role && (
+            <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="text-sm text-gray-700">
+                {formData.user_role === 'student' && (
+                  <div>
+                    <strong className="text-blue-600">طالب:</strong> يمكن للطالب تسجيل الدخول لعرض معلوماته الشخصية وتاريخ حضوره وغيابه.
+                  </div>
+                )}
+                {formData.user_role === 'teacher' && (
+                  <div>
+                    <strong className="text-green-600">معلم:</strong> يمكن للمعلم تسجيل حضور الطلاب في فصوله، وعرض التقارير المتعلقة بفصوله، وإدارة ملفه الشخصي.
+                  </div>
+                )}
+                {formData.user_role === 'school_admin' && (
+                  <div>
+                    <strong className="text-orange-600">مدير مدرسة:</strong> صلاحيات شاملة لإدارة المدرسة بما في ذلك إدارة المعلمين والطلاب والفصول، وعرض جميع التقارير والإحصائيات، وإرسال الإشعارات.
+                  </div>
+                )}
+                {formData.user_role === 'data_analyst' && (
+                  <div>
+                    <strong className="text-purple-600">محلل بيانات:</strong> صلاحيات متقدمة لتحليل البيانات وعرض التقارير المفصلة والإحصائيات، مع إمكانية الوصول لجميع بيانات الحضور والغياب في المدرسة.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
         {currentUser?.role === 'admin' && (
           <SearchableSelect
@@ -786,7 +846,7 @@ const EditUserForm = ({ user, onClose, onSuccess }) => {
             placeholder="اتركه فارغاً إذا كنت لا تريد تغيير كلمة المرور"
           />
         </div>
-        {(formData.user_role === 'teacher' || formData.user_role === 'school_admin') && (
+        {(formData.user_role === 'teacher' || formData.user_role === 'school_admin' || formData.user_role === 'data_analyst') && (
           <>
             <div>
               <label className="label">المادة التدرسية</label>
@@ -796,7 +856,7 @@ const EditUserForm = ({ user, onClose, onSuccess }) => {
                 value={formData.job_name}
                 onChange={handleChange}
                 className="input"
-                placeholder={formData.user_role === 'school_admin' ? 'مدير مدرسة' : 'المادة التدرسية'}
+                placeholder={formData.user_role === 'school_admin' ? 'مدير مدرسة' : formData.user_role === 'data_analyst' ? 'محلل بيانات' : 'المادة التدرسية'}
               />
             </div>
             <div>
@@ -826,7 +886,7 @@ const EditUserForm = ({ user, onClose, onSuccess }) => {
         </div>
       </div>
 
-      <div className="flex items-center justify-end space-x-3 pt-4">
+      <div className="flex items-center justify-between">
         <button
           type="button"
           onClick={onClose}

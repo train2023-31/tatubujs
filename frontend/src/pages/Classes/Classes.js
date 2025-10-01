@@ -426,7 +426,7 @@ const AddClassForm = ({ onClose, onSubmit, loading }) => {
         />
       </div>
 
-      <div className="flex items-center justify-end space-x-3 pt-4">
+      <div className="flex items-center justify-between">
         <button
           type="button"
           onClick={onClose}
@@ -606,7 +606,7 @@ const AddSubjectForm = ({ onClose, onSubmit, loading, existingSubjects = [] }) =
           )}
         </div>
 
-        <div className="flex items-center justify-end space-x-3 pt-4">
+        <div className="flex items-center justify-between">
           <button
             type="button"
             onClick={onClose}
@@ -791,7 +791,7 @@ const EditForm = ({ item, type, onClose }) => {
         />
       </div>
 
-      <div className="flex items-center justify-end space-x-3 pt-4">
+      <div className="flex items-center justify-between">
         <button
           type="button"
           onClick={onClose}
@@ -878,7 +878,7 @@ const AssignStudentsForm = ({ classData, students, onClose, onSubmit, loading })
         )}
       </div>
 
-      <div className="flex items-center justify-end space-x-3 pt-4">
+      <div className="flex items-center justify-between">
         <button
           type="button"
           onClick={onClose}
@@ -1035,7 +1035,7 @@ const RemoveStudentsForm = ({ classData, students, loading, onClose, onSubmit, s
         )}
       </div>
 
-      <div className="flex items-center justify-end space-x-3 pt-4">
+      <div className="flex items-center justify-between">
         <button
           type="button"
           onClick={onClose}

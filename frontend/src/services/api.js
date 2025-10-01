@@ -103,6 +103,10 @@ export const attendanceAPI = {
   updateExcuseNote: (data) => api.put('/attendance/update_excuse_note', data),
   getStudentAttendanceLog: (params) => api.get('/attendance/student_attendance_log', { params }).then(res => res.data),
   updateExcuseForStudent: (data) => api.post('/attendance/update-excuse-for-student', data),
+  // New student-specific endpoints (no date ranges required)
+  getMyAttendanceHistory: () => api.get('/attendance/student/my-attendance-history').then(res => res.data),
+  getMyAttendanceStats: () => api.get('/attendance/student/my-attendance-stats').then(res => res.data),
+  getMyProfile: () => api.get('/attendance/student/my-profile').then(res => res.data),
   confirmDayAbsents: (data) => api.post('/attendance/confirm-day-absents', data),
   getConfirmationStatus: (params) => api.get('/attendance/get-confirmation-status', { params }).then(res => res.data),
 };

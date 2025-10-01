@@ -180,6 +180,16 @@ def register():
             fullName=fullName,
             school_id=school_id
         )
+    elif role == 'data_analyst':
+        new_user = Teacher(
+            username=username,
+            password=hashed_password,
+            email=email,
+            phone_number=phone_number,
+            user_role=role,
+            fullName=fullName,
+            school_id=school_id
+        )
     elif role == 'admin':
         new_user = User(
             username=username,
@@ -205,7 +215,7 @@ def register_single_teacher():
     user_id = get_jwt_identity()
     Login_user = User.query.get(user_id)
 
-    if Login_user.user_role != 'school_admin':  # Ensure only school_admin can register teachers
+    if Login_user.user_role != 'school_admin' and Login_user.user_role != 'data_analyst':  # Ensure only school_admin or data_analyst can register teachers
         return jsonify(message={"en": "Unauthorized to make this action.", "ar": "غير مصرح لك بتنفيذ هذا الإجراء."}, flag=1), 400
     
     data = request.get_json()
@@ -268,7 +278,7 @@ def register_Users():
 
     data = request.get_json()
     
-    if Login_user.user_role != 'school_admin':  # Ensure only school_admin can register teachers
+    if Login_user.user_role != 'school_admin' and Login_user.user_role != 'data_analyst':  # Ensure only school_admin or data_analyst can register teachers
         return jsonify(message={"en": "Unauthorized to make this action.", "ar": "غير مصرح لك بتنفيذ هذا الإجراء."}, flag=1), 400
     
     if not isinstance(data, list):  # Ensure data is a list of users
@@ -1342,7 +1352,7 @@ def view_logs():
         User, ActionLog.user_id == User.id
     )
 
-    if user.user_role == 'school_admin':
+    if user.user_role == 'school_admin' or user.user_role == 'data_analyst':
         query = query.filter(User.school_id == user.school_id)
     elif user.user_role == 'admin':
         pass

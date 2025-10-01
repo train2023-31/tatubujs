@@ -22,11 +22,11 @@ def get_users_of_my_school():
         return jsonify(message="User not found."), 404
 
     # Check user role
-    if user.user_role == 'teacher' or user.user_role == 'school_admin':
+    if user.user_role == 'teacher' or user.user_role == 'school_admin' or user.user_role == 'data_analyst':
         # Retrieve the Teacher instance to get school_id
         teacher = Teacher.query.get(user_id)
         if not teacher or not user.school_id:
-            return jsonify(message="Teacher is not associated with a school."), 400
+            return jsonify(message="User is not associated with a school."), 400
         school_id = user.school_id
 
         # Fetch all students and teachers in the school
@@ -57,11 +57,11 @@ def get_Teachers_of_my_school():
         return jsonify(message="User not found."), 404
 
     # Check user role
-    if user.user_role == 'teacher' or user.user_role == 'school_admin':
+    if user.user_role == 'teacher' or user.user_role == 'school_admin' or user.user_role == 'data_analyst':
         # Retrieve the Teacher instance to get school_id
         teacher = Teacher.query.get(user_id)
         if not teacher or not user.school_id:
-            return jsonify(message="Teacher is not associated with a school."), 400
+            return jsonify(message="User is not associated with a school."), 400
         school_id = user.school_id
 
         # Fetch all students and teachers in the school
@@ -91,7 +91,7 @@ def get_Students_of_my_school():
         return jsonify(message="User not found."), 404
 
     # Check user role and get school_id
-    if user.user_role == 'teacher' or user.user_role == 'school_admin':
+    if user.user_role == 'teacher' or user.user_role == 'school_admin' or user.user_role == 'data_analyst':
         if not user.school_id:
             return jsonify(message="User is not associated with a school."), 400
         school_id = user.school_id
@@ -143,7 +143,7 @@ def update_student_behavior_note(student_id):
         return jsonify(message="User not found."), 404
 
     # Check if user has permission to update student behavior notes
-    if user.user_role not in ['teacher', 'school_admin', 'admin']:
+    if user.user_role not in ['teacher', 'school_admin', 'admin', 'data_analyst']:
         return jsonify(message="Access forbidden: insufficient permissions."), 403
 
     # Get the student
@@ -152,7 +152,7 @@ def update_student_behavior_note(student_id):
         return jsonify(message="Student not found."), 404
 
     # Check if user has access to this student's school
-    if user.user_role in ['teacher', 'school_admin']:
+    if user.user_role in ['teacher', 'school_admin', 'data_analyst']:
         if user.school_id != student.school_id:
             return jsonify(message="Access forbidden: cannot update student from different school."), 403
 

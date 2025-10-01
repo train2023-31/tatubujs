@@ -259,8 +259,8 @@ def teacher_attendance_this_week():
             "week_Classes_Number": teacher.week_Classes_Number
         })
 
-    # 4️⃣ If user is a school_admin
-    elif user.user_role == 'school_admin':
+    # 4️⃣ If user is a school_admin or data_analyst
+    elif user.user_role == 'school_admin' or user.user_role == 'data_analyst':
         teachers = Teacher.query.filter_by(school_id=user.school_id).all()
 
         for teacher in teachers:
@@ -372,8 +372,8 @@ def teacher_master_report():
                 "percentage": percentage
             })
 
-        # If user is a school_admin
-        elif user.user_role == 'school_admin':
+        # If user is a school_admin or data_analyst
+        elif user.user_role == 'school_admin' or user.user_role == 'data_analyst':
             teachers = Teacher.query.filter_by(school_id=user.school_id).all()
             
             if not teachers:
@@ -523,7 +523,7 @@ def add_news():
     if user.user_role == 'admin':
         news_type = 'global'
     
-    if user.user_role == 'school_admin':
+    if user.user_role == 'school_admin' or user.user_role == 'data_analyst':
         news_type = 'school'
     
     if not title or not description or not news_type:
@@ -565,7 +565,7 @@ def get_news():
         or_(News.end_at == None, News.end_at >= today)
     )
 
-    if user.user_role == 'school_admin':
+    if user.user_role == 'school_admin' or user.user_role == 'data_analyst':
         query = query.filter(
             or_(
                 News.type == 'global',
@@ -619,7 +619,7 @@ def delete_news(news_id):
     # Only allow deletion based on role and ownership
     if user.user_role == 'admin':
         pass  # Admin can delete any news
-    elif user.user_role == 'school_admin':
+    elif user.user_role == 'school_admin' or user.user_role == 'data_analyst':
         if news_item.type != 'school' or news_item.school_id != user.school_id:
             return jsonify(message="Unauthorized to delete this news item."), 403
     else:
@@ -641,7 +641,7 @@ def school_absence_statistics():
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
 
-    if user.user_role not in ['admin', 'school_admin' , 'teacher']:
+    if user.user_role not in ['admin', 'school_admin' , 'teacher' , 'data_analyst']:
         return jsonify(message="Unauthorized access"), 403
 
     try:

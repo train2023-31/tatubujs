@@ -136,58 +136,58 @@ function App() {
                 <Route index element={<Navigate to="/app/dashboard" replace />} />
                 <Route path="dashboard" element={<Dashboard />} />
                 
-                {/* User Management - Admin and School Admin only */}
+                {/* User Management - Admin, School Admin, and Data Analyst */}
                 <Route 
                   path="users" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                    <ProtectedRoute allowedRoles={['admin', 'school_admin', 'data_analyst']}>
                       <Users />
                     </ProtectedRoute>
                   } 
                 />
                 
-                {/* Class Management - School Admin only */}
+                {/* Class Management - School Admin and Data Analyst */}
                 <Route 
                   path="classes" 
                   element={
-                    <ProtectedRoute allowedRoles={['school_admin']}>
+                    <ProtectedRoute allowedRoles={['school_admin', 'data_analyst']}>
                       <Classes />
                     </ProtectedRoute>
                   } 
                 />
                 
-                {/* Attendance - Teachers and School Admin */}
+                {/* Attendance - Teachers, School Admin, and Data Analyst */}
                 <Route 
                   path="attendance" 
                   element={
-                    <ProtectedRoute allowedRoles={['teacher', 'school_admin']}>
+                    <ProtectedRoute allowedRoles={['teacher', 'school_admin', 'data_analyst']}>
                       <Attendance />
                     </ProtectedRoute>
                   } 
                 />
                 
-                {/* Attendance Details - Teachers and School Admin */}
+                {/* Attendance Details - Teachers, School Admin, and Data Analyst */}
                 <Route 
                   path="attendance-details" 
                   element={
-                    <ProtectedRoute allowedRoles={['teacher', 'school_admin']}>
+                    <ProtectedRoute allowedRoles={['teacher', 'school_admin', 'data_analyst']}>
                       <AttendanceDetails />
                     </ProtectedRoute>
                   } 
                 />
                 
-                {/* Reports - All roles */}
+                {/* Reports - School Admin and Data Analyst */}
                 <Route path="reports" element={
-                  <ProtectedRoute allowedRoles={['school_admin']}>
+                  <ProtectedRoute allowedRoles={['school_admin', 'data_analyst']}>
                     <Reports />
                   </ProtectedRoute>
                 } />
                 
-                {/* Daily Report - Teachers and School Admin */}
+                {/* Daily Report - School Admin and Data Analyst */}
                 <Route 
                   path="daily-report" 
                   element={
-                    <ProtectedRoute allowedRoles={['school_admin']}>
+                    <ProtectedRoute allowedRoles={['school_admin', 'data_analyst']}>
                       <DailyReport />
                     </ProtectedRoute>
                   } 
@@ -203,11 +203,11 @@ function App() {
                   } 
                 />
                 
-                {/* News Management - Admin and School Admin */}
+                {/* News Management - Admin, School Admin, and Data Analyst */}
                 <Route 
                   path="news" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                    <ProtectedRoute allowedRoles={['admin', 'school_admin', 'data_analyst']}>
                       <News />
                     </ProtectedRoute>
                   } 
@@ -243,11 +243,11 @@ function App() {
                   } 
                 />
                 
-                {/* View Logs - Admin and School Admin only */}
+                {/* View Logs - Admin, School Admin, and Data Analyst */}
                 <Route 
                   path="view-logs" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                    <ProtectedRoute allowedRoles={['admin', 'school_admin', 'data_analyst']}>
                       <ViewLogs />
                     </ProtectedRoute>
                   } 
