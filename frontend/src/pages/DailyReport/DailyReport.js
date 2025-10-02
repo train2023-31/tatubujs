@@ -600,8 +600,8 @@ ${attendanceStatus}
         <div className="card-body">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Calendar className="h-5 w-5 text-gray-400" />
-              <label className="text-sm font-medium text-gray-700">تاريخ التقرير:</label>
+              <Calendar className="h-5 w-5 text-gray-400 ml-2" />
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">تاريخ التقرير:</label>
               <input
                 type="date"
                 value={selectedDate}

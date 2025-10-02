@@ -288,16 +288,16 @@ const TeacherHistoryDialog = ({ isOpen, onClose, teacher }) => {
 
         {/* Date Range Selector */}
         <div className="p-6 border-b border-gray-200 bg-gray-50">
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row space-x-8">
             <Calendar className="h-5 w-5 text-gray-400" />
-            <label className="text-sm font-medium text-gray-700">من تاريخ:</label>
+            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">من تاريخ:</label>
             <input
               type="date"
               value={dateRange.startDate}
               onChange={(e) => handleDateRangeChange('startDate', e.target.value)}
               className="input"
             />
-            <label className="text-sm font-medium text-gray-700">إلى تاريخ:</label>
+            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">إلى تاريخ:</label>
             <input
               type="date"
               value={dateRange.endDate}

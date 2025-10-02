@@ -365,14 +365,14 @@ const TeacherReport = () => {
             {/* Manual Date Selection */}
             <div className="flex flex-col sm:flex-row space-x-4 sm:space-x-6 ">
               <Calendar className="h-5 w-5 text-gray-400" />
-              <label className="text-sm font-medium text-gray-700">من تاريخ:</label>
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">من تاريخ:</label>
               <input
                 type="date"
                 value={dateRange.fromDate}
                 onChange={(e) => setDateRange(prev => ({ ...prev, fromDate: e.target.value }))}
                 className="input"
               />
-              <label className="text-sm font-medium text-gray-700">إلى تاريخ:</label>
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">إلى تاريخ:</label>
               <input
                 type="date"
                 value={dateRange.toDate}
@@ -650,7 +650,7 @@ const TeacherReport = () => {
                          </td>
                          <td className="px-6 py-4 whitespace-nowrap text-center">
                            <div className="flex items-center justify-center">
-                             <TrendingUp className="h-4 w-4 text-gray-400 mr-1" />
+                             <TrendingUp className="h-4 w-4 text-gray-400 ml-2" />
                              <span className={`text-sm font-medium ${
                                teacher.teacher_attendance_percentage >= 80 ? 'text-green-600' :
                                teacher.teacher_attendance_percentage >= 60 ? 'text-yellow-600' : 'text-red-600'
@@ -697,7 +697,7 @@ const TeacherReport = () => {
               تقرير المعلمين من {formatDate(dateRange.fromDate, 'dd/MM/yyyy', 'ar')} إلى {formatDate(dateRange.toDate, 'dd/MM/yyyy', 'ar')}
             </h3>
             <div className="flex items-center space-x-2">
-              <button
+              {/* <button
                 onClick={handleDownloadPDF}
                 disabled={isGeneratingPDF}
                 className="btn btn-primary btn-sm"
@@ -713,7 +713,7 @@ const TeacherReport = () => {
                     تحميل PDF
                   </>
                 )}
-              </button>
+              </button> */}
               <button
                 onClick={handlePrint}
                 className="btn btn-outline btn-sm"
