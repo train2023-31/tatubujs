@@ -1,8 +1,8 @@
 // Auto-generated version file
 export const BUILD_INFO = {
-  "buildTime": "2025-09-29T08:38:25.707Z",
-  "buildTimestamp": 1759135105707,
-  "version": "1.0.1",
+  "buildTime": "2025-10-02T09:08:16.251Z",
+  "buildTimestamp": 1759396096252,
+  "version": "1.0.2",
   "gitCommit": "unknown",
   "environment": "production"
 };
