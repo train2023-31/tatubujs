@@ -417,22 +417,36 @@ def get_teacher_report():
         if user.user_role not in ['admin', 'school_admin', 'teacher', 'data_analyst']:
             return jsonify(message="Unauthorized access."), 403
 
-        # Parse requested date; default to today if not provided
-        selected_date_str = request.args.get('date', default=date.today().isoformat())
+        # Parse requested date range; default to today if not provided
+        from_date_str = request.args.get('from_date', default=date.today().isoformat())
+        to_date_str = request.args.get('to_date', default=date.today().isoformat())
+        
         try:
-            selected_date = datetime.strptime(selected_date_str, '%Y-%m-%d').date()
+            from_date = datetime.strptime(from_date_str, '%Y-%m-%d').date()
+            to_date = datetime.strptime(to_date_str, '%Y-%m-%d').date()
         except ValueError:
             return jsonify(message="Invalid date format. Use YYYY-MM-DD."), 400
 
-        # Get all teachers in the school
+        # Validate date range
+        if from_date > to_date:
+            return jsonify(message="Start date cannot be after end date."), 400
+
+        # Get teachers based on user role
         if user.user_role == 'admin':
             teachers = Teacher.query.all()
+        elif user.user_role == 'teacher':
+            # If user is a teacher, only show their own data
+            teacher = Teacher.query.get(user.id)
+            teachers = [teacher] if teacher else []
         else:
             teachers = Teacher.query.filter_by(school_id=user.school_id).all()
 
         if not teachers:
             return jsonify({
-                "date": selected_date.strftime('%Y-%m-%d'),
+                "date_range": {
+                    "start_date": from_date.strftime('%Y-%m-%d'),
+                    "end_date": to_date.strftime('%Y-%m-%d')
+                },
                 "teacher_summary": [],
                 "total_teachers": 0,
                 "total_classes_taught": 0,
@@ -448,50 +462,57 @@ def get_teacher_report():
             classes_taught = Class.query.filter_by(teacher_id=teacher.id).all()
             class_names = [cls.name for cls in classes_taught]
             
-            # Get attendance records for this teacher on the selected date
-            attendance_records = db.session.query(
-                Attendance.id,
-                Attendance.class_id,
-                Attendance.subject_id,
-                Attendance.class_time_num,
-                Attendance.date,
-                Class.name.label('class_name'),
-                Subject.name.label('subject_name'),
-                func.count(Attendance.student_id).label('total_students'),
-                func.count(case((Attendance.is_present == True, Attendance.student_id), else_=None)).label('present_students'),
-                func.count(case((Attendance.is_Acsent == True, Attendance.student_id), else_=None)).label('absent_students'),
-                func.count(case((Attendance.is_late == True, Attendance.student_id), else_=None)).label('late_students'),
-                func.count(case((Attendance.is_Excus == True, Attendance.student_id), else_=None)).label('excused_students')
-            ).join(
-                Class, Class.id == Attendance.class_id
-            ).join(
-                Subject, Subject.id == Attendance.subject_id
+            # Calculate recorded days (days with at least one record) for the date range
+            recorded_days = db.session.query(
+                func.count(func.distinct(func.date(Attendance.date)))
             ).filter(
                 and_(
                     Attendance.teacher_id == teacher.id,
-                    Attendance.date == selected_date
+                    func.date(Attendance.date) >= from_date,
+                    func.date(Attendance.date) <= to_date
                 )
-            ).group_by(
-                Attendance.class_id,
-                Attendance.subject_id,
-                Attendance.class_time_num
-            ).all()
+            ).scalar()
 
-            # Calculate totals for this teacher
-            teacher_total_students = sum(record.total_students for record in attendance_records)
-            teacher_present_students = sum(record.present_students for record in attendance_records)
-            teacher_absent_students = sum(record.absent_students for record in attendance_records)
-            teacher_late_students = sum(record.late_students for record in attendance_records)
-            teacher_excused_students = sum(record.excused_students for record in attendance_records)
-
+            # Calculate working days in the date range
+            working_days = 0
+            current_date = from_date
+            while current_date <= to_date:
+                # Sunday = 6, Monday = 0, Tuesday = 1, Wednesday = 2, Thursday = 3
+                if current_date.weekday() in [6, 0, 1, 2, 3]:  # Sunday to Thursday
+                    working_days += 1
+                current_date += timedelta(days=1)
+            
             # Calculate teacher attendance based on weekly class number
             teacher_weekly_classes = teacher.week_Classes_Number or 0
-            teacher_actual_classes = len(attendance_records)
-            teacher_attendance_percentage = round((teacher_actual_classes / teacher_weekly_classes * 100) if teacher_weekly_classes > 0 else 0, 2)
+            
+            # Calculate number of weeks in the date range
+            days_diff = (to_date - from_date).days
+            number_of_weeks = max(1, (days_diff + 1) // 7)  # At least 1 week, round up for partial weeks
+            
+            # Calculate expected classes based on weeks
+            total_expected_classes = teacher_weekly_classes * number_of_weeks
+            
+            # Get total actual classes recorded for additional info
+            teacher_actual_classes = db.session.query(
+                func.count(func.distinct(
+                    func.concat(
+                        Attendance.class_id, '-', Attendance.class_time_num, '-', func.date(Attendance.date)
+                    )
+                ))
+            ).filter(
+                and_(
+                    Attendance.teacher_id == teacher.id,
+                    func.date(Attendance.date) >= from_date,
+                    func.date(Attendance.date) <= to_date
+                )
+            ).scalar()
+            
+            # Calculate attendance percentage based on actual classes vs expected classes
+            teacher_attendance_percentage = round((teacher_actual_classes / total_expected_classes * 100) if total_expected_classes > 0 else 0, 2)
 
             # Update global counters
             total_classes_taught += len(classes_taught)
-            total_attendance_records += len(attendance_records)
+            total_attendance_records += teacher_actual_classes
 
             teacher_summary.append({
                 "teacher_id": teacher.id,
@@ -502,28 +523,17 @@ def get_teacher_report():
                 "weekly_classes": teacher_weekly_classes,
                 "actual_classes": teacher_actual_classes,
                 "teacher_attendance_percentage": teacher_attendance_percentage,
-                "attendance_records": [
-                    {
-                        "class_name": record.class_name,
-                        "subject_name": record.subject_name,
-                        "class_time_num": record.class_time_num,
-                        "total_students": record.total_students,
-                        "present_students": record.present_students,
-                        "absent_students": record.absent_students,
-                        "late_students": record.late_students,
-                        "excused_students": record.excused_students
-                    } for record in attendance_records
-                ],
-                "total_students": teacher_total_students,
-                "present_students": teacher_present_students,
-                "absent_students": teacher_absent_students,
-                "late_students": teacher_late_students,
-                "excused_students": teacher_excused_students,
-                "attendance_percentage": round((teacher_present_students / teacher_total_students * 100) if teacher_total_students > 0 else 0, 2)
+                "working_days": working_days,
+                "recorded_days": recorded_days,
+                "number_of_weeks": number_of_weeks,
+                "total_expected_classes": total_expected_classes
             })
 
         return jsonify({
-            "date": selected_date.strftime('%Y-%m-%d'),
+            "date_range": {
+                "start_date": from_date.strftime('%Y-%m-%d'),
+                "end_date": to_date.strftime('%Y-%m-%d')
+            },
             "teacher_summary": teacher_summary,
             "total_teachers": len(teachers),
             "total_classes_taught": total_classes_taught,
@@ -657,7 +667,13 @@ def get_teacher_history(teacher_id):
 
         # Calculate teacher attendance based on weekly class number
         teacher_weekly_classes = teacher.week_Classes_Number or 0
-        total_expected_classes = teacher_weekly_classes * total_days
+        
+        # Calculate number of weeks in the date range
+        days_diff = (end_date - start_date).days
+        number_of_weeks = max(1, (days_diff + 1) // 7)  # At least 1 week, round up for partial weeks
+        
+        # Calculate expected classes based on weeks
+        total_expected_classes = teacher_weekly_classes * number_of_weeks
         teacher_attendance_percentage = round((total_classes / total_expected_classes * 100) if total_expected_classes > 0 else 0, 2)
 
         return jsonify({
@@ -682,6 +698,7 @@ def get_teacher_history(teacher_id):
                 "total_excused": sum(day["excused_students"] for day in history_by_date.values()),
                 "overall_attendance_percentage": overall_attendance_percentage,
                 "teacher_weekly_classes": teacher_weekly_classes,
+                "number_of_weeks": number_of_weeks,
                 "total_expected_classes": total_expected_classes,
                 "teacher_attendance_percentage": teacher_attendance_percentage
             },

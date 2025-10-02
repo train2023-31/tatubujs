@@ -838,8 +838,20 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
       {/* Teacher Attendance */}
       {teacherAttendance?.data && teacherAttendance.data.length > 0 && (
         <div className="card">
-          <div className="card-header">
+          <div className="card-header flex items-center justify-between">
             <h3 className="text-lg font-medium text-gray-900">حضور المعلمين هذا الأسبوع</h3>
+          <button
+            className="btn btn-primary btn-sm ml-2"
+            onClick={() => navigate('/app/teacher-report')}
+            title="تقرير المعلمين"
+          >
+            <span className="inline-flex items-center">
+              <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+              </svg>
+              تقرير المعلمين
+            </span>
+          </button>
           </div>
           <div className="card-body">
             <div className="overflow-x-auto">

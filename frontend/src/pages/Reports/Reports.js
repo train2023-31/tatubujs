@@ -66,7 +66,7 @@ const Reports = () => {
     { id: 'daily', name: 'التقرير اليومي' },
     { id: 'weekly', name: 'التقرير الأسبوعي' },
     { id: 'monthly', name: 'التقرير الشهري' },
-    { id: 'teachers', name: 'تقرير المعلمين' },
+    { id: 'teachers', name: 'تقرير المعلمين الحضوري' },
   ];
 
   const getCurrentData = () => {
@@ -625,7 +625,7 @@ const Reports = () => {
           {selectedTab === 'teachers' && teacherMasterReport?.data && (
             <div className="card text-right">
               <div className="card-header">
-                <h3 className="text-lg font-medium text-gray-900">تقرير المعلمين</h3>
+                <h3 className="text-lg font-medium text-gray-900">تقرير المعلمين الحضوري - اليومي</h3>
               </div>
               <div className="card-body">
                 <div className="overflow-x-auto">
@@ -636,7 +636,7 @@ const Reports = () => {
                         <th className="table-header-cell text-right">الوظيفة</th>
                         <th className="table-header-cell text-right">الأيام المسجلة</th>
                         <th className="table-header-cell text-right">أيام العمل</th>
-                        <th className="table-header-cell text-right">الحصص الأسبوعية</th>
+                        {/* <th className="table-header-cell text-right">الحصص الأسبوعية</th> */}
                         <th className="table-header-cell text-right">النسبة المئوية</th>
                       </tr>
                     </thead>
@@ -647,7 +647,7 @@ const Reports = () => {
                           <td className="table-cell">{teacher.job_name}</td>
                           <td className="table-cell">{teacher.recorded_days}</td>
                           <td className="table-cell">{teacher.working_days}</td>
-                          <td className="table-cell">{teacher.week_classes}</td>
+                          {/* <td className="table-cell">{teacher.week_classes}</td> */}
                           <td className="table-cell">
                             <span className={`badge ${
                               teacher.percentage >= 80 ? 'badge-success' :

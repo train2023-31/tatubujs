@@ -467,28 +467,8 @@ ${attendanceStatus}
               }
               
               /* Hide elements that shouldn't print */
-              button, .btn, .no-print {
+              button, .btn, .no-print, .card, .stat-card, .grid {
                 display: none !important;
-              }
-              
-              /* Show summary cards in print */
-              .summary-cards, .summary-cards .card, .summary-cards .grid {
-                display: block !important;
-              }
-              
-              .summary-cards .grid {
-                display: grid !important;
-                grid-template-columns: repeat(6, 1fr) !important;
-                gap: 16px !important;
-                margin-bottom: 20px !important;
-              }
-              
-              .summary-cards .card {
-                border: 1px solid #000 !important;
-                padding: 12px !important;
-                text-align: center !important;
-                background: white !important;
-                page-break-inside: avoid !important;
               }
               
               /* Table styles for print */
@@ -496,86 +476,19 @@ ${attendanceStatus}
                 width: 100%;
                 border-collapse: collapse;
                 font-size: 11px;
-                page-break-inside: avoid;
-              }
-              
-              thead {
-                display: table-header-group;
-                page-break-inside: avoid;
-                page-break-after: avoid;
-              }
-              
-              tbody {
-                display: table-row-group;
-                page-break-inside: auto;
-              }
-              
-              tr {
-                page-break-inside: avoid;
-                page-break-after: auto;
               }
               
               th, td {
                 border: 1px solid #000;
                 padding: 4px;
                 text-align: right;
-                page-break-inside: avoid;
               }
               
               th {
                 background-color: #f5f5f5;
                 font-weight: bold;
-                position: sticky;
-                top: 0;
-                z-index: 10;
               }
               
-              .report-table {
-                border-collapse: collapse;
-                width: 100%;
-                margin-top: 0;
-              }
-              
-              .report-table thead {
-                display: table-header-group;
-              }
-              
-              .report-table tbody {
-                display: table-row-group;
-              }
-              
-              /* Class header styles for print */
-              .class-header {
-                background-color: #e5e7eb !important;
-                font-weight: bold;
-                page-break-after: avoid;
-              }
-              
-              .class-header td {
-                background-color: #e5e7eb !important;
-                border: 1px solid #000;
-                font-weight: bold;
-              }
-              
-              /* Student row styles for print */
-              .student-row {
-                page-break-inside: avoid;
-              }
-              
-              .student-row td {
-                border: 1px solid #000;
-                padding: 6px;
-              }
-              
-              /* Ensure proper table structure */
-              .report-container table {
-                border-collapse: collapse !important;
-                border-spacing: 0 !important;
-              }
-              
-              .report-container thead tr {
-                page-break-after: avoid;
-              }
               
               /* Badge styles */
               .badge {
@@ -773,7 +686,7 @@ ${attendanceStatus}
 
       {/* Summary Cards */}
       {!isLoading && attendanceData?.attendance_details && (
-        <div className="summary-cards grid grid-cols-1 md:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <div className="card">
             <div className="card-body text-center">
               <div className="text-2xl font-bold text-blue-600">
@@ -977,86 +890,175 @@ ${attendanceStatus}
           <div className="card-body p-0">
             <div className="overflow-x-auto scrollbar-hide overflow-hidden">
               <table className="w-full">
-                <thead className="bg-blue-600 text-white sticky top-0 z-10 shadow-md">
+                <thead className="bg-gray-50 border-b sticky top-0 z-10 shadow-md">
                   <tr>
-                    <th className="px-6 py-4 text-right font-bold text-lg">الطالب/ة</th>
-                    <th className="px-6 py-4 text-center font-bold text-lg">هارب</th>
-                    <th className="px-6 py-4 text-center font-bold text-lg">متأخر</th>
-                    <th className="px-6 py-4 text-center font-bold text-lg">غائب</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                      الصف ↕
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                      الطالب/ة ↕
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                      المعلمين/ات ↕
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                      هارب ↕
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                      متأخر ↕
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                      غائب ↕
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <div className="flex items-center justify-center space-x-2">
+                        <span>بعذر ↕</span>
+                        <div className="flex items-center space-x-1">
+                         
+                        </div>
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      WhatsApp
+                    </th>
                   </tr>
                 </thead>
-                <tbody>
-                  {Object.entries(groupedData).map(([className, students]) => (
-                    <React.Fragment key={className}>
-                      {/* Class Header */}
-                      <tr className="bg-blue-200">
-                        <td colSpan="4" className="px-6 py-3 font-bold text-gray-800 text-lg">
-                          {className}
-                        </td>
-                      </tr>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredData
+                    .filter(record => record.student_id && record.status !== "no record yet")
+                    .map((record, index) => {
+                      const haribTimes = record.absent_times || record.absentTimes || record.absent_periods || [];
+                      const lateTimes = record.late_times || record.lateTimes || record.late_periods || [];
+                      const ghaibTimes = record.excused_times || record.excusedTimes || record.excused_periods || [];
+                      const hasExcuse = record.is_has_excuse || record.is_has_exuse || false;
                       
-                      {/* Students */}
-                      {students.length > 0 ? (
-                        students.map((record, index) => {
-                          const haribTimes = record.absent_times || record.absentTimes || record.absent_periods || [];
-                          const lateTimes = record.late_times || record.lateTimes || record.late_periods || [];
-                          const ghaibTimes = record.excused_times || record.excusedTimes || record.excused_periods || [];
-                          const hasExcuse = record.is_has_excuse || record.is_has_exuse || false;
-                          
-                          // Determine row color based on attendance status
-                          let rowColorClass = "hover:bg-gray-50";
-                          if (haribTimes.length > 0) {
-                            // Red background for students with absent periods
-                            rowColorClass = "bg-red-50 hover:bg-red-100 border-l-4 border-red-400";
-                          } else if (hasExcuse) {
-                            // Green background for students with excuses
-                            rowColorClass = "bg-green-50 hover:bg-green-100 border-l-4 border-green-400";
-                          }
-                          
-                          return (
-                            <tr key={record.student_id || index} className={rowColorClass}>
-                              <td className="px-6 py-4 text-right text-base font-medium text-gray-900">
-                                {record.student_name || 'غير محدد'}
-                              </td>
-                              <td className="px-6 py-4 text-center text-base">
-                                {haribTimes.length > 0 ? (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                    {haribTimes.sort((a, b) => a - b).join(', ')}
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-400">-</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 text-center text-base">
-                                {lateTimes.length > 0 ? (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                    {lateTimes.sort((a, b) => a - b).join(', ')}
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-400">-</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 text-center text-base">
-                                {ghaibTimes.length > 0 ? (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                    {ghaibTimes.sort((a, b) => a - b).join(', ')}
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-400">-</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr className="bg-gray-50">
-                          <td colSpan="4" className="px-6 py-4 text-center text-yellow-700 text-base italic">
-                            لا توجد سجلات بعد أو لا يوجد غائبين
+                      // Determine row color based on attendance status
+                      let rowColorClass = "hover:bg-gray-50";
+                      if (haribTimes.length > 0) {
+                        // Red background for students with absent periods
+                        rowColorClass = "bg-red-50 hover:bg-red-100 border-l-4 border-red-400";
+                      } else if (hasExcuse) {
+                        // Green background for students with excuses
+                        rowColorClass = "bg-green-50 hover:bg-green-100 border-l-4 border-green-400";
+                      }
+                      
+                      return (
+                        <tr key={record.student_id || index} className={rowColorClass}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {record.class_name || 'غير محدد'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {record.student_name || 'غير محدد'}
+                          </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                              {(() => {
+                                const teachersByPeriod = record.teachers_by_period;
+                                
+                                if (!teachersByPeriod || typeof teachersByPeriod !== 'object' || Object.keys(teachersByPeriod).length === 0) {
+                                  return <span className="text-gray-400">-</span>;
+                                }
+                                
+                                const teachersList = Object.entries(teachersByPeriod)
+                                  .filter(([period, teacher]) => teacher && teacher.trim())
+                                  .map(([period, teacher]) => ({ period, teacher: teacher.trim() }))
+                                  .sort((a, b) => parseInt(a.period) - parseInt(b.period));
+                                
+                                if (teachersList.length === 0) {
+                                  return <span className="text-gray-400">-</span>;
+                                }
+                                
+                                return (
+                                  <div className="relative group">
+                                    <div className="flex items-center justify-center">
+                                      <Users className="h-5 w-5 text-blue-600 cursor-pointer hover:text-blue-800 transition-colors" />
+                                      <span className="mr-1 text-sm text-gray-600">
+                                        {teachersList.length}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* Tooltip */}
+                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 min-w-max">
+                                      <div className="space-y-1">
+                                        <div className="font-semibold text-center border-b border-gray-700 pb-1 mb-2">
+                                          المعلمين/ات
+                                        </div>
+                                        {teachersList.map(({ period, teacher }) => (
+                                          <div key={period} className="flex items-center space-x-2">
+                                            <span className="text-blue-300 font-medium min-w-[20px]">
+                                              {period}:
+                                            </span>
+                                            <span>{teacher}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      {/* Arrow */}
+                                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            {haribTimes.length > 0 ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                {haribTimes.sort((a, b) => a - b).join(', ')}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            {lateTimes.length > 0 ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                {lateTimes.sort((a, b) => a - b).join(', ')}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            {ghaibTimes.length > 0 ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                {ghaibTimes.sort((a, b) => a - b).join(', ')}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <div className="flex items-center justify-center space-x-2">
+                              <input
+                                type="checkbox"
+                                checked={hasExcuse}
+                                onChange={(e) => handleIndividualExcuseUpdate(record.student_id, e.target.checked)}
+                                disabled={updatingStudents.has(record.student_id)}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                              />
+                              {updatingStudents.has(record.student_id) ? (
+                                <LoadingSpinner size="sm" />
+                              ) : (
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                  hasExcuse 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {hasExcuse ? 'نعم' : 'لا'}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <button
+                              onClick={() => handleWhatsAppClick(record)}
+                              className="inline-flex items-center justify-center w-8 h-8 bg-green-500 hover:bg-green-600 text-white rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                              title="إرسال تقرير الحضور عبر WhatsApp"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </button>
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
@@ -1114,7 +1116,6 @@ ${attendanceStatus}
             filters={filters}
             allClasses={allClasses}
             confirmationStatus={confirmationStatus}
-            attendanceData={attendanceData}
           />
           </div>
         </div>
@@ -1124,7 +1125,7 @@ ${attendanceStatus}
 };
 
 // Report Content Component
-const ReportContent = ({ data, filteredData, selectedDate, schoolName, filters, allClasses, confirmationStatus, attendanceData }) => {
+const ReportContent = ({ data, filteredData, selectedDate, schoolName, filters, allClasses, confirmationStatus }) => {
   // Create filtered grouped data for PDF
   const filteredGroupedData = React.useMemo(() => {
     // Initialize with all classes
@@ -1244,72 +1245,6 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName, filters, 
           </div>
         )}
       </div>
-
-      {/* Summary Cards for Print */}
-      {attendanceData?.attendance_details && (
-        <div className="summary-cards grid grid-cols-3 md:grid-cols-6 gap-4 mb-6">
-          <div className="card">
-            <div className="card-body text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {Object.keys(data).length}
-              </div>
-              <div className="text-sm text-gray-600">عدد الفصول</div>
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-body text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {attendanceData.attendance_details.filter(record => record.student_id).length}
-              </div>
-              <div className="text-sm text-gray-600">إجمالي الطلاب</div>
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-body text-center">
-              <div className="text-2xl font-bold text-red-600">
-                {attendanceData.attendance_details.filter(record => {
-                  const haribTimes = record.absent_times || record.absentTimes || record.absent_periods || [];
-                  return haribTimes.length > 0;
-                }).length}
-              </div>
-              <div className="text-sm text-gray-600">الطلاب الهاربين</div>
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-body text-center">
-              <div className="text-2xl font-bold text-yellow-600">
-                {attendanceData.attendance_details.filter(record => {
-                  const lateTimes = record.late_times || record.lateTimes || record.late_periods || [];
-                  return lateTimes.length > 0;
-                }).length}
-              </div>
-              <div className="text-sm text-gray-600">الطلاب المتأخرين</div>
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-body text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {attendanceData.attendance_details.filter(record => {
-                  const hasExcuse = record.is_has_excuse || record.is_has_exuse || false;
-                  return hasExcuse;
-                }).length}
-              </div>
-              <div className="text-sm text-gray-600">الطلاب ذوي الأعذار</div>
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-body text-center">
-              <div className="text-2xl font-bold text-orange-600">
-                {attendanceData.attendance_details.filter(record => {
-                  const ghaibTimes = record.excused_times || record.excusedTimes || record.excused_periods || [];
-                  return ghaibTimes.length > 0;
-                }).length}
-              </div>
-              <div className="text-sm text-gray-600">الطلاب الغائبين</div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Report Table */}
       <div className="">

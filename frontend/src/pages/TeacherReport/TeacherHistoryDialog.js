@@ -248,12 +248,12 @@ const TeacherHistoryDialog = ({ isOpen, onClose, teacher }) => {
                 سجل المعلم: {teacher.teacher_name}
               </h2>
               <p className="text-sm text-gray-500">
-                {teacher.job_name || 'غير محدد'} - {teacher.classes_taught.join(', ')}
+                {teacher.job_name || 'غير محدد'} - {teacher.weekly_classes + ' حصص أسبوعية'}
               </p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <button
+            {/* <button
               onClick={handleDownloadPDF}
               disabled={isGeneratingPDF}
               className="btn btn-primary btn-sm"
@@ -269,7 +269,7 @@ const TeacherHistoryDialog = ({ isOpen, onClose, teacher }) => {
                   تحميل PDF
                 </>
               )}
-            </button>
+            </button> */}
             <button
               onClick={handlePrint}
               className="btn btn-outline btn-sm"
@@ -317,13 +317,13 @@ const TeacherHistoryDialog = ({ isOpen, onClose, teacher }) => {
           ) : historyData ? (
             <div ref={historyRef} className="p-6" dir="rtl">
               {/* Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                 <div className="card">
                   <div className="card-body text-center">
                     <div className="text-2xl font-bold text-blue-600">
                       {historyData.summary.total_days}
                     </div>
-                    <div className="text-sm text-gray-600">إجمالي الأيام</div>
+                    <div className="text-sm text-gray-600"> إجمالي الأيام المسجلة</div>
                   </div>
                 </div>
                 <div className="card">
@@ -331,7 +331,7 @@ const TeacherHistoryDialog = ({ isOpen, onClose, teacher }) => {
                     <div className="text-2xl font-bold text-green-600">
                       {historyData.summary.total_classes}
                     </div>
-                    <div className="text-sm text-gray-600">إجمالي الحصص الفعلية</div>
+                    <div className="text-sm text-gray-600">إجمالي الحصص المسجلة</div>
                   </div>
                 </div>
                 <div className="card">
@@ -339,7 +339,7 @@ const TeacherHistoryDialog = ({ isOpen, onClose, teacher }) => {
                     <div className="text-2xl font-bold text-purple-600">
                       {historyData.summary.total_expected_classes || 0}
                     </div>
-                    <div className="text-sm text-gray-600">إجمالي الحصص المطلوبة</div>
+                    <div className="text-sm text-gray-600">إجمالي الحصص الاسبوعية</div>
                   </div>
                 </div>
                 <div className="card">
@@ -361,52 +361,17 @@ const TeacherHistoryDialog = ({ isOpen, onClose, teacher }) => {
                     <div className="text-sm text-gray-600">نسبة حضور الطلاب</div>
                   </div>
                 </div>
-                <div className="card">
+                {/* <div className="card">
                   <div className="card-body text-center">
                     <div className="text-2xl font-bold text-indigo-600">
                       {historyData.summary.total_students}
                     </div>
                     <div className="text-sm text-gray-600">إجمالي الطلاب</div>
                   </div>
-                </div>
+                </div> */}
               </div>
 
-              {/* Detailed Statistics */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="card">
-                  <div className="card-body text-center">
-                    <div className="flex items-center justify-center mb-2">
-                      <UserCheck className="h-5 w-5 text-green-600 mr-2" />
-                      <span className="text-lg font-semibold text-green-600">
-                        {historyData.summary.total_present}
-                      </span>
-                    </div>
-                    <div className="text-sm text-gray-600">الطلاب الحاضرين</div>
-                  </div>
-                </div>
-                <div className="card">
-                  <div className="card-body text-center">
-                    <div className="flex items-center justify-center mb-2">
-                      <UserX className="h-5 w-5 text-red-600 mr-2" />
-                      <span className="text-lg font-semibold text-red-600">
-                        {historyData.summary.total_absent}
-                      </span>
-                    </div>
-                    <div className="text-sm text-gray-600">الطلاب الغائبين</div>
-                  </div>
-                </div>
-                <div className="card">
-                  <div className="card-body text-center">
-                    <div className="flex items-center justify-center mb-2">
-                      <AlertCircle className="h-5 w-5 text-yellow-600 mr-2" />
-                      <span className="text-lg font-semibold text-yellow-600">
-                        {historyData.summary.total_late}
-                      </span>
-                    </div>
-                    <div className="text-sm text-gray-600">الطلاب المتأخرين</div>
-                  </div>
-                </div>
-              </div>
+          
 
               {/* History Table */}
               <div className="card">

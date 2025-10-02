@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { attendanceAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
-import { formatDate, getTodayAPI } from '../../utils/helpers';
+import { formatDate, getTodayAPI, getCurrentWorkingWeekRange, getCurrentMonthWeeks } from '../../utils/helpers';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import Modal from '../../components/UI/Modal';
 import TeacherHistoryDialog from './TeacherHistoryDialog';
@@ -31,7 +31,14 @@ import './TeacherReport.css';
 
 const TeacherReport = () => {
   const { user } = useAuth();
-  const [selectedDate, setSelectedDate] = useState(getTodayAPI());
+  // Teacher report with date range filtering
+  const [dateRange, setDateRange] = useState(() => {
+    const weekRange = getCurrentWorkingWeekRange();
+    return {
+      fromDate: weekRange.start,
+      toDate: weekRange.end
+    };
+  });
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
@@ -41,12 +48,23 @@ const TeacherReport = () => {
     jobFilter: '',
     classFilter: ''
   });
+  const [currentMonthWeeks, setCurrentMonthWeeks] = useState([]);
   const reportRef = useRef(null);
+
+  // Load current month weeks on component mount
+  React.useEffect(() => {
+    const weeks = getCurrentMonthWeeks();
+    console.log('Current month weeks:', weeks);
+    setCurrentMonthWeeks(weeks);
+  }, []);
 
   // Fetch teacher report data
   const { data: teacherData, isLoading } = useQuery(
-    ['teacherReport', selectedDate],
-    () => attendanceAPI.getTeacherReport({ date: selectedDate }),
+    ['teacherReport', dateRange],
+    () => attendanceAPI.getTeacherReport({ 
+      from_date: dateRange.fromDate,
+      to_date: dateRange.toDate 
+    }),
     { 
       enabled: !!user,
       onError: (error) => {
@@ -106,6 +124,14 @@ const TeacherReport = () => {
     });
   };
 
+  // Handle week selection
+  const handleWeekSelect = (week) => {
+    setDateRange({
+      fromDate: week.start,
+      toDate: week.end
+    });
+  };
+
   const handlePreview = () => {
     setIsPreviewOpen(true);
   };
@@ -159,7 +185,7 @@ const TeacherReport = () => {
         heightLeft -= pageHeight;
       }
       
-      const fileName = `تقرير_المعلمين_${selectedDate}.pdf`;
+      const fileName = `تقرير_المعلمين_${dateRange.fromDate}_${dateRange.toDate}.pdf`;
       pdf.save(fileName);
       
       toast.success('تم تحميل التقرير بنجاح');
@@ -301,7 +327,7 @@ const TeacherReport = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">تقرير المعلمين</h1>
-          <p className="text-gray-600">عرض وتحميل تقرير أداء المعلمين</p>
+          <p className="text-gray-600">عرض وتحميل تقرير سجلات المعلمين</p>
         </div>
         <div className="flex items-center space-x-3">
           <button
@@ -312,7 +338,7 @@ const TeacherReport = () => {
             <Eye className="h-5 w-5 mr-2" />
             معاينة التقرير
           </button>
-          <button
+          {/* <button
             onClick={handleDownloadPDF}
             disabled={isLoading || isGeneratingPDF}
             className="btn btn-primary"
@@ -328,22 +354,55 @@ const TeacherReport = () => {
                 تحميل PDF
               </>
             )}
-          </button>
+          </button> */}
         </div>
       </div>
 
-      {/* Date Selector */}
+      {/* Date Range Selector */}
       <div className="card">
         <div className="card-body">
-          <div className="flex items-center space-x-4">
-            <Calendar className="h-5 w-5 text-gray-400" />
-            <label className="text-sm font-medium text-gray-700">تاريخ التقرير:</label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="input"
-            />
+          <div className="space-y-4">
+            {/* Manual Date Selection */}
+            <div className="flex flex-col sm:flex-row space-x-4 sm:space-x-6 ">
+              <Calendar className="h-5 w-5 text-gray-400" />
+              <label className="text-sm font-medium text-gray-700">من تاريخ:</label>
+              <input
+                type="date"
+                value={dateRange.fromDate}
+                onChange={(e) => setDateRange(prev => ({ ...prev, fromDate: e.target.value }))}
+                className="input"
+              />
+              <label className="text-sm font-medium text-gray-700">إلى تاريخ:</label>
+              <input
+                type="date"
+                value={dateRange.toDate}
+                onChange={(e) => setDateRange(prev => ({ ...prev, toDate: e.target.value }))}
+                className="input"
+              />
+            </div>
+            
+            {/* Quick Select Buttons */}
+            <div className="border-t pt-4">
+              <div className="flex items-center space-x-2 mb-3">
+                <Filter className="h-4 w-4 text-gray-400" />
+                <span className="text-sm font-medium text-gray-700">اختيار سريع:</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {currentMonthWeeks.map((week, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleWeekSelect(week)}
+                    className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                      dateRange.fromDate === week.start && dateRange.toDate === week.end
+                        ? 'bg-blue-100 text-blue-800 border-blue-300'
+                        : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+                    }`}
+                  >
+                    {week.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -358,7 +417,7 @@ const TeacherReport = () => {
 
        {/* Summary Cards */}
        {!isLoading && teacherData && (
-         <div className="summary-cards grid grid-cols-1 md:grid-cols-6 gap-4">
+         <div className="summary-cards grid grid-cols-1 md:grid-cols-5 gap-4">
            <div className="card">
              <div className="card-body text-center">
                <div className="text-2xl font-bold text-blue-600">
@@ -372,7 +431,7 @@ const TeacherReport = () => {
                <div className="text-2xl font-bold text-green-600">
                  {teacherData.teacher_summary?.reduce((sum, teacher) => sum + (teacher.weekly_classes || 0), 0) || 0}
                </div>
-               <div className="text-sm text-gray-600">إجمالي الحصص المطلوبة</div>
+               <div className="text-sm text-gray-600">إجمالي الحصص الاسبوعية</div>
              </div>
            </div>
            <div className="card">
@@ -380,9 +439,17 @@ const TeacherReport = () => {
                <div className="text-2xl font-bold text-purple-600">
                  {teacherData.teacher_summary?.reduce((sum, teacher) => sum + (teacher.actual_classes || 0), 0) || 0}
                </div>
-               <div className="text-sm text-gray-600">إجمالي الحصص الفعلية</div>
+               <div className="text-sm text-gray-600">إجمالي الحصص المسجلة</div>
              </div>
            </div>
+           {/* <div className="card">
+             <div className="card-body text-center">
+               <div className="text-2xl font-bold text-indigo-600">
+                 {teacherData.teacher_summary?.reduce((sum, teacher) => sum + (teacher.recorded_days || 0), 0) || 0}
+               </div>
+               <div className="text-sm text-gray-600">إجمالي الأيام المسجلة</div>
+             </div>
+           </div> */}
            <div className="card">
              <div className="card-body text-center">
                <div className="text-2xl font-bold text-orange-600">
@@ -397,14 +464,6 @@ const TeacherReport = () => {
                  {teacherData.teacher_summary?.filter(teacher => teacher.teacher_attendance_percentage < 60).length || 0}
                </div>
                <div className="text-sm text-gray-600">معلمون بنسبة حضور منخفضة</div>
-             </div>
-           </div>
-           <div className="card">
-             <div className="card-body text-center">
-               <div className="text-2xl font-bold text-yellow-600">
-                 {filteredTeachers.length}
-               </div>
-               <div className="text-sm text-gray-600">المعلمين المفلترين</div>
              </div>
            </div>
          </div>
@@ -537,26 +596,20 @@ const TeacherReport = () => {
                        الوظيفة
                      </th>
                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                       الحصص المطلوبة
+                       الحصص الاسبوعية
                      </th>
                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                       الحصص الفعلية
+                       الحصص المسجلة
+                     </th>
+                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                       الأيام المسجلة
+                     </th>
+                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                       أيام العمل
                      </th>
                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                        نسبة الحضور
                      </th>
-                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                       إجمالي الطلاب
-                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      الحضور
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      الغياب
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      النسبة
-                    </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       الإجراءات
                     </th>
@@ -589,6 +642,12 @@ const TeacherReport = () => {
                          <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
                            {teacher.actual_classes > 0 ? teacher.actual_classes : '-'}
                          </td>
+                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                           {teacher.recorded_days || 0}
+                         </td>
+                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                           {teacher.working_days || 0}
+                         </td>
                          <td className="px-6 py-4 whitespace-nowrap text-center">
                            <div className="flex items-center justify-center">
                              <TrendingUp className="h-4 w-4 text-gray-400 mr-1" />
@@ -600,40 +659,6 @@ const TeacherReport = () => {
                              </span>
                            </div>
                          </td>
-                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-                           {teacher.total_students}
-                         </td>
-                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                           {teacher.present_students > 0 ? (
-                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                               <UserCheck className="h-3 w-3 mr-1" />
-                               {teacher.present_students}
-                             </span>
-                           ) : (
-                             <span className="text-gray-400">-</span>
-                           )}
-                         </td>
-                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                           {teacher.absent_students > 0 ? (
-                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                               <UserX className="h-3 w-3 mr-1" />
-                               {teacher.absent_students}
-                             </span>
-                           ) : (
-                             <span className="text-gray-400">-</span>
-                           )}
-                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <div className="flex items-center justify-center">
-                            <TrendingUp className="h-4 w-4 text-gray-400 mr-1" />
-                            <span className={`text-sm font-medium ${
-                              teacher.attendance_percentage >= 80 ? 'text-green-600' :
-                              teacher.attendance_percentage >= 60 ? 'text-yellow-600' : 'text-red-600'
-                            }`}>
-                              {teacher.attendance_percentage}%
-                            </span>
-                          </div>
-                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <button
                             onClick={() => handleViewHistory(teacher)}
@@ -647,8 +672,8 @@ const TeacherReport = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="10" className="px-6 py-4 text-center text-gray-500">
-                        لا توجد بيانات للمعلمين لهذا اليوم أو لا يوجد معلمون مطابقون للفلاتر.
+                      <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
+                        لا توجد بيانات للمعلمين للفترة المحددة أو لا يوجد معلمون مطابقون للفلاتر.
                       </td>
                     </tr>
                   )}
@@ -669,7 +694,7 @@ const TeacherReport = () => {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-medium text-gray-900">
-              تقرير المعلمين ليوم {formatDate(selectedDate, 'dd/MM/yyyy', 'ar')}
+              تقرير المعلمين من {formatDate(dateRange.fromDate, 'dd/MM/yyyy', 'ar')} إلى {formatDate(dateRange.toDate, 'dd/MM/yyyy', 'ar')}
             </h3>
             <div className="flex items-center space-x-2">
               <button
@@ -704,7 +729,7 @@ const TeacherReport = () => {
             <ReportContent 
               data={teacherData} 
               filteredData={filteredTeachers}
-              selectedDate={selectedDate}
+              dateRange={dateRange}
               schoolName={user?.school_name || 'المدرسة'}
             />
           </div>
@@ -722,7 +747,7 @@ const TeacherReport = () => {
 };
 
 // Report Content Component
-const ReportContent = ({ data, filteredData, selectedDate, schoolName }) => {
+const ReportContent = ({ data, filteredData, dateRange, schoolName }) => {
   return (
     <div className="report-container max-w-5xl mx-auto">
       {/* Header */}
@@ -743,13 +768,13 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName }) => {
           تقرير المعلمين
         </h2>
         <p className="text-gray-600 text-lg">
-          التاريخ: {formatDate(selectedDate, 'dd/MM/yyyy', 'ar')}
+          من {formatDate(data?.date_range?.start_date || dateRange.fromDate, 'dd/MM/yyyy', 'ar')} إلى {formatDate(data?.date_range?.end_date || dateRange.toDate, 'dd/MM/yyyy', 'ar')}
         </p>
       </div>
 
        {/* Summary Cards */}
        {data && (
-         <div className="summary-cards grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+         <div className="summary-cards grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
            <div className="card">
              <div className="card-body text-center">
                <div className="text-2xl font-bold text-blue-600">
@@ -763,7 +788,7 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName }) => {
                <div className="text-2xl font-bold text-green-600">
                  {data.teacher_summary?.reduce((sum, teacher) => sum + (teacher.weekly_classes || 0), 0) || 0}
                </div>
-               <div className="text-sm text-gray-600">إجمالي الحصص المطلوبة</div>
+               <div className="text-sm text-gray-600">إجمالي الحصص الاسبوعية</div>
              </div>
            </div>
            <div className="card">
@@ -771,9 +796,17 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName }) => {
                <div className="text-2xl font-bold text-purple-600">
                  {data.teacher_summary?.reduce((sum, teacher) => sum + (teacher.actual_classes || 0), 0) || 0}
                </div>
-               <div className="text-sm text-gray-600">إجمالي الحصص الفعلية</div>
+               <div className="text-sm text-gray-600">إجمالي الحصص المسجلة</div>
              </div>
            </div>
+           {/* <div className="card">
+             <div className="card-body text-center">
+               <div className="text-2xl font-bold text-indigo-600">
+                 {data.teacher_summary?.reduce((sum, teacher) => sum + (teacher.recorded_days || 0), 0) || 0}
+               </div>
+               <div className="text-sm text-gray-600">إجمالي الأيام المسجلة</div>
+             </div>
+           </div> */}
            <div className="card">
              <div className="card-body text-center">
                <div className="text-2xl font-bold text-orange-600">
@@ -790,14 +823,7 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName }) => {
                <div className="text-sm text-gray-600">معلمون بنسبة حضور منخفضة</div>
              </div>
            </div>
-           <div className="card">
-             <div className="card-body text-center">
-               <div className="text-2xl font-bold text-yellow-600">
-                 {filteredData.length}
-               </div>
-               <div className="text-sm text-gray-600">المعلمين المفلترين</div>
-             </div>
-           </div>
+           
          </div>
        )}
 
@@ -808,13 +834,11 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName }) => {
             <tr>
                <th className="px-6 py-4 text-right font-bold text-lg">المعلم/ة</th>
                <th className="px-6 py-4 text-center font-bold text-lg">الوظيفة</th>
-               <th className="px-6 py-4 text-center font-bold text-lg">الحصص المطلوبة</th>
-               <th className="px-6 py-4 text-center font-bold text-lg">الحصص الفعلية</th>
+               <th className="px-6 py-4 text-center font-bold text-lg">الحصص الاسبوعية</th>
+               <th className="px-6 py-4 text-center font-bold text-lg">الحصص المسجلة</th>
+               <th className="px-6 py-4 text-center font-bold text-lg">الأيام المسجلة</th>
+               <th className="px-6 py-4 text-center font-bold text-lg">أيام العمل</th>
                <th className="px-6 py-4 text-center font-bold text-lg">نسبة الحضور</th>
-               <th className="px-6 py-4 text-center font-bold text-lg">إجمالي الطلاب</th>
-               <th className="px-6 py-4 text-center font-bold text-lg">الحضور</th>
-               <th className="px-6 py-4 text-center font-bold text-lg">الغياب</th>
-               <th className="px-6 py-4 text-center font-bold text-lg">النسبة</th>
             </tr>
           </thead>
           <tbody>
@@ -834,25 +858,19 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName }) => {
                      {teacher.actual_classes > 0 ? teacher.actual_classes : '-'}
                    </td>
                    <td className="px-6 py-4 text-center text-base">
+                     {teacher.recorded_days || 0}
+                   </td>
+                   <td className="px-6 py-4 text-center text-base">
+                     {teacher.working_days || 0}
+                   </td>
+                   <td className="px-6 py-4 text-center text-base">
                      {teacher.teacher_attendance_percentage}%
                    </td>
-                   <td className="px-6 py-4 text-center text-base">
-                     {teacher.total_students}
-                   </td>
-                   <td className="px-6 py-4 text-center text-base">
-                     {teacher.present_students > 0 ? teacher.present_students : '-'}
-                   </td>
-                   <td className="px-6 py-4 text-center text-base">
-                     {teacher.absent_students > 0 ? teacher.absent_students : '-'}
-                   </td>
-                  <td className="px-6 py-4 text-center text-base">
-                    {teacher.attendance_percentage}%
-                  </td>
                 </tr>
               ))
             ) : (
                <tr className="bg-gray-50">
-                 <td colSpan="9" className="px-6 py-4 text-center text-yellow-700 text-base italic">
+                 <td colSpan="7" className="px-6 py-4 text-center text-yellow-700 text-base italic">
                    لا توجد بيانات متاحة
                  </td>
                </tr>

@@ -102,6 +102,106 @@ export const getCurrentWeekRange = () => {
 };
 
 /**
+ * Get current working week date range (Sunday to Thursday)
+ * @returns {Object} Object with start and end dates of current working week
+ */
+export const getCurrentWorkingWeekRange = () => {
+  const today = new Date();
+  // Convert to Muscat timezone using a robust method
+  const muscatToday = new Date(today.toLocaleString("en-US", {timeZone: "Asia/Muscat"}));
+  
+  // Fallback to current date if conversion fails
+  if (isNaN(muscatToday.getTime())) {
+    const dayOfWeek = today.getDay();
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - dayOfWeek); // Sunday
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 4); // Thursday
+    
+    return {
+      start: startOfWeek.toISOString().split('T')[0],
+      end: endOfWeek.toISOString().split('T')[0],
+    };
+  }
+  
+  const dayOfWeek = muscatToday.getDay();
+  const startOfWeek = new Date(muscatToday);
+  startOfWeek.setDate(muscatToday.getDate() - dayOfWeek); // Sunday
+  
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 4); // Thursday
+  
+  return {
+    start: startOfWeek.toISOString().split('T')[0],
+    end: endOfWeek.toISOString().split('T')[0],
+  };
+};
+
+/**
+ * Get all working weeks in the current month (Sunday to Thursday)
+ * Weeks start from Sunday (day 0) and end on Thursday (day 4)
+ * @returns {Array} Array of week objects with start, end, and label
+ */
+export const getCurrentMonthWeeks = () => {
+  const today = new Date();
+  const muscatToday = new Date(today.toLocaleString("en-US", {timeZone: "Asia/Muscat"}));
+  
+  // Fallback to current date if conversion fails
+  if (isNaN(muscatToday.getTime())) {
+    return getCurrentMonthWeeksFallback(today);
+  }
+  
+  return getCurrentMonthWeeksFallback(muscatToday);
+};
+
+/**
+ * Fallback function for getting current month weeks
+ * @param {Date} currentDate - The current date
+ * @returns {Array} Array of week objects
+ */
+const getCurrentMonthWeeksFallback = (currentDate) => {
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  
+  // Get first day of the month
+  const firstDay = new Date(year, month, 1);
+  // Get last day of the month
+  const lastDay = new Date(year, month + 1, 0);
+  
+  const weeks = [];
+  let currentWeekStart = new Date(firstDay);
+  
+  // Find the first Sunday of the month or before
+  const firstDayOfWeek = firstDay.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  currentWeekStart.setDate(firstDay.getDate() - firstDayOfWeek);
+  
+  let weekNumber = 1;
+  
+  // Generate all weeks that have at least one day in the current month
+  while (currentWeekStart <= lastDay) {
+    const weekStart = new Date(currentWeekStart);
+    const weekEnd = new Date(currentWeekStart);
+    weekEnd.setDate(currentWeekStart.getDate() + 5); // Thursday
+    
+    // Only include weeks that have at least one day in the current month
+    if (weekEnd >= firstDay && weekStart <= lastDay) {
+      weeks.push({
+        start: weekStart.toISOString().split('T')[0],
+        end: weekEnd.toISOString().split('T')[0],
+        label: `الأسبوع ${weekNumber}`,
+        weekNumber: weekNumber
+      });
+      weekNumber++;
+    }
+    
+    // Move to next week
+    currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+  }
+  
+  return weeks;
+};
+
+/**
  * Get current month date range
  * @returns {Object} Object with start and end dates of current month
  */
