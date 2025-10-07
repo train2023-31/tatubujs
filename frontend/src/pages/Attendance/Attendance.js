@@ -788,32 +788,30 @@ const Attendance = () => {
                           isUnmarked ? 'border-orange-400 border-l-4 bg-orange-50' : 'border-gray-200'
                         }`}>
                           {/* Student Info */}
-                          <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-sm font-semibold text-gray-900 truncate">
-                                {student.fullName}
-                              </h3>
-                              {student.phone_number && (
-                                <p className="text-xs text-gray-500 truncate">
-                                  {student.phone_number}
-                                </p>
-                              )}
-                            </div>
-                            <div className="ml-2 flex-shrink-0">
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                status.color === 'green' ? 'bg-green-100 text-green-800' : 
-                                status.color === 'red' ? 'bg-red-100 text-red-800' : 
-                                status.color === 'blue' ? 'bg-blue-100 text-blue-800' : 
-                                status.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {status.text}
-                              </span>
+                          <div className="mb-3 pb-3 border-b border-gray-100">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="text-base text-sm font-semibold text-gray-900 leading-tight break-words">
+                                  {student.fullName}
+                                </h3>
+                          
+                              </div>
+                              <div className="flex-shrink-0">
+                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                                  status.color === 'green' ? 'bg-green-100 text-green-800' : 
+                                  status.color === 'red' ? 'bg-red-100 text-red-800' : 
+                                  status.color === 'blue' ? 'bg-blue-100 text-blue-800' : 
+                                  status.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {status.text}
+                                </span>
+                              </div>
                             </div>
                           </div>
 
                           {/* Class Numbers - Only show for absent, excused, or late students */}
                           {classAttendance?.class_time_data && Object.keys(classAttendance.class_time_data).length > 0 && (
-                            <div className="mb-2">
+                            <div className="mb-3">
                               {(() => {
                                 const problemPeriods = [];
                                 
@@ -845,12 +843,12 @@ const Attendance = () => {
                                 
                                 if (problemPeriods.length > 0) {
                                   return (
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs font-medium text-gray-500">حصص الغياب:</span>
-                                      <div className="flex flex-wrap gap-1">
+                                    <div className="flex flex-col gap-2">
+                                      <span className="text-sm font-medium text-gray-600">حصص الغياب/التأخير:</span>
+                                      <div className="flex flex-wrap gap-2">
                                         {problemPeriods.map((period) => (
-                                          <span key={period.number} className={`text-xs px-1.5 py-0.5 rounded ${period.bgColor} ${period.textColor} font-medium`}>
-                                            {period.number}
+                                          <span key={period.number} className={`text-sm px-2 py-1 rounded-lg ${period.bgColor} ${period.textColor} font-semibold`}>
+                                            الحصة {period.number}
                                           </span>
                                         ))}
                                       </div>
@@ -864,55 +862,58 @@ const Attendance = () => {
 
                           {/* Attendance Options */}
                           {!isViewMode && (
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                               <div className="grid grid-cols-2 gap-1">
-                                <label className="flex items-center p-1.5 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+                                <label className="flex items-center p-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
                                   <input
                                     type="checkbox"
                                     checked={record.is_present}
                                     onChange={(e) => handleAttendanceChange(record.student_id, 'is_present', e.target.checked)}
-                                    className="w-3.5 h-3.5 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-1 ml-1.5"
+                                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2 ml-2"
                                   />
-                                  <span className="text-xs text-green-600">حاضر</span>
+                                  <span className="text-sm font-medium text-green-600">حاضر</span>
                                 </label>
-                                <label className="flex items-center p-1.5 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+                                <label className="flex items-center p-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
                                   <input
                                     type="checkbox"
                                     checked={record.is_Acsent}
                                     onChange={(e) => handleAttendanceChange(record.student_id, 'is_Acsent', e.target.checked)}
-                                    className="w-3.5 h-3.5 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-1 ml-1.5"
+                                    className="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-2 ml-2"
                                   />
-                                  <span className="text-xs text-red-600">هارب</span>
+                                  <span className="text-sm font-medium text-red-600">هارب</span>
                                 </label>
-                                <label className="flex items-center p-1.5 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+                                <label className="flex items-center p-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
                                   <input
                                     type="checkbox"
                                     checked={record.is_Excus}
                                     onChange={(e) => handleAttendanceChange(record.student_id, 'is_Excus', e.target.checked)}
-                                    className="w-3.5 h-3.5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-1 ml-1.5"
+                                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 ml-2"
                                   />
-                                  <span className="text-xs text-blue-600">غائب</span>
+                                  <span className="text-sm font-medium text-blue-600">غائب</span>
                                 </label>
-                                <label className="flex items-center p-1.5 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+                                <label className="flex items-center p-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
                                   <input
                                     type="checkbox"
                                     checked={record.is_late}
                                     onChange={(e) => handleAttendanceChange(record.student_id, 'is_late', e.target.checked)}
-                                    className="w-3.5 h-3.5 text-yellow-600 bg-gray-100 border-gray-300 rounded focus:ring-yellow-500 focus:ring-1 ml-1.5"
+                                    className="w-4 h-4 text-yellow-600 bg-gray-100 border-gray-300 rounded focus:ring-yellow-500 focus:ring-2 ml-2"
                                   />
-                                  <span className="text-xs text-yellow-600">متأخر</span>
+                                  <span className="text-sm font-medium text-yellow-600">متأخر</span>
                                 </label>
                               </div>
                               
                               {/* Excuse Note */}
                               {record.is_Excus && (
-                                <div className="mt-2">
+                                <div className="mt-3">
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    ملاحظة العذر
+                                  </label>
                                   <input
                                     type="text"
                                     value={record.ExcusNote}
                                     onChange={(e) => handleAttendanceChange(record.student_id, 'ExcusNote', e.target.value)}
-                                    placeholder="ملاحظة العذر..."
-                                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="أدخل ملاحظة العذر..."
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                   />
                                 </div>
                               )}
@@ -1031,7 +1032,7 @@ const Attendance = () => {
                         </div>
                         <div className="text-center p-2 bg-red-100 rounded">
                           <div className="text-lg font-bold text-red-700">{absentCount}</div>
-                          <div className="text-xs text-red-600">غائب</div>
+                          <div className="text-xs text-red-600">هارب</div>
                         </div>
                         <div className="text-center p-2 bg-yellow-100 rounded">
                           <div className="text-lg font-bold text-yellow-700">{lateCount}</div>
@@ -1039,7 +1040,7 @@ const Attendance = () => {
                         </div>
                         <div className="text-center p-2 bg-blue-100 rounded">
                           <div className="text-lg font-bold text-blue-700">{excusedCount}</div>
-                          <div className="text-xs text-blue-600">معذور</div>
+                          <div className="text-xs text-blue-600">غائب</div>
                         </div>
                       </>
                     );

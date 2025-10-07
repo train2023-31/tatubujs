@@ -261,7 +261,7 @@ def teacher_attendance_this_week():
 
     # 4️⃣ If user is a school_admin or data_analyst
     elif user.user_role == 'school_admin' or user.user_role == 'data_analyst':
-        teachers = Teacher.query.filter_by(school_id=user.school_id).all()
+        teachers = Teacher.query.filter_by(school_id=user.school_id, is_active=True).all()
 
         for teacher in teachers:
             attendance_count = db.session.query(

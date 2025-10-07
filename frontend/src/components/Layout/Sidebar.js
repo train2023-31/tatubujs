@@ -15,7 +15,8 @@ import {
   Upload,
   FileText,
   Trash2,
-  Star
+  Star,
+  MessageCircle
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasRole } from '../../utils/helpers';
@@ -109,6 +110,12 @@ const Sidebar = ({ isOpen, onClose }) => {
           icon: Newspaper,
           roles: ['admin', 'school_admin', 'data_analyst'],
         },
+        // {
+        //   name: 'إرسال إشعارات WhatsApp',
+        //   href: '/app/whatsapp-messaging',
+        //   icon: MessageCircle,
+        //   roles: ['admin', 'school_admin', 'data_analyst'],
+        // },
         // {
         //   name: 'الرسائل النصية',
         //   href: '/app/sms',

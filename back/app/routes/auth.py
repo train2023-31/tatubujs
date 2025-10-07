@@ -16,6 +16,9 @@ from datetime import datetime, timedelta
 from time import time, sleep 
 from app.logger import log_action
 from app.config import get_oman_time
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -118,7 +121,7 @@ def register():
     user_id = get_jwt_identity()
     Login_user = User.query.get(user_id)
 
-    if Login_user.user_role != 'admin':  # Ensure only school_admin can register teachers
+    if Login_user.user_role != 'admin':  # Ensure only admin can register users
         return jsonify(message={"en": "Unauthorized to make this action.", "ar": "غير مصرح لك بتنفيذ هذا الإجراء."}, flag=1), 400
     
     data = request.get_json()
@@ -189,15 +192,6 @@ def register():
             user_role=role,
             fullName=fullName,
             school_id=school_id
-        )
-    elif role == 'admin':
-        new_user = User(
-            username=username,
-            password=hashed_password,
-            email=email,
-            fullName=fullName,
-            phone_number=phone_number,
-            user_role=role,
         )
     else:
         return jsonify(message="Invalid role specified."), 400
@@ -376,6 +370,62 @@ def register_Users():
         return jsonify(message={"en": f"Database error: {str(e)}", "ar": f"خطأ في قاعدة البيانات: {str(e)}"}, flag=7), 500
 
     return jsonify(response), 201
+
+@auth_blueprint.route('/register_single_data_analyst', methods=['POST'])
+@jwt_required()
+@log_action("إضافة", description="إضافة محلل بيانات جديد " ,content='')
+def register_single_data_analyst():
+    user_id = get_jwt_identity()
+    Login_user = User.query.get(user_id)
+
+    if Login_user.user_role != 'school_admin':  # Ensure only school_admin can register data_analyst
+        return jsonify(message={"en": "Unauthorized to make this action.", "ar": "غير مصرح لك بتنفيذ هذا الإجراء."}, flag=1), 400
+    
+    data = request.get_json()
+    username = data.get('username')
+    email = data.get('email')
+    fullName = data.get('fullName')
+    phone_number = data.get('phone_number')
+    job_name = data.get('job_name')
+
+    # Validate required fields
+    if not all([username, email, fullName]):
+        return jsonify(message="Missing required fields."), 400
+
+    # Check if username or email already exists
+    existing_user = User.query.filter(
+        (User.username == username) | (User.email == email)
+    ).first()
+    if existing_user:
+        return jsonify(message="Username or email already exists."), 409
+    
+    # Ensure school exists
+    school = School.query.get(Login_user.school_id)
+
+    # Hash the password
+    hashed_password = generate_password_hash(school.password)
+
+    # Ensure school exists
+    school = School.query.get(Login_user.school_id)
+    if not school:
+        return jsonify(message="School not found."), 404
+
+    new_user = Teacher(
+        password=hashed_password,
+        email=email,
+        phone_number=phone_number,
+        user_role='data_analyst',
+        fullName=fullName,
+        job_name=job_name,
+        school_id=Login_user.school_id,
+        username=username,
+    )
+       
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify(message="Data analyst registered successfully , تم إضافة محلل البيانات بنجاح"), 201
+
 
 @auth_blueprint.route('/register_single_assign_student', methods=['POST'])
 @jwt_required()
@@ -1022,28 +1072,197 @@ def delete_user(user_id):
     # Fetch the user to be deleted
     user = User.query.get(user_id)
     if not user:
-        return jsonify(message="User not found."), 404
+        return jsonify(message="المستخدم غير موجود."), 404
 
     # Check if the user is active
     if not user.is_active:
-        return jsonify(message="User account is inactive and cannot be deleted."), 400
+        return jsonify(message="لا يمكن حذف حساب مستخدم غير نشط."), 400
 
-    # Check if the user has associated classes (assuming a Teacher class relationship)
+    # Check if the user has associated classes (for teachers)
     if isinstance(user, Teacher):
         associated_classes = Class.query.filter_by(teacher_id=user_id).count()
         if associated_classes > 0:
-            return jsonify(message="Cannot delete user with associated classes."), 400
+            return jsonify(
+                message=f"لا يمكن حذف المعلم '{user.fullName}' لأنه مرتبط بـ {associated_classes} فصل دراسي. يرجى إلغاء ربطه من الفصول أولاً.",
+                details={
+                    "user_name": user.fullName,
+                    "associated_classes_count": associated_classes,
+                    "reason": "معلم مرتبط بفصول دراسية"
+                }
+            ), 400
+
+    # Check if the user has attendance records (for students)
+    if isinstance(user, Student):
+        from app.models import Attendance
+        attendance_records = Attendance.query.filter_by(student_id=user_id).count()
+        if attendance_records > 0:
+            return jsonify(
+                message=f"لا يمكن حذف الطالب '{user.fullName}' لأنه لديه {attendance_records} سجل حضور. يرجى حذف سجلات الحضور أولاً.",
+                details={
+                    "user_name": user.fullName,
+                    "attendance_records_count": attendance_records,
+                    "reason": "طالب لديه سجلات حضور"
+                }
+            ), 400
+
+    # Check if the user has any other related records
+    # Check for any logs or other related data
+    from app.models import Log
+    user_logs = Log.query.filter_by(user_id=user_id).count()
+    if user_logs > 0:
+        return jsonify(
+            message=f"لا يمكن حذف المستخدم '{user.fullName}' لأنه لديه {user_logs} سجل في النظام. يرجى مراجعة السجلات أولاً.",
+            details={
+                "user_name": user.fullName,
+                "logs_count": user_logs,
+                "reason": "مستخدم لديه سجلات في النظام"
+            }
+        ), 400
 
     # Authorization check (only allow admins or the user themselves to delete)
     current_user = User.query.get(current_user_id)
     if current_user.user_role != 'admin' and current_user_id != user_id:
-        return jsonify(message="Unauthorized to delete this user."), 403
+        return jsonify(message="غير مصرح لك بحذف هذا المستخدم."), 403
+
+    # Additional check: prevent admin from deleting themselves
+    if current_user_id == user_id and current_user.user_role == 'admin':
+        return jsonify(message="لا يمكن للمدير حذف حسابه الخاص."), 400
 
     # Delete the user
     db.session.delete(user)
     db.session.commit()
 
-    return jsonify(message="User deleted successfully."), 200
+    return jsonify(
+        message=f"تم حذف المستخدم '{user.fullName}' بنجاح.",
+        details={
+            "user_name": user.fullName,
+            "user_role": user.user_role
+        }
+    ), 200
+
+
+@auth_blueprint.route('/send-absence-notifications', methods=['POST'])
+@jwt_required()
+@log_action("إرسال إشعارات الغياب", description="إرسال رسائل WhatsApp للطلاب المتغيبين")
+def send_absence_notifications():
+    """
+    Send WhatsApp notifications to students with absences
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        # Check authorization (only school admins and data analysts)
+        if current_user.user_role not in ['school_admin', 'data_analyst', 'admin']:
+            return jsonify(message="غير مصرح لك بإرسال إشعارات الغياب."), 403
+        
+        # Get request data
+        data = request.get_json() or {}
+        school_id = data.get('school_id')
+        days_back = data.get('days_back', 7)
+        custom_message = data.get('custom_message')
+        
+        # Validate days_back
+        if not isinstance(days_back, int) or days_back < 1 or days_back > 30:
+            return jsonify(message="عدد الأيام يجب أن يكون بين 1 و 30."), 400
+        
+        # Import the messaging service
+        try:
+            from whatsapp_automation import AbsenceMessagingService
+        except ImportError as e:
+            logger.error(f"Failed to import whatsapp_automation: {str(e)}")
+            return jsonify(message=f"خطأ في تحميل نظام WhatsApp: {str(e)}"), 500
+        except Exception as e:
+            logger.error(f"Unexpected error importing whatsapp_automation: {str(e)}")
+            return jsonify(message=f"خطأ غير متوقع في تحميل نظام WhatsApp: {str(e)}"), 500
+        
+        # Initialize and run the messaging service
+        messaging_service = AbsenceMessagingService()
+        results = messaging_service.send_absence_notifications(
+            school_id=school_id or current_user.school_id,
+            days_back=days_back,
+            custom_message=custom_message
+        )
+        
+        if results['success']:
+            return jsonify({
+                "message": results['message'],
+                "total": results['total'],
+                "sent": results['sent'],
+                "failed": results['failed'],
+                "failed_contacts": results.get('failed_contacts', [])
+            }), 200
+        else:
+            return jsonify({
+                "message": results['message'],
+                "error": True
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error in send_absence_notifications: {str(e)}")
+        return jsonify(message=f"حدث خطأ أثناء إرسال الإشعارات: {str(e)}"), 500
+
+
+@auth_blueprint.route('/get-absence-stats', methods=['GET'])
+@jwt_required()
+def get_absence_stats():
+    """
+    Get statistics about students with absences
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        # Check authorization
+        if current_user.user_role not in ['school_admin', 'data_analyst', 'admin']:
+            return jsonify(message="غير مصرح لك بعرض إحصائيات الغياب."), 403
+        
+        # Get query parameters
+        school_id = request.args.get('school_id', type=int)
+        days_back = request.args.get('days_back', 7, type=int)
+        
+        # Validate days_back
+        if days_back < 1 or days_back > 30:
+            return jsonify(message="عدد الأيام يجب أن يكون بين 1 و 30."), 400
+        
+        # Import the messaging service to get stats
+        try:
+            from whatsapp_automation import AbsenceMessagingService
+        except ImportError as e:
+            logger.error(f"Failed to import whatsapp_automation: {str(e)}")
+            return jsonify(message=f"خطأ في تحميل نظام WhatsApp: {str(e)}"), 500
+        except Exception as e:
+            logger.error(f"Unexpected error importing whatsapp_automation: {str(e)}")
+            return jsonify(message=f"خطأ غير متوقع في تحميل نظام WhatsApp: {str(e)}"), 500
+        
+        messaging_service = AbsenceMessagingService()
+        students_data = messaging_service.get_students_with_absences(school_id, days_back)
+        
+        # Calculate statistics
+        total_students = len(students_data)
+        students_with_phone = len([s for s in students_data if s.get('phone')])
+        total_absences = sum(s['absence_count'] for s in students_data)
+        
+        # Group by absence count
+        absence_groups = {}
+        for student in students_data:
+            count = student['absence_count']
+            if count not in absence_groups:
+                absence_groups[count] = 0
+            absence_groups[count] += 1
+        
+        return jsonify({
+            "total_students_with_absences": total_students,
+            "students_with_phone_numbers": students_with_phone,
+            "total_absence_records": total_absences,
+            "absence_distribution": absence_groups,
+            "days_checked": days_back,
+            "school_id": school_id
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error in get_absence_stats: {str(e)}")
+        return jsonify(message=f"حدث خطأ أثناء جلب الإحصائيات: {str(e)}"), 500
 
 
 def validate_password_strength(password):

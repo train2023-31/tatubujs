@@ -435,6 +435,8 @@ def get_students_from_my_school():
     # Prepare the student list for the response
     student_list = []
     for student in students:
+        if not student.is_active:
+            continue  # Only include active students
         # Get the first class name for the student (assuming students are in one class)
         class_name = None
         if student.classes:

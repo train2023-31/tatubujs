@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { useQuery, useQueryClient } from 'react-query';
+import ReactDOM from 'react-dom';
+import { useQuery, useQueryClient, useMutation } from 'react-query';
 import { 
   Download, 
   Eye, 
@@ -15,7 +16,7 @@ import {
   Filter,
   XCircle
 } from 'lucide-react';
-import { attendanceAPI, classesAPI } from '../../services/api';
+import { attendanceAPI, classesAPI, authAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDate, getTodayAPI } from '../../utils/helpers';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
@@ -42,7 +43,39 @@ const DailyReport = () => {
     searchTerm: '',
     excuseFilter: ''
   });
+  const [isSendingBulkWhatsApp, setIsSendingBulkWhatsApp] = useState(false);
+  const [showBulkWhatsAppModal, setShowBulkWhatsAppModal] = useState(false);
   const reportRef = useRef(null);
+
+  // Bulk WhatsApp messaging mutation
+  const sendBulkWhatsAppMutation = useMutation(
+    (data) => authAPI.sendAbsenceNotifications(data),
+    {
+      onSuccess: (response) => {
+        const message = response.data.message;
+        const schoolPhone = response.data.school_phone;
+        
+        if (schoolPhone) {
+          toast.success(`${message}\nرقم المدرسة المستخدم: ${schoolPhone}`, {
+            duration: 8000,
+            style: {
+              whiteSpace: 'pre-line',
+              maxWidth: '500px'
+            }
+          });
+        } else {
+          toast.success(message);
+        }
+        
+        setIsSendingBulkWhatsApp(false);
+        setShowBulkWhatsAppModal(false);
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message || 'فشل في إرسال الإشعارات');
+        setIsSendingBulkWhatsApp(false);
+      },
+    }
+  );
 
   // Fetch daily attendance data
   const { data: attendanceData, isLoading } = useQuery(
@@ -158,7 +191,7 @@ const DailyReport = () => {
       
       // Excuse filter
       if (filters.excuseFilter) {
-        const hasExcuse = record.is_has_excuse || record.is_has_exuse || false;
+        const hasExcuse = record.is_has_exuse || record.is_has_exuse || false;
         if (filters.excuseFilter === 'with_excuse' && !hasExcuse) return false;
         if (filters.excuseFilter === 'without_excuse' && hasExcuse) return false;
       }
@@ -210,11 +243,11 @@ const DailyReport = () => {
       }
 
       const updatePromises = studentsWithRecords.map(student => 
-        attendanceAPI.updateExcuseForStudent({
-          student_id: student.student_id,
-          date: selectedDate,
-          has_excuse: excuseForAll
-        })
+         attendanceAPI.updateExcuseForStudent({
+           student_id: student.student_id,
+           date: selectedDate,
+           is_has_exuse: excuseForAll
+         })
       );
 
       await Promise.all(updatePromises);
@@ -235,11 +268,11 @@ const DailyReport = () => {
     setUpdatingStudents(prev => new Set(prev).add(studentId));
     
     try {
-      await attendanceAPI.updateExcuseForStudent({
-        student_id: studentId,
-        date: selectedDate,
-        is_has_exuse: hasExcuse
-      });
+      await          attendanceAPI.updateExcuseForStudent({
+           student_id: studentId,
+           date: selectedDate,
+           is_has_exuse: hasExcuse
+         });
       
       // Invalidate and refetch the data
       await queryClient.invalidateQueries(['dailyAttendanceReport', selectedDate]);
@@ -287,7 +320,7 @@ const DailyReport = () => {
     const haribTimes = record.absent_times || record.absentTimes || record.absent_periods || [];
     const lateTimes = record.late_times || record.lateTimes || record.late_periods || [];
     const ghaibTimes = record.excused_times || record.excusedTimes || record.excused_periods || [];
-    const hasExcuse = record.is_has_excuse || record.is_has_exuse || false;
+     const hasExcuse = record.is_has_exuse || record.is_has_exuse || false;
     
     let attendanceStatus = '';
     
@@ -346,6 +379,18 @@ ${attendanceStatus}
       const url = `https://web.whatsapp.com/send?text=${encodeURIComponent(mssg_Ar)}`;
       window.open(url, "_blank");
     }
+  };
+
+  const handleBulkWhatsAppSend = () => {
+    setIsSendingBulkWhatsApp(true);
+    
+    const data = {
+      school_id: user?.school_id || null,
+      days_back: 1, // Send for today only
+      custom_message: null // Use default message template
+    };
+
+    sendBulkWhatsAppMutation.mutate(data);
   };
 
   const handleDownloadPDF = async () => {
@@ -570,11 +615,21 @@ ${attendanceStatus}
           <button
             onClick={handlePreview}
             disabled={isLoading}
-            className="btn btn-outline"
+            className="btn btn-outline ml-2"
           >
             <Eye className="h-5 w-5 mr-2" />
             معاينة التقرير
           </button>
+          
+          {/* <button
+            onClick={() => setShowBulkWhatsAppModal(true)}
+            disabled={isLoading}
+            className="btn btn-primary mr-2"
+          >
+            <MessageCircle className="h-5 w-5 ml-2" />
+            إرسال إشعارات WhatsApp
+          </button> */}
+          
           {/* <button
             onClick={handleDownloadPDF}
             disabled={isLoading || isGeneratingPDF}
@@ -635,7 +690,7 @@ ${attendanceStatus}
                       <button
                         onClick={() => handleConfirmDayAbsents(true)}
                         disabled={isConfirming || confirmationStatus?.is_confirm}
-                        className={`btn btn-sm ${
+                        className={`btn btn-sm btn-primary mr-2 ml-2 ${
                           confirmationStatus?.is_confirm 
                             ? 'btn-success opacity-50 cursor-not-allowed' 
                             : 'btn-success'
@@ -656,7 +711,7 @@ ${attendanceStatus}
                         <button
                           onClick={() => handleConfirmDayAbsents(false)}
                           disabled={isConfirming}
-                          className="btn btn-sm btn-outline"
+                          className="btn btn-sm btn-outline mr-2 btn-danger"
                         >
                           {isConfirming ? (
                             <>
@@ -730,7 +785,7 @@ ${attendanceStatus}
             <div className="card-body text-center">
               <div className="text-2xl font-bold text-purple-600">
                 {attendanceData.attendance_details.filter(record => {
-                  const hasExcuse = record.is_has_excuse || record.is_has_exuse || false;
+                  const hasExcuse = record.is_has_exuse || record.is_has_exuse || false;
                   return hasExcuse;
                 }).length}
               </div>
@@ -803,7 +858,7 @@ ${attendanceStatus}
                   {/* <option value="present">حاضر</option> */}
                   <option value="absent">هارب</option>
                   <option value="late">متأخر</option>
-                  <option value="excused">معذور</option>
+                  <option value="excused">غائب</option>
                 </select>
               </div>
 
@@ -852,8 +907,8 @@ ${attendanceStatus}
                 {filters.statusFilter && (
                   <span className="badge badge-warning">
                     الحالة: {filters.statusFilter === 'present' ? 'حاضر' : 
-                            filters.statusFilter === 'absent' ? 'غائب' :
-                            filters.statusFilter === 'late' ? 'متأخر' : 'معذور'}
+                            filters.statusFilter === 'absent' ? 'هارب' :
+                            filters.statusFilter === 'late' ? 'متأخر' : 'غائب'}
                     <button
                       onClick={() => setFilters(prev => ({ ...prev, statusFilter: '' }))}
                       className="ml-1 text-white hover:text-gray-200"
@@ -931,17 +986,17 @@ ${attendanceStatus}
                       const haribTimes = record.absent_times || record.absentTimes || record.absent_periods || [];
                       const lateTimes = record.late_times || record.lateTimes || record.late_periods || [];
                       const ghaibTimes = record.excused_times || record.excusedTimes || record.excused_periods || [];
-                      const hasExcuse = record.is_has_excuse || record.is_has_exuse || false;
+                      const hasExcuse = record.is_has_exuse || record.is_has_exuse || false;
                       
-                      // Determine row color based on attendance status
-                      let rowColorClass = "hover:bg-gray-50";
-                      if (haribTimes.length > 0) {
-                        // Red background for students with absent periods
-                        rowColorClass = "bg-red-50 hover:bg-red-100 border-l-4 border-red-400";
-                      } else if (hasExcuse) {
-                        // Green background for students with excuses
-                        rowColorClass = "bg-green-50 hover:bg-green-100 border-l-4 border-green-400";
-                      }
+                       // Determine row color based on attendance status
+                       let rowColorClass = "hover:bg-gray-50";
+                       if (haribTimes.length > 0) {
+                         // Red background for students with absent periods
+                         rowColorClass = "bg-red-50 hover:bg-red-100 border-l-4 border-red-400";
+                       }  if (hasExcuse) {
+                         // Green background for students with excuses
+                         rowColorClass = "bg-green-50 hover:bg-green-100 border-l-4 border-green-400";
+                       }
                       
                       return (
                         <tr key={record.student_id || index} className={rowColorClass}>
@@ -977,8 +1032,66 @@ ${attendanceStatus}
                                       </span>
                                     </div>
                                     
-                                    {/* Tooltip */}
-                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 min-w-max">
+                                    {/* Dynamic Tooltip */}
+                                    <div 
+                                      className="absolute left-1/2 transform -translate-x-1/2 px-3 py-2 bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 min-w-max"
+                                      ref={(el) => {
+                                        if (!el) return;
+                                        
+                                        const updatePosition = () => {
+                                          const trigger = el.parentElement?.querySelector('.flex.items-center');
+                                          if (!trigger) return;
+                                          
+                                          const triggerRect = trigger.getBoundingClientRect();
+                                          const tooltipRect = el.getBoundingClientRect();
+                                          const viewportHeight = window.innerHeight;
+                                          
+                                          // Calculate available space above and below
+                                          const spaceAbove = triggerRect.top;
+                                          const spaceBelow = viewportHeight - triggerRect.bottom;
+                                          
+                                          // Estimate tooltip height (approximate based on content)
+                                          const estimatedTooltipHeight = 60 + (teachersList.length * 20); // Base height + per teacher
+                                          
+                                          // Determine if tooltip should appear above or below
+                                          const shouldShowAbove = spaceBelow < estimatedTooltipHeight && spaceAbove > estimatedTooltipHeight;
+                                          
+                                          if (shouldShowAbove) {
+                                            // Position above
+                                            el.style.bottom = '100%';
+                                            el.style.top = 'auto';
+                                            el.style.marginBottom = '8px';
+                                            el.style.marginTop = '0';
+                                            
+                                            // Update arrow to point down
+                                            const arrow = el.querySelector('.tooltip-arrow');
+                                            if (arrow) {
+                                              arrow.className = 'tooltip-arrow absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-700';
+                                            }
+                                          } else {
+                                            // Position below
+                                            el.style.top = '100%';
+                                            el.style.bottom = 'auto';
+                                            el.style.marginTop = '8px';
+                                            el.style.marginBottom = '0';
+                                            
+                                            // Update arrow to point up
+                                            const arrow = el.querySelector('.tooltip-arrow');
+                                            if (arrow) {
+                                              arrow.className = 'tooltip-arrow absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-700';
+                                            }
+                                          }
+                                        };
+                                        
+                                        // Update position on hover
+                                        const parent = el.parentElement;
+                                        if (parent) {
+                                          parent.addEventListener('mouseenter', updatePosition);
+                                          // Also update on window resize
+                                          window.addEventListener('resize', updatePosition);
+                                        }
+                                      }}
+                                    >
                                       <div className="space-y-1">
                                         <div className="font-semibold text-center border-b border-gray-700 pb-1 mb-2">
                                           المعلمين/ات
@@ -992,8 +1105,8 @@ ${attendanceStatus}
                                           </div>
                                         ))}
                                       </div>
-                                      {/* Arrow */}
-                                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                                      {/* Dynamic Arrow */}
+                                      <div className="tooltip-arrow absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-700"></div>
                                     </div>
                                   </div>
                                 );
@@ -1121,6 +1234,87 @@ ${attendanceStatus}
           </div>
         </div>
       </Modal>
+
+      {/* Bulk WhatsApp Modal */}
+      <Modal
+        isOpen={showBulkWhatsAppModal}
+        onClose={() => setShowBulkWhatsAppModal(false)}
+        title="إرسال إشعارات WhatsApp للطلاب المتغيبين"
+        size="lg"
+      >
+        <div className="space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <MessageCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-2">تعليمات الاستخدام:</p>
+                <ul className="space-y-1 list-disc list-inside">
+                  <li>تأكد من أن WhatsApp Web مفتوح في متصفح Chrome</li>
+                  <li>قم بمسح رمز QR إذا لم تكن مسجل الدخول</li>
+                  <li>لا تغلق نافذة المتصفح أثناء عملية الإرسال</li>
+                  <li>سيتم إرسال الرسائل تلقائياً مع توقف 3 ثوان بين كل رسالة</li>
+                  <li>الرسائل ستُرسل من رقم المدرسة المسجل في النظام</li>
+                  <li>يشمل النظام الهارب والغائب والمتأخر</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <Calendar className="h-5 w-5 text-yellow-600 mt-0.5" />
+              <div className="text-sm text-yellow-800">
+                <p className="font-medium mb-1">سيتم إرسال الإشعارات للطلاب المتغيبين في:</p>
+                <p className="font-bold">{formatDate(selectedDate, 'dd/MM/yyyy', 'ar')}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">تنسيق الرسالة الافتراضي:</h4>
+            <div className="text-sm text-gray-900 whitespace-pre-line bg-white p-3 rounded border">
+              *تقرير الحضور اليومي*
+
+*المدرسة:* [اسم المدرسة]
+*الطالب/ة:* [اسم الطالب]
+*الصف:* [اسم الصف]
+*التاريخ:* [التاريخ]
+*حالة الحضور:* [حالة الحضور - هارب/غائب/متأخر]
+*حالة العذر:* [حالة العذر]
+
+---
+تم إرسال هذا التقرير من نظام إدارة الحضور
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between space-x-3">
+            <button
+              onClick={() => setShowBulkWhatsAppModal(false)}
+              className="btn btn-outline"
+              disabled={isSendingBulkWhatsApp}
+            >
+              إلغاء
+            </button>
+            <button
+              onClick={handleBulkWhatsAppSend}
+              disabled={isSendingBulkWhatsApp}
+              className="btn btn-primary"
+            >
+              {isSendingBulkWhatsApp ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  <span className="mr-2">جاري الإرسال...</span>
+                </>
+              ) : (
+                <>
+                  <MessageCircle className="h-5 w-5 mr-2" />
+                  إرسال الإشعارات
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
@@ -1230,8 +1424,8 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName, filters, 
               {filters.statusFilter && (
                 <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
                   الحالة: {filters.statusFilter === 'present' ? 'حاضر' : 
-                          filters.statusFilter === 'absent' ? 'غائب' :
-                          filters.statusFilter === 'late' ? 'متأخر' : 'معذور'}
+                          filters.statusFilter === 'absent' ? 'هارب' :
+                          filters.statusFilter === 'late' ? 'متأخر' : 'غائب'}
                 </span>
               )}
               {filters.searchTerm && (
@@ -1272,14 +1466,14 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName, filters, 
                 {students.length > 0 ? (
                   students.map((record, index) => {
                     const haribTimes = record.absent_times || record.absentTimes || record.absent_periods || [];
-                    const hasExcuse = record.is_has_excuse || record.is_has_exuse || false;
+                    const hasExcuse = record.is_has_exuse || record.is_has_exuse || false;
                     
                     // Determine row color based on attendance status for PDF
                     let rowColorClass = "student-row";
                     if (haribTimes.length > 0) {
                       // Red background for students with absent periods
                       rowColorClass = "student-row bg-red-50 border-l-4 border-red-400 text-red-800";
-                    } else if (hasExcuse) {
+                    }  if (hasExcuse) {
                       // Green background for students with excuses
                       rowColorClass = "student-row bg-green-50 border-l-4 border-green-400 text-green-800";
                     }
@@ -1341,7 +1535,7 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName, filters, 
             <div className="text-center">
               <div className="text-2xl font-bold text-yellow-600">
                 {Object.values(filteredGroupedData).reduce((total, students) => 
-                  total + students.filter(s => s.is_has_excuse || s.is_has_exuse).length, 0)}
+                   total + students.filter(s => s.is_has_exuse || s.is_has_exuse).length, 0)}
               </div>
               <div className="text-gray-600">الطلاب ذوي الأعذار</div>
             </div>

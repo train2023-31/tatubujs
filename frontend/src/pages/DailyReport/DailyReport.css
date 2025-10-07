@@ -3,6 +3,12 @@
 
 /* Print styles for Daily Report */
 @media print {
+  /* Force colors to print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
   .print\\:p-4 {
     padding: 1rem !important;
   }
@@ -57,6 +63,47 @@
     margin-top: 20px !important;
     font-size: 12px !important;
   }
+  
+  /* Ensure colored rows show in print/PDF */
+  .student-row.bg-red-50 {
+    background-color: #fef2f2 !important;
+    border-left: 4px solid #f87171 !important;
+    color: #991b1b !important;
+  }
+  
+  .student-row.bg-green-50 {
+    background-color: #f0fdf4 !important;
+    border-left: 4px solid #4ade80 !important;
+    color: #166534 !important;
+  }
+  
+  /* Override nth-child selectors for colored rows in print */
+  .student-row.bg-red-50,
+  .student-row.bg-green-50 {
+    background-color: inherit !important;
+  }
+  
+  /* Force background colors to show in print */
+  .bg-red-50 {
+    background-color: #fef2f2 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  .bg-green-50 {
+    background-color: #f0fdf4 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Ensure borders show in print */
+  .border-red-400 {
+    border-color: #f87171 !important;
+  }
+  
+  .border-green-400 {
+    border-color: #4ade80 !important;
+  }
 }
 
 /* Additional styling for better PDF generation */
@@ -104,17 +151,17 @@
 }
 
 .report-table th {
-  background-color: #2563eb;
+  background-color: #2564eb;
   color: white;
   font-weight: bold;
   font-size: 16px;
 }
 
-.report-table tbody tr:nth-child(even) {
+.report-table tbody tr:nth-child(even):not(.bg-red-50):not(.bg-green-50) {
   background-color: #f9fafb;
 }
 
-.report-table tbody tr:nth-child(odd) {
+.report-table tbody tr:nth-child(odd):not(.bg-red-50):not(.bg-green-50) {
   background-color: white;
 }
 
@@ -128,6 +175,19 @@
 
 .student-row {
   border-bottom: 1px solid #d1d5db;
+}
+
+/* Colored row styles for attendance status */
+.student-row.bg-red-50 {
+  background-color: #fef2f2 !important;
+  border-left: 4px solid #f87171 !important;
+  color: #991b1b !important;
+}
+
+.student-row.bg-green-50 {
+  background-color: #f0fdf4 !important;
+  border-left: 4px solid #4ade80 !important;
+  color: #166534 !important;
 }
 
 .student-name {

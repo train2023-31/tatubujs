@@ -433,13 +433,13 @@ def get_teacher_report():
 
         # Get teachers based on user role
         if user.user_role == 'admin':
-            teachers = Teacher.query.all()
+            teachers = Teacher.query.filter_by(is_active=True).all()
         elif user.user_role == 'teacher':
             # If user is a teacher, only show their own data
-            teacher = Teacher.query.get(user.id)
+            teacher = Teacher.query.filter_by(id=user.id, is_active=True).first()
             teachers = [teacher] if teacher else []
         else:
-            teachers = Teacher.query.filter_by(school_id=user.school_id).all()
+            teachers = Teacher.query.filter_by(school_id=user.school_id, is_active=True).all()
 
         if not teachers:
             return jsonify({
@@ -557,7 +557,7 @@ def get_teacher_history(teacher_id):
             return jsonify(message="Unauthorized access."), 403
 
         # Get teacher details
-        teacher = Teacher.query.get(teacher_id)
+        teacher = Teacher.query.filter_by(id=teacher_id, is_active=True).first()
         if not teacher:
             return jsonify(message="Teacher not found."), 404
 

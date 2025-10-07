@@ -23,6 +23,7 @@ import TeacherReport from './pages/TeacherReport/TeacherReport';
 import DeleteSchoolData from './pages/DeleteSchoolData/DeleteSchoolData';
 import ViewLogs from './pages/ViewLogs/ViewLogs';
 import VersionFeatures from './pages/VersionFeatures/VersionFeatures';
+import WhatsAppMessaging from './pages/WhatsAppMessaging/WhatsAppMessaging';
 import LoadingSpinner from './components/UI/LoadingSpinner';
 
 // Create a client
@@ -230,6 +231,16 @@ function App() {
                   element={
                     <ProtectedRoute allowedRoles={['school_admin']}>
                       <SMS />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* WhatsApp Messaging - School Admin, Data Analyst, and Admin */}
+                <Route 
+                  path="whatsapp-messaging" 
+                  element={
+                    <ProtectedRoute allowedRoles={['school_admin', 'data_analyst', 'admin']}>
+                      <WhatsAppMessaging />
                     </ProtectedRoute>
                   } 
                 />

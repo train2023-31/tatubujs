@@ -48,6 +48,7 @@ export const authAPI = {
   changePassword: (passwordData) => api.put('/auth/change_password', passwordData),
   registerUser: (userData) => api.post('/auth/register', userData),
   registerTeacher: (teacherData) => api.post('/auth/register_single_teacher', teacherData),
+  registerDataAnalyst: (dataAnalystData) => api.post('/auth/register_single_data_analyst', dataAnalystData),
   registerTeachers: (teachersData) => api.post('/auth/register_Teacher', teachersData),
   registerStudents: (studentsData) => api.post('/auth/register_Students', studentsData),
   registerAndAssignStudents: (data) => api.post('/auth/register_and_assign_students_v2', data),
@@ -61,6 +62,8 @@ export const authAPI = {
     api.get('/auth/view_logs', { 
       params: { page, per_page, days } 
     }).then(res => res.data),
+  sendAbsenceNotifications: (data) => api.post('/auth/send-absence-notifications', data),
+  getAbsenceStats: (params) => api.get('/auth/get-absence-stats', { params }).then(res => res.data),
 };
 
 // Users API

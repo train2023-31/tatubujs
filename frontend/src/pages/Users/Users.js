@@ -55,27 +55,20 @@ const Users = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  
+  // Filter states
+  const [filters, setFilters] = useState({
+    role: '',
+    status: '',
+    jobName: '',
+    sortBy: 'fullName',
+    sortOrder: 'asc'
+  });
 
-  // Fetch users data
-  const { data: allUsers, isLoading: allUsersLoading } = useQuery(
-    'allUsers',
+  // Fetch users data - using only my-school endpoint
+  const { data: allUsers, isLoading: usersLoading } = useQuery(
+    'mySchoolUsers',
     usersAPI.getMySchoolUsers,
-    {
-      enabled: !!user,
-    }
-  );
-
-  const { data: teachers, isLoading: teachersLoading } = useQuery(
-    'teachers',
-    usersAPI.getMySchoolTeachers,
-    {
-      enabled: !!user,
-    }
-  );
-
-  const { data: students, isLoading: studentsLoading } = useQuery(
-    'students',
-    usersAPI.getMySchoolStudents,
     {
       enabled: !!user,
     }
@@ -94,48 +87,111 @@ const Users = () => {
   const deleteUserMutation = useMutation(
     (userId) => authAPI.deleteUser(userId),
     {
-      onSuccess: () => {
-        queryClient.invalidateQueries('allUsers');
-        queryClient.invalidateQueries('teachers');
-        queryClient.invalidateQueries('students');
-        toast.success('تم حذف المستخدم بنجاح');
+      onSuccess: (response) => {
+        queryClient.invalidateQueries('mySchoolUsers');
+        const message = response.data?.message || 'تم حذف المستخدم بنجاح';
+        toast.success(message);
       },
       onError: (error) => {
-        toast.error(error.response?.data?.message || 'فشل في حذف المستخدم');
+        const errorData = error.response?.data;
+        let errorMessage = 'فشل في حذف المستخدم';
+        
+        if (errorData?.message) {
+          errorMessage = errorData.message;
+          
+          // If there are additional details, show them in a more detailed toast
+          if (errorData.details) {
+            const details = errorData.details;
+            let detailMessage = '';
+            
+            if (details.reason === 'معلم مرتبط بفصول دراسية') {
+              detailMessage = `المعلم مرتبط بـ ${details.associated_classes_count} فصل دراسي`;
+            } else if (details.reason === 'طالب لديه سجلات حضور') {
+              detailMessage = `الطالب لديه ${details.attendance_records_count} سجل حضور`;
+            } else if (details.reason === 'مستخدم لديه سجلات في النظام') {
+              detailMessage = `المستخدم لديه ${details.logs_count} سجل في النظام`;
+            }
+            
+            if (detailMessage) {
+              errorMessage += `\n${detailMessage}`;
+            }
+          }
+        }
+        
+        toast.error(errorMessage, {
+          duration: 6000, // Show longer for detailed messages
+          style: {
+            whiteSpace: 'pre-line', // Allow line breaks
+            maxWidth: '500px'
+          }
+        });
       },
     }
   );
 
-  // Get current data based on selected tab
+  // Get current data based on selected tab - filter from single API response
   const getCurrentData = () => {
+    if (!allUsers) return [];
+    
     switch (selectedTab) {
       case 'teachers':
-        return teachers || [];
+        return allUsers.filter(user => user.role === 'teacher');
       case 'students':
-        return students || [];
+        return allUsers.filter(user => user.role === 'student');
       default:
-        return allUsers || [];
+        return allUsers;
     }
   };
 
   const getCurrentLoading = () => {
-    switch (selectedTab) {
-      case 'teachers':
-        return teachersLoading;
-      case 'students':
-        return studentsLoading;
-      default:
-        return allUsersLoading;
-    }
+    return usersLoading;
   };
 
-  // Filter data based on search term
-  const filteredData = getCurrentData().filter((user) =>
-    user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.job_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Reset filters when tab changes
+  useEffect(() => {
+    setFilters({
+      role: '',
+      status: '',
+      jobName: '',
+      sortBy: 'fullName',
+      sortOrder: 'asc'
+    });
+  }, [selectedTab]);
+
+  // Filter and sort data based on search term and filters
+  const filteredData = getCurrentData()
+    .filter((user) => {
+      // Search term filter
+      const matchesSearch = !searchTerm || 
+        user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.job_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Role filter (only apply if not already filtered by tab)
+      const matchesRole = !filters.role || user.role === filters.role;
+      
+      // Status filter
+      const matchesStatus = !filters.status || 
+        (filters.status === 'active' && user.is_active) ||
+        (filters.status === 'inactive' && !user.is_active);
+      
+      // Job name filter (only relevant for teachers and data analysts)
+      const matchesJobName = !filters.jobName || 
+        user.job_name?.toLowerCase().includes(filters.jobName.toLowerCase());
+      
+      return matchesSearch && matchesRole && matchesStatus && matchesJobName;
+    })
+    .sort((a, b) => {
+      const aValue = a[filters.sortBy] || '';
+      const bValue = b[filters.sortBy] || '';
+      
+      if (filters.sortOrder === 'asc') {
+        return aValue.toString().localeCompare(bValue.toString(), 'ar');
+      } else {
+        return bValue.toString().localeCompare(aValue.toString(), 'ar');
+      }
+    });
 
   // Table columns configuration
   const columns = [
@@ -216,7 +272,8 @@ const Users = () => {
           </button>
           <button
             onClick={() => {
-              if (window.confirm('هل أنت متأكد من حذف هذا المستخدم؟')) {
+              const confirmMessage = `هل أنت متأكد من حذف المستخدم "${row.fullName}"؟\n\nملاحظة: لا يمكن حذف المستخدمين الذين لديهم سجلات مرتبطة (فصول دراسية، سجلات حضور، إلخ)`;
+              if (window.confirm(confirmMessage)) {
                 deleteUserMutation.mutate(row.id);
               }
             }}
@@ -233,8 +290,8 @@ const Users = () => {
 
   const tabs = [
     { id: 'all', name: 'جميع المستخدمين', count: allUsers?.length || 0 },
-    { id: 'teachers', name: 'المعلمين', count: teachers?.length || 0 },
-    { id: 'students', name: 'الطلاب', count: students?.length || 0 },
+    { id: 'teachers', name: 'المعلمين', count: allUsers?.filter(user => user.role === 'teacher').length || 0 },
+    { id: 'students', name: 'الطلاب', count: allUsers?.filter(user => user.role === 'student').length || 0 },
   ];
 
   return (
@@ -274,17 +331,282 @@ const Users = () => {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="البحث في المستخدمين..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="input pr-10"
-            />
+      <div className="card">
+        <div className="card-body">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${
+            selectedTab === 'students' ? 'lg:grid-cols-4' : 'lg:grid-cols-6'
+          }`}>
+            {/* Search */}
+            <div className="lg:col-span-2">
+              <label className="label">البحث</label>
+              <div className="relative">
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder={
+                    selectedTab === 'teachers' 
+                      ? 'البحث في المعلمين (الاسم، المادة، البريد الإلكتروني)...'
+                      : selectedTab === 'students'
+                      ? 'البحث في الطلاب (الاسم، اسم المستخدم، البريد الإلكتروني)...'
+                      : 'البحث في الاسم، اسم المستخدم، البريد الإلكتروني...'
+                  }
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="input pr-10"
+                />
+              </div>
+            </div>
+
+            {/* Role Filter - Dynamic based on selected tab */}
+            <div>
+              <label className="label">الدور</label>
+              <select
+                value={filters.role}
+                onChange={(e) => setFilters({...filters, role: e.target.value})}
+                className="input"
+                disabled={selectedTab !== 'all'}
+              >
+                {selectedTab === 'all' ? (
+                  <>
+                    <option value="">جميع الأدوار</option>
+                    <option value="teacher">معلم</option>
+                    <option value="student">طالب</option>
+                    <option value="school_admin">مدير مدرسة</option>
+                    <option value="data_analyst">محلل بيانات</option>
+                  </>
+                ) : selectedTab === 'teachers' ? (
+                  <>
+                    <option value="">جميع المعلمين</option>
+                    <option value="teacher">معلم</option>
+                    <option value="school_admin">مدير مدرسة</option>
+                    <option value="data_analyst">محلل بيانات</option>
+                  </>
+                ) : selectedTab === 'students' ? (
+                  <>
+                    <option value="">جميع الطلاب</option>
+                    <option value="student">طالب</option>
+                  </>
+                ) : null}
+              </select>
+              {selectedTab !== 'all' && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {selectedTab === 'teachers' ? 'محدد تلقائياً للمعلمين' : 'محدد تلقائياً للطلاب'}
+                </p>
+              )}
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <label className="label">الحالة</label>
+              <select
+                value={filters.status}
+                onChange={(e) => setFilters({...filters, status: e.target.value})}
+                className="input"
+              >
+                <option value="">جميع الحالات</option>
+                <option value="active">نشط</option>
+                <option value="inactive">غير نشط</option>
+              </select>
+            </div>
+
+            {/* Job Name Filter - Only show for teachers tab or all tab */}
+            {(selectedTab === 'all' || selectedTab === 'teachers') && (
+              <div>
+                <label className="label">
+                  {selectedTab === 'teachers' ? 'المادة التدرسية' : 'الوظيفة/المادة'}
+                </label>
+                <input
+                  type="text"
+                  placeholder={selectedTab === 'teachers' ? 'البحث في المادة التدرسية...' : 'البحث في الوظيفة...'}
+                  value={filters.jobName}
+                  onChange={(e) => setFilters({...filters, jobName: e.target.value})}
+                  className="input"
+                />
+              </div>
+            )}
+
+            {/* Sort Options */}
+            <div>
+              <label className="label">ترتيب حسب</label>
+              <div className="flex space-x-2">
+                <select
+                  value={filters.sortBy}
+                  onChange={(e) => setFilters({...filters, sortBy: e.target.value})}
+                  className="input flex-1"
+                >
+                  <option value="fullName">الاسم</option>
+                  <option value="username">اسم المستخدم</option>
+                  <option value="email">البريد الإلكتروني</option>
+                  <option value="role">الدور</option>
+                  <option value="job_name">الوظيفة</option>
+                </select>
+                <button
+                  onClick={() => setFilters({...filters, sortOrder: filters.sortOrder === 'asc' ? 'desc' : 'asc'})}
+                  className="btn btn-outline px-3"
+                  title={filters.sortOrder === 'asc' ? 'ترتيب تنازلي' : 'ترتيب تصاعدي'}
+                >
+                  {filters.sortOrder === 'asc' ? '↑' : '↓'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Active Filters */}
+          {(searchTerm || filters.role || filters.status || filters.jobName) && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="flex items-center flex-wrap gap-2">
+                <span className="text-sm font-medium text-gray-700">الفلاتر النشطة:</span>
+                {searchTerm && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    البحث: "{searchTerm}"
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="mr-1 text-blue-600 hover:text-blue-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+                {filters.role && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    الدور: {getRoleDisplayName(filters.role)}
+                    <button
+                      onClick={() => setFilters({...filters, role: ''})}
+                      className="mr-1 text-green-600 hover:text-green-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+                {filters.status && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                    الحالة: {filters.status === 'active' ? 'نشط' : 'غير نشط'}
+                    <button
+                      onClick={() => setFilters({...filters, status: ''})}
+                      className="mr-1 text-purple-600 hover:text-purple-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+                {filters.jobName && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                    الوظيفة: "{filters.jobName}"
+                    <button
+                      onClick={() => setFilters({...filters, jobName: ''})}
+                      className="mr-1 text-orange-600 hover:text-orange-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Quick Filters - Context aware based on selected tab */}
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="flex items-center flex-wrap gap-2 mb-3">
+              <span className="text-sm font-medium text-gray-700">فلتر سريع:</span>
+              
+              {selectedTab === 'all' && (
+                <>
+                  <button
+                    onClick={() => setFilters({...filters, role: 'teacher'})}
+                    className="btn btn-outline btn-sm"
+                  >
+                    المعلمين فقط
+                  </button>
+                  <button
+                    onClick={() => setFilters({...filters, role: 'student'})}
+                    className="btn btn-outline btn-sm"
+                  >
+                    الطلاب فقط
+                  </button>
+                  <button
+                    onClick={() => setFilters({...filters, role: 'school_admin'})}
+                    className="btn btn-outline btn-sm"
+                  >
+                    مدراء المدارس
+                  </button>
+                  <button
+                    onClick={() => setFilters({...filters, role: 'data_analyst'})}
+                    className="btn btn-outline btn-sm"
+                  >
+                    محللي البيانات
+                  </button>
+                </>
+              )}
+              
+              {selectedTab === 'teachers' && (
+                <>
+                  <button
+                    onClick={() => setFilters({...filters, role: 'teacher'})}
+                    className="btn btn-outline btn-sm"
+                  >
+                    المعلمين العاديين
+                  </button>
+                  <button
+                    onClick={() => setFilters({...filters, role: 'school_admin'})}
+                    className="btn btn-outline btn-sm"
+                  >
+                    مدراء المدارس
+                  </button>
+                  <button
+                    onClick={() => setFilters({...filters, role: 'data_analyst'})}
+                    className="btn btn-outline btn-sm"
+                  >
+                    محللي البيانات
+                  </button>
+                </>
+              )}
+              
+              {/* Status filters - available for all tabs */}
+              <button
+                onClick={() => setFilters({...filters, status: 'active'})}
+                className="btn btn-outline btn-sm"
+              >
+                النشطين فقط
+              </button>
+              <button
+                onClick={() => setFilters({...filters, status: 'inactive'})}
+                className="btn btn-outline btn-sm"
+              >
+                غير النشطين
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Summary */}
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4 text-sm text-gray-600">
+                <span>عدد النتائج: <strong className="text-gray-900">{filteredData.length}</strong></span>
+                {(searchTerm || filters.role || filters.status || filters.jobName) && (
+                  <span>من أصل <strong className="text-gray-900">{getCurrentData().length}</strong> مستخدم</span>
+                )}
+                {selectedTab !== 'all' && (
+                  <span className="text-blue-600">
+                    (محدد تلقائياً: {selectedTab === 'teachers' ? 'المعلمين' : 'الطلاب'})
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setFilters({
+                    role: '',
+                    status: '',
+                    jobName: '',
+                    sortBy: 'fullName',
+                    sortOrder: 'asc'
+                  });
+                }}
+                className="btn btn-outline btn-sm"
+              >
+                مسح جميع الفلاتر
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -307,9 +629,7 @@ const Users = () => {
         <AddUserForm
           onClose={() => setIsAddModalOpen(false)}
           onSuccess={() => {
-            queryClient.invalidateQueries('allUsers');
-            queryClient.invalidateQueries('teachers');
-            queryClient.invalidateQueries('students');
+            queryClient.invalidateQueries('mySchoolUsers');
           }}
         />
       </Modal>
@@ -326,9 +646,7 @@ const Users = () => {
             user={selectedUser}
             onClose={() => setIsEditModalOpen(false)}
             onSuccess={() => {
-              queryClient.invalidateQueries('allUsers');
-              queryClient.invalidateQueries('teachers');
-              queryClient.invalidateQueries('students');
+              queryClient.invalidateQueries('mySchoolUsers');
             }}
           />
         )}
@@ -385,18 +703,37 @@ const AddUserForm = ({ onClose, onSuccess }) => {
 
   const addUserMutation = useMutation(
     (userData) => {
-      switch (userData.role) {
-        case 'teacher':
-          return authAPI.registerTeacher(userData);
-        case 'student':
-          return authAPI.registerStudents([userData]);
-        case 'school_admin':
-          return authAPI.registerUser(userData);
-        case 'data_analyst':
-          return authAPI.registerUser(userData);
-        default:
-          return authAPI.registerUser(userData);
+      // If current user is school_admin, they can add teachers, students, and data_analyst
+      if (user?.role === 'school_admin') {
+        switch (userData.role) {
+          case 'teacher':
+            return authAPI.registerTeacher(userData);
+          case 'student':
+            return authAPI.registerStudents([userData]);
+          case 'data_analyst':
+            return authAPI.registerDataAnalyst(userData);
+          default:
+            throw new Error('School admin can only add teachers, students, and data analysts');
+        }
       }
+      
+      // If current user is admin, they can use the general register endpoint
+      if (user?.role === 'admin') {
+        switch (userData.role) {
+          case 'teacher':
+            return authAPI.registerUser(userData);
+          case 'student':
+            return authAPI.registerStudents([userData]);
+          case 'school_admin':
+            return authAPI.registerUser(userData);
+          case 'data_analyst':
+            return authAPI.registerUser(userData);
+          default:
+            return authAPI.registerUser(userData);
+        }
+      }
+      
+      throw new Error('Unauthorized to add users');
     },
     {
       onSuccess: () => {
@@ -511,10 +848,20 @@ const AddUserForm = ({ onClose, onSuccess }) => {
             className="input"
             required
           >
-            <option value="student">طالب</option>
-            <option value="teacher">معلم</option>
-            <option value="school_admin">مدير مدرسة</option>
-            <option value="data_analyst">محلل بيانات</option>
+            {user?.role === 'admin' ? (
+              <>
+                <option value="student">طالب</option>
+                <option value="teacher">معلم</option>
+                <option value="school_admin">مدير مدرسة</option>
+                <option value="data_analyst">محلل بيانات</option>
+              </>
+            ) : (
+              <>
+                <option value="student">طالب</option>
+                <option value="teacher">معلم</option>
+                <option value="data_analyst">محلل بيانات</option>
+              </>
+            )}
           </select>
           
           {/* Role Description */}
@@ -562,21 +909,23 @@ const AddUserForm = ({ onClose, onSuccess }) => {
             label="المدرسة"
           />
         )}
-        <div>
-          <label className="label">كلمة المرور</label>
-          <input
-            type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            className="input"
-            required
-          />
-        </div>
+        {user?.role === 'admin' && (
+          <div>
+            <label className="label">كلمة المرور</label>
+            <input
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              className="input"
+              required
+            />
+          </div>
+        )}
         {(formData.role === 'teacher' || formData.role === 'school_admin' || formData.role === 'data_analyst') && (
           <>
             <div>
-              <label className="label">الوظيفة</label>
+              <label className="label">المادة التدرسية</label>
               <input
                 type="text"
                 name="job_name"
@@ -584,6 +933,7 @@ const AddUserForm = ({ onClose, onSuccess }) => {
                 onChange={handleChange}
                 className="input"
                 placeholder={formData.role === 'school_admin' ? 'مدير مدرسة' : formData.role === 'data_analyst' ? 'محلل بيانات' : 'الوظيفة'}
+                required={user?.role === 'school_admin' && (formData.role === 'teacher' || formData.role === 'data_analyst')}
               />
             </div>
             <div>

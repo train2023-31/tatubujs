@@ -103,25 +103,25 @@ const Reports = () => {
         return data.map(cls => ({
           name: cls.class_name,
           حاضر: cls.number_of_presents,
-          غائب: cls.number_of_absents,
+          هارب: cls.number_of_absents,
           متأخر: cls.number_of_lates,
-          معذور: cls.number_of_excus,
+          غائب: cls.number_of_excus,
         }));
       
       case 'weekly':
         return data.map(day => ({
           name: formatDate(day.date, 'dd/MM', 'ar'),
-          غائب: day.absent,
+          هارب: day.absent,
           متأخر: day.late,
-          معذور: day.excused,
+          غائب: day.excused,
         }));
       
       case 'monthly':
         return data.map(week => ({
           name: `${formatDate(week.start, 'dd/MM', 'ar')} - ${formatDate(week.end, 'dd/MM', 'ar')}`,
-          غائب: week.absent,
+          هارب: week.absent,
           متأخر: week.late,
-          معذور: week.excused,
+          غائب: week.excused,
         }));
       
       case 'teachers':
@@ -481,23 +481,23 @@ const Reports = () => {
                       {selectedTab === 'daily' && (
                         <>
                           <Bar dataKey="حاضر" fill="#10B981" />
-                          <Bar dataKey="غائب" fill="#EF4444" />
+                          <Bar dataKey="هارب" fill="#EF4444" />
                           <Bar dataKey="متأخر" fill="#F59E0B" />
-                          <Bar dataKey="معذور" fill="#3B82F6" />
+                          <Bar dataKey="غائب" fill="#3B82F6" />
                         </>
                       )}
                       {selectedTab === 'weekly' && (
                         <>
-                          <Bar dataKey="غائب" fill="#EF4444" />
+                          <Bar dataKey="هارب" fill="#EF4444" />
                           <Bar dataKey="متأخر" fill="#F59E0B" />
-                          <Bar dataKey="معذور" fill="#3B82F6" />
+                          <Bar dataKey="غائب" fill="#3B82F6" />
                         </>
                       )}
                       {selectedTab === 'monthly' && (
                         <>
-                          <Bar dataKey="غائب" fill="#EF4444" />
+                          <Bar dataKey="هارب" fill="#EF4444" />
                           <Bar dataKey="متأخر" fill="#F59E0B" />
-                          <Bar dataKey="معذور" fill="#3B82F6" />
+                          <Bar dataKey="غائب" fill="#3B82F6" />
                         </>
                       )}
                       {selectedTab === 'teachers' && (
@@ -523,23 +523,22 @@ const Reports = () => {
                         <Pie
                           data={[
                             { name: 'حاضر', value: schoolStats?.number_of_presents || 0 },
-                            { name: 'غائب', value: schoolStats?.number_of_absents || 0 },
+                            { name: 'هارب', value: schoolStats?.number_of_absents || 0 },
                             { name: 'متأخر', value: schoolStats?.number_of_lates || 0 },
-                            { name: 'معذور', value: schoolStats?.number_of_excus || 0 },
+                            { name: 'غائب', value: schoolStats?.number_of_excus || 0 },
                           ]}
                           cx="50%"
                           cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                          outerRadius={80}
+                          
+                          outerRadius={90}
                           fill="#8884d8"
                           dataKey="value"
                         >
                           {[
                             { name: 'حاضر', value: schoolStats?.number_of_presents || 0 },
-                            { name: 'غائب', value: schoolStats?.number_of_absents || 0 },
+                            { name: 'هارب', value: schoolStats?.number_of_absents || 0 },
                             { name: 'متأخر', value: schoolStats?.number_of_lates || 0 },
-                            { name: 'معذور', value: schoolStats?.number_of_excus || 0 },
+                            { name: 'غائب', value: schoolStats?.number_of_excus || 0 },
                           ].map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
@@ -547,6 +546,24 @@ const Reports = () => {
                         <Tooltip />
                       </PieChart>
                     </ResponsiveContainer>
+                  {/* Show percentages for each attendance type */}
+                  <div className="flex flex-wrap justify-center gap-4 mt-4">
+                    {[
+                      { label: 'حاضر', value: schoolStats?.number_of_presents || 0, color: COLORS[0] },
+                      { label: 'هارب', value: schoolStats?.number_of_absents || 0, color: COLORS[1] },
+                      { label: 'متأخر', value: schoolStats?.number_of_lates || 0, color: COLORS[2] },
+                      { label: 'غائب', value: schoolStats?.number_of_excus || 0, color: COLORS[3] },
+                    ].map((item, idx, arr) => {
+                      const total = arr.reduce((sum, i) => sum + i.value, 0);
+                      const percent = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0.0";
+                      return (
+                        <div key={item.label} className="flex flex-col items-center">
+                          <span className="text-sm font-semibold" style={{ color: item.color }}>{item.label}</span>
+                          <span className="text-lg font-bold" style={{ color: item.color }}>{percent}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                   </div>
                 </div>
               )}
@@ -564,9 +581,9 @@ const Reports = () => {
                         <XAxis dataKey="name" />
                         <YAxis />
                         <Tooltip />
-                        <Line type="monotone" dataKey="غائب" stroke="#EF4444" strokeWidth={2} />
+                        <Line type="monotone" dataKey="هارب" stroke="#EF4444" strokeWidth={2} />
                         <Line type="monotone" dataKey="متأخر" stroke="#F59E0B" strokeWidth={2} />
-                        <Line type="monotone" dataKey="معذور" stroke="#3B82F6" strokeWidth={2} />
+                        <Line type="monotone" dataKey="غائب" stroke="#3B82F6" strokeWidth={2} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -584,15 +601,15 @@ const Reports = () => {
               <div className="card-body">
                 <div className="overflow-x-auto">
                   <table className="table">
-                    <thead className="table-header">
+                    <thead className="table-header text-right">
                       <tr>
-                        <th className="table-header-cell">اسم الفصل</th>
-                        <th className="table-header-cell">المعلم</th>
-                        <th className="table-header-cell">إجمالي الطلاب</th>
-                        <th className="table-header-cell">الحاضرين</th>
-                        <th className="table-header-cell">الغائبين</th>
-                        <th className="table-header-cell">المتأخرين</th>
-                        <th className="table-header-cell">المعذورين</th>
+                        <th className="table-header-cell text-right">اسم الفصل</th>
+                        <th className="table-header-cell text-right">المعلم</th>
+                        <th className="table-header-cell text-right">إجمالي الطلاب</th>
+                        <th className="table-header-cell text-right">الحاضرين</th>
+                        <th className="table-header-cell text-right">الهاربين</th>
+                        <th className="table-header-cell text-right">المتأخرين</th>
+                        <th className="table-header-cell text-right">الغائبين</th>
                       </tr>
                     </thead>
                     <tbody className="table-body">
