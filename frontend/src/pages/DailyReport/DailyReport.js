@@ -16,7 +16,7 @@ import {
   Filter,
   XCircle
 } from 'lucide-react';
-import { attendanceAPI, classesAPI, authAPI } from '../../services/api';
+import { attendanceAPI, classesAPI, authAPI, reportsAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDate, getTodayAPI } from '../../utils/helpers';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
@@ -47,31 +47,38 @@ const DailyReport = () => {
   const [showBulkWhatsAppModal, setShowBulkWhatsAppModal] = useState(false);
   const reportRef = useRef(null);
 
-  // Bulk WhatsApp messaging mutation
+  // Bulk WhatsApp messaging mutation for daily reports
   const sendBulkWhatsAppMutation = useMutation(
-    (data) => authAPI.sendAbsenceNotifications(data),
+    (data) => reportsAPI.sendBulkDailyReports(data),
     {
       onSuccess: (response) => {
         const message = response.data.message;
-        const schoolPhone = response.data.school_phone;
+        const total = response.data.total;
+        const sent = response.data.sent;
+        const failed = response.data.failed;
+        const scheduledMessages = response.data.scheduled_messages || [];
         
-        if (schoolPhone) {
-          toast.success(`${message}\nرقم المدرسة المستخدم: ${schoolPhone}`, {
-            duration: 8000,
-            style: {
-              whiteSpace: 'pre-line',
-              maxWidth: '500px'
-            }
+        let successMessage = message;
+        if (scheduledMessages.length > 0) {
+          successMessage += `\n\nالرسائل المجدولة:`;
+          scheduledMessages.forEach(msg => {
+            successMessage += `\n• ${msg.name}: ${msg.scheduled_time}`;
           });
-        } else {
-          toast.success(message);
         }
+        
+        toast.success(successMessage, {
+          duration: 10000,
+          style: {
+            whiteSpace: 'pre-line',
+            maxWidth: '600px'
+          }
+        });
         
         setIsSendingBulkWhatsApp(false);
         setShowBulkWhatsAppModal(false);
       },
       onError: (error) => {
-        toast.error(error.response?.data?.message || 'فشل في إرسال الإشعارات');
+        toast.error(error.response?.data?.message || 'فشل في إرسال التقارير اليومية');
         setIsSendingBulkWhatsApp(false);
       },
     }
@@ -384,12 +391,17 @@ ${attendanceStatus}
   const handleBulkWhatsAppSend = () => {
     setIsSendingBulkWhatsApp(true);
     
+    // Debug: Log user object to see what's available
+    console.log('User object:', user);
+    console.log('User school_id:', user?.school_id);
+    
     const data = {
-      school_id: user?.school_id || null,
-      days_back: 1, // Send for today only
-      custom_message: null // Use default message template
+      date: selectedDate,
+      school_id: user?.school_id, // Will be undefined if not present, backend will use current_user.school_id
+      delay_between_messages: 0.25 // 15 seconds between messages (0.25 minutes)
     };
 
+    console.log('Sending data:', data);
     sendBulkWhatsAppMutation.mutate(data);
   };
 
@@ -621,16 +633,16 @@ ${attendanceStatus}
             معاينة التقرير
           </button>
           
-          {/* <button
+           {/*<button
             onClick={() => setShowBulkWhatsAppModal(true)}
             disabled={isLoading}
             className="btn btn-primary mr-2"
           >
             <MessageCircle className="h-5 w-5 ml-2" />
-            إرسال إشعارات WhatsApp
-          </button> */}
+            إرسال تقارير يومية مجمعة
+          </button>
           
-          {/* <button
+          <button
             onClick={handleDownloadPDF}
             disabled={isLoading || isGeneratingPDF}
             className="btn btn-primary"
@@ -1239,7 +1251,7 @@ ${attendanceStatus}
       <Modal
         isOpen={showBulkWhatsAppModal}
         onClose={() => setShowBulkWhatsAppModal(false)}
-        title="إرسال إشعارات WhatsApp للطلاب المتغيبين"
+        title="إرسال تقارير يومية مجمعة عبر WhatsApp"
         size="lg"
       >
         <div className="space-y-6">
@@ -1249,12 +1261,14 @@ ${attendanceStatus}
               <div className="text-sm text-blue-800">
                 <p className="font-medium mb-2">تعليمات الاستخدام:</p>
                 <ul className="space-y-1 list-disc list-inside">
+                  <li>سيتم جدولة الرسائل للإرسال تلقائياً باستخدام pywhatkit</li>
                   <li>تأكد من أن WhatsApp Web مفتوح في متصفح Chrome</li>
                   <li>قم بمسح رمز QR إذا لم تكن مسجل الدخول</li>
                   <li>لا تغلق نافذة المتصفح أثناء عملية الإرسال</li>
-                  <li>سيتم إرسال الرسائل تلقائياً مع توقف 3 ثوان بين كل رسالة</li>
-                  <li>الرسائل ستُرسل من رقم المدرسة المسجل في النظام</li>
+                  <li>سيتم إرسال الرسائل مع توقف 15 ثانية بين كل رسالة</li>
+                  <li>الرسائل ستُرسل للطلاب الذين لديهم مشاكل في الحضور فقط</li>
                   <li>يشمل النظام الهارب والغائب والمتأخر</li>
+                  <li>سيتم استخدام رقم هاتف المدرسة كمرسل للرسائل</li>
                 </ul>
               </div>
             </div>
@@ -1308,7 +1322,7 @@ ${attendanceStatus}
               ) : (
                 <>
                   <MessageCircle className="h-5 w-5 mr-2" />
-                  إرسال الإشعارات
+                  إرسال التقارير المجمعة
                 </>
               )}
             </button>

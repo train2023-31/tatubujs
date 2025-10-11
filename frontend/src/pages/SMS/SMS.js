@@ -88,7 +88,7 @@ const SMS = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">إرسال الرسائل النصية</h1>
-          <p className="text-gray-600">إرسال رسائل للطلاب الغائبين والمعذورين</p>
+          <p className="text-gray-600">إرسال رسائل للطلاب الغائبين والهاربين</p>
         </div>
         <button
           onClick={handleSendSMS}
@@ -154,7 +154,7 @@ const SMS = () => {
               معاينة الرسائل - {formatDate(selectedDate, 'dd/MM/yyyy', 'ar')}
             </h3>
             <p className="text-sm text-gray-600">
-              سيتم إرسال {smsData.length} رسالة للطلاب الغائبين والمعذورين
+              سيتم إرسال {smsData.length} رسالة للطلاب الغائبين والهاربين
             </p>
           </div>
           <div className="card-body">
@@ -188,14 +188,14 @@ const SMS = () => {
                       {item.absent_times.length > 0 && (
                         <div className="mb-1">
                           <span className="text-sm text-red-600 font-medium">
-                            غائب عن الحصص: {item.absent_times.join(', ')}
+                            هارب عن الحصص: {item.absent_times.join(', ')}
                           </span>
                         </div>
                       )}
                       {item.excused_times.length > 0 && (
                         <div>
                           <span className="text-sm text-blue-600 font-medium">
-                            معذور عن الحصص: {item.excused_times.join(', ')}
+                            غائب عن الحصص: {item.excused_times.join(', ')}
                           </span>
                         </div>
                       )}
@@ -208,7 +208,7 @@ const SMS = () => {
                     <div className="text-sm text-gray-800 bg-white p-3 rounded border">
                       <p className="font-medium">{item.student_name} :ولي الأمر الطالب</p>
                       {item.excused_times.length > 0 && (
-                        <p>{item.excused_times.join(', ')} :الطالب متغيب/بعذر عن حصص</p>
+                        <p>{item.excused_times.join(', ')} :الطالب متغيب عن حصص</p>
                       )}
                       {item.absent_times.length > 0 && (
                         <p>{item.absent_times.join(', ')} :الطالب هارب عن حصص</p>
@@ -241,7 +241,7 @@ const SMS = () => {
               <CheckCircle className="h-5 w-5 text-green-600" />
               <div>
                 <p className="text-sm font-medium text-gray-900">الرسائل الناجحة</p>
-                <p className="text-sm text-gray-600">سيتم إرسال رسالة لكل طالب غائب أو معذور</p>
+                <p className="text-sm text-gray-600">سيتم إرسال رسالة لكل طالب غائب أو هارب</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">

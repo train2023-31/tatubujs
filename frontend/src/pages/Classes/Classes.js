@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { Plus, BookOpen, Users, Edit, Trash2, UserPlus, Eye, UserMinus } from 'lucide-react';
+import { Plus, BookOpen, Users, Edit, Trash2, UserPlus, Eye, UserMinus, UserCheck } from 'lucide-react';
 import { classesAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import DataTable from '../../components/UI/DataTable';
@@ -17,6 +17,7 @@ const Classes = () => {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isViewStudentsModalOpen, setIsViewStudentsModalOpen] = useState(false);
   const [isRemoveStudentsModalOpen, setIsRemoveStudentsModalOpen] = useState(false);
+  const [isAddNewStudentModalOpen, setIsAddNewStudentModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
 
   // Fetch data
@@ -107,6 +108,22 @@ const Classes = () => {
     }
   );
 
+  const addNewStudentMutation = useMutation(
+    (data) => classesAPI.addNewStudent(data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('classes');
+        queryClient.invalidateQueries('unassignedStudents');
+        queryClient.invalidateQueries(['classStudents', selectedItem?.id]);
+        toast.success('تم إضافة الطالب الجديد بنجاح');
+        setIsAddNewStudentModalOpen(false);
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message || 'فشل في إضافة الطالب الجديد');
+      },
+    }
+  );
+
   const tabs = [
     { id: 'classes', name: 'الفصول', count: classes?.length || 0 },
     { id: 'subjects', name: 'المواد', count: subjects?.length || 0 },
@@ -162,46 +179,62 @@ const Classes = () => {
       key: 'actions',
       header: 'الإجراءات',
       render: (row) => (
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => {
               setSelectedItem(row);
               setIsViewStudentsModalOpen(true);
             }}
-            className="text-green-600 hover:text-green-900"
+            className="flex items-center text-green-600 hover:text-green-900 text-sm px-2 py-1 rounded border border-green-200 hover:bg-green-50 transition-colors"
             title="عرض الطلاب"
           >
-            <Eye className="h-4 w-4 mr-2" />
+            <Eye className="h-4 w-4 ml-1" />
+            عرض الطلاب
+          </button>
+          <button
+            onClick={() => {
+              setSelectedItem(row);
+              setIsAddNewStudentModalOpen(true);
+            }}
+            className="flex items-center text-emerald-600 hover:text-emerald-900 text-sm px-2 py-1 rounded border border-emerald-200 hover:bg-emerald-50 transition-colors"
+            title="إضافة طالب جديد"
+          >
+            <UserCheck className="h-4 w-4 ml-1" />
+            إضافة طالب جديد
           </button>
           <button
             onClick={() => {
               setSelectedItem(row);
               setIsAssignModalOpen(true);
             }}
-            className="text-blue-600 hover:text-blue-900"
+            className="flex items-center text-blue-600 hover:text-blue-900 text-sm px-2 py-1 rounded border border-blue-200 hover:bg-blue-50 transition-colors"
             title="تعيين طلاب"
           >
-            <UserPlus className="h-4 w-4 mr-2" />
+            <UserPlus className="h-4 w-4 ml-1" />
+            تعيين طلاب
           </button>
+          
           <button
             onClick={() => {
               setSelectedItem(row);
               setIsRemoveStudentsModalOpen(true);
             }}
-            className="text-orange-600 hover:text-orange-900"
+            className="flex items-center text-orange-600 hover:text-orange-900 text-sm px-2 py-1 rounded border border-orange-200 hover:bg-orange-50 transition-colors"
             title="نقل إلى غير المعينين"
           >
-            <UserMinus className="h-4 w-4 mr-2" />
+            <UserMinus className="h-4 w-4 ml-1" />
+            نقل طلاب
           </button>
           <button
             onClick={() => {
               setSelectedItem(row);
               setIsEditModalOpen(true);
             }}
-            className="text-primary-600 hover:text-primary-900"
+            className="flex items-center text-primary-600 hover:text-primary-900 text-sm px-2 py-1 rounded border border-primary-200 hover:bg-primary-50 transition-colors"
             title="تعديل"
           >
-            <Edit className="h-4 w-4 mr-2" />
+            <Edit className="h-4 w-4 ml-1" />
+            تعديل
           </button>
         </div>
       ),
@@ -240,16 +273,17 @@ const Classes = () => {
       key: 'actions',
       header: 'الإجراءات',
       render: (row) => (
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center">
           <button
             onClick={() => {
               setSelectedItem(row);
               setIsEditModalOpen(true);
             }}
-            className="text-primary-600 hover:text-primary-900"
+            className="flex items-center text-primary-600 hover:text-primary-900 text-sm px-2 py-1 rounded border border-primary-200 hover:bg-primary-50 transition-colors"
             title="تعديل"
           >
-            <Edit className="h-4 w-4" />
+            <Edit className="h-4 w-4 ml-1" />
+            تعديل
           </button>
         </div>
       ),
@@ -387,6 +421,23 @@ const Classes = () => {
             onClose={() => setIsRemoveStudentsModalOpen(false)}
             onSubmit={removeStudentsMutation.mutate}
             submitLoading={removeStudentsMutation.isLoading}
+          />
+        )}
+      </Modal>
+
+      {/* Add New Student Modal */}
+      <Modal
+        isOpen={isAddNewStudentModalOpen}
+        onClose={() => setIsAddNewStudentModalOpen(false)}
+        title={`إضافة طالب جديد لفصل ${selectedItem?.name || ''}`}
+        size="lg"
+      >
+        {selectedItem && (
+          <AddNewStudentForm
+            classData={selectedItem}
+            onClose={() => setIsAddNewStudentModalOpen(false)}
+            onSubmit={addNewStudentMutation.mutate}
+            loading={addNewStudentMutation.isLoading}
           />
         )}
       </Modal>
@@ -1055,6 +1106,135 @@ const RemoveStudentsForm = ({ classData, students, loading, onClose, onSubmit, s
             </>
           ) : (
             `نقل ${selectedStudents.length} طالب`
+          )}
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// Add New Student Form
+const AddNewStudentForm = ({ classData, onClose, onSubmit, loading }) => {
+  const [formData, setFormData] = useState({
+    username: '',
+    fullName: '',
+    phone_number: '',
+    email: '',
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.username || !formData.fullName) {
+      toast.error('يرجى إدخال اسم المستخدم والاسم الكامل');
+      return;
+    }
+
+    // Prepare data for the API
+    const studentData = {
+      class_id: classData.id,
+      student: {
+        username: formData.username,
+        fullName: formData.fullName,
+        phone_number: formData.phone_number || null,
+        email: formData.email || formData.username, // Use username as email if not provided
+      }
+    };
+
+    onSubmit(studentData);
+  };
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">
+          إضافة طالب جديد لفصل: {classData.name}
+        </h3>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="label">اسم المستخدم *</label>
+            <input
+              type="text"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
+              className="input"
+              placeholder="أدخل اسم المستخدم"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="label">الاسم الكامل *</label>
+            <input
+              type="text"
+              name="fullName"
+              value={formData.fullName}
+              onChange={handleChange}
+              className="input"
+              placeholder="أدخل الاسم الكامل"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="label">رقم الهاتف</label>
+            <input
+              type="tel"
+              name="phone_number"
+              value={formData.phone_number}
+              onChange={handleChange}
+              className="input"
+              placeholder="أدخل رقم الهاتف (اختياري)"
+            />
+          </div>
+
+          <div>
+            <label className="label">البريد الإلكتروني</label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              className="input"
+              placeholder="أدخل البريد الإلكتروني (اختياري)"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              إذا لم يتم إدخال البريد الإلكتروني، سيتم استخدام اسم المستخدم
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onClose}
+          className="btn btn-outline"
+        >
+          إلغاء
+        </button>
+        <button
+          type="submit"
+          disabled={loading || !formData.username || !formData.fullName}
+          className="btn btn-primary"
+        >
+          {loading ? (
+            <>
+              <LoadingSpinner size="sm" />
+              <span className="mr-2">جاري الإضافة...</span>
+            </>
+          ) : (
+            'إضافة الطالب'
           )}
         </button>
       </div>

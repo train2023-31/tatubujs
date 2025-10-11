@@ -92,6 +92,7 @@ export const classesAPI = {
   getClassStudents: (classId) => api.get(`/classes/students/${classId}`).then(res => res.data),
   getMySchoolStudents: () => api.get('/classes/my-school-students').then(res => res.data),
   removeStudents: (data) => api.post('/classes/remove-students', data),
+  addNewStudent: (data) => api.post('/auth/register_single_assign_student', data),
 };
 
 // Attendance API
@@ -123,6 +124,7 @@ export const reportsAPI = {
   getTeacherAttendanceThisWeek: (params) => api.get('/static/teacher_attendance_this_week', { params }).then(res => res.data),
   getTeacherMasterReport: (params) => api.get('/static/teacher_master_report', { params }).then(res => res.data),
   sendSMS: (data) => api.post('/static/send-sms', data),
+  sendBulkDailyReports: (data) => api.post('/static/send-bulk-daily-reports', data),
   addNews: (data) => api.post('/static/news', data),
   getNews: () => api.get('/static/news').then(res => res.data),
   deleteNews: (newsId) => api.delete(`/static/news/${newsId}`),
