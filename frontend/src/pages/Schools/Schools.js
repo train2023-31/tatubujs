@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { Plus, Building, Edit, Trash2, ToggleLeft, ToggleRight, Eye } from 'lucide-react';
+import { Plus, Building, Edit, Trash2, ToggleLeft, ToggleRight, Eye, FileText, UserPlus } from 'lucide-react';
 import { classesAPI, authAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import DataTable from '../../components/UI/DataTable';
 import Modal from '../../components/UI/Modal';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
+import Invoice from '../../components/UI/Invoice';
+import SearchableSelect from '../../components/UI/SearchableSelect';
 import toast from 'react-hot-toast';
 
 const Schools = () => {
@@ -14,6 +16,8 @@ const Schools = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [selectedSchool, setSelectedSchool] = useState(null);
 
   // Fetch schools data
@@ -141,6 +145,26 @@ const Schools = () => {
             <Eye className="h-4 w-4" />
           </button>
           <button
+            onClick={() => {
+              setSelectedSchool(row);
+              setIsInvoiceModalOpen(true);
+            }}
+            className="text-green-600 hover:text-green-900 mr-2"
+            title="عرض الفاتورة"
+          >
+            <FileText className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => {
+              setSelectedSchool(row);
+              setIsAddUserModalOpen(true);
+            }}
+            className="text-purple-600 hover:text-purple-900 mr-2"
+            title="إضافة مستخدم للمدرسة"
+          >
+            <UserPlus className="h-4 w-4" />
+          </button>
+          <button
             onClick={() => toggleSchoolStatusMutation.mutate(row.id)}
             className={`${row.is_active ? 'text-red-600 hover:text-red-900 mr-2' : 'text-green-600 hover:text-green-900 mr-2'}`}
             title={row.is_active ? 'تعطيل المدرسة' : 'تفعيل المدرسة'}
@@ -238,6 +262,52 @@ const Schools = () => {
           logs={logs || []}
           loading={logsLoading}
         />
+      </Modal>
+
+      {/* Invoice Modal */}
+      <Modal
+        isOpen={isInvoiceModalOpen}
+        onClose={() => {
+          setIsInvoiceModalOpen(false);
+          setSelectedSchool(null);
+        }}
+        title={`فاتورة المدرسة: ${selectedSchool?.name}`}
+        size="full"
+        showCloseButton={true}
+      >
+        {selectedSchool && (
+          <Invoice
+            school={selectedSchool}
+            onClose={() => {
+              setIsInvoiceModalOpen(false);
+              setSelectedSchool(null);
+            }}
+          />
+        )}
+      </Modal>
+
+      {/* Add User Modal */}
+      <Modal
+        isOpen={isAddUserModalOpen}
+        onClose={() => {
+          setIsAddUserModalOpen(false);
+          setSelectedSchool(null);
+        }}
+        title={`إضافة مستخدم جديد - ${selectedSchool?.name}`}
+        size="lg"
+      >
+        {selectedSchool && (
+          <AddUserForm
+            school={selectedSchool}
+            onClose={() => {
+              setIsAddUserModalOpen(false);
+              setSelectedSchool(null);
+            }}
+            onSuccess={() => {
+              queryClient.invalidateQueries('mySchoolUsers');
+            }}
+          />
+        )}
       </Modal>
     </div>
   );
@@ -544,6 +614,308 @@ const LogsViewer = ({ logs, loading }) => {
         </div>
       )}
     </div>
+  );
+};
+
+// Add User Form Component (reused from Users page)
+const AddUserForm = ({ school, onClose, onSuccess }) => {
+  const { user } = useAuth();
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    fullName: '',
+    phone_number: '',
+    role: 'student',
+    password: '',
+    job_name: '',
+    week_Classes_Number: '',
+    school_id: school?.id || '',
+  });
+  const [emailValidation, setEmailValidation] = useState({ isValid: true, suggestion: null });
+
+  // Email validation function
+  const validateEmailFormat = (email) => {
+    if (!email) return { isValid: true, suggestion: null };
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const isValidFormat = emailRegex.test(email);
+    
+    if (!isValidFormat) {
+      const atIndex = email.indexOf('@');
+      if (atIndex > 0) {
+        const localPart = email.substring(0, atIndex);
+        return {
+          isValid: false,
+          suggestion: `${localPart}@tatubu.com`
+        };
+      } else {
+        return {
+          isValid: false,
+          suggestion: `${email}@tatubu.com`
+        };
+      }
+    }
+    
+    if (!email.endsWith('@tatubu.com')) {
+      const localPart = email.split('@')[0];
+      return {
+        isValid: false,
+        suggestion: `${localPart}@tatubu.com`
+      };
+    }
+    
+    return { isValid: true, suggestion: null };
+  };
+
+  const addUserMutation = useMutation(
+    (userData) => {
+      // If current user is admin, they can use the general register endpoint
+      if (user?.role === 'admin') {
+        switch (userData.role) {
+          case 'teacher':
+            return authAPI.registerUser(userData);
+          case 'student':
+            return authAPI.registerStudents([userData]);
+          case 'school_admin':
+            return authAPI.registerUser(userData);
+          case 'data_analyst':
+            return authAPI.registerUser(userData);
+          default:
+            return authAPI.registerUser(userData);
+        }
+      }
+      
+      throw new Error('Unauthorized to add users');
+    },
+    {
+      onSuccess: () => {
+        toast.success('تم إضافة المستخدم بنجاح');
+        onSuccess();
+        onClose();
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message || 'فشل في إضافة المستخدم');
+      },
+    }
+  );
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    // Validate email before submission
+    const emailValidation = validateEmailFormat(formData.email);
+    if (!emailValidation.isValid) {
+      setEmailValidation(emailValidation);
+      toast.error('يرجى إدخال بريد إلكتروني صحيح ينتهي بـ @tatubu.com');
+      return;
+    }
+    
+    addUserMutation.mutate(formData);
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value,
+    });
+    
+    // Validate email when it changes
+    if (name === 'email') {
+      const validation = validateEmailFormat(value);
+      setEmailValidation(validation);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="label">اسم المستخدم</label>
+          <input
+            type="text"
+            name="username"
+            value={formData.username}
+            onChange={handleChange}
+            className="input"
+            required
+          />
+        </div>
+        <div>
+          <label className="label">البريد الإلكتروني</label>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            className={`input ${!emailValidation.isValid ? 'border-red-500 focus:border-red-500' : ''}`}
+            required
+          />
+          {!emailValidation.isValid && emailValidation.suggestion && (
+            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-800">
+                <strong>اقتراح:</strong> هل تقصد{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({ ...formData, email: emailValidation.suggestion });
+                    setEmailValidation({ isValid: true, suggestion: null });
+                  }}
+                  className="text-blue-600 underline hover:text-blue-800 font-medium"
+                >
+                  {emailValidation.suggestion}
+                </button>
+                ؟
+              </p>
+            </div>
+          )}
+        </div>
+        <div>
+          <label className="label">الاسم الكامل</label>
+          <input
+            type="text"
+            name="fullName"
+            value={formData.fullName}
+            onChange={handleChange}
+            className="input"
+            required
+          />
+        </div>
+        <div>
+          <label className="label">رقم الهاتف</label>
+          <input
+            type="tel"
+            name="phone_number"
+            value={formData.phone_number}
+            onChange={handleChange}
+            className="input"
+          />
+        </div>
+        <div>
+          <label className="label">الدور</label>
+          <select
+            name="role"
+            value={formData.role}
+            onChange={handleChange}
+            className="input"
+            required
+          >
+            <option value="student">طالب</option>
+            <option value="teacher">معلم</option>
+            <option value="school_admin">مدير مدرسة</option>
+            <option value="data_analyst">محلل بيانات</option>
+          </select>
+          
+          {/* Role Description */}
+          {formData.role && (
+            <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="text-sm text-gray-700">
+                {formData.role === 'student' && (
+                  <div>
+                    <strong className="text-blue-600">طالب:</strong> يمكن للطالب تسجيل الدخول لعرض معلوماته الشخصية وتاريخ حضوره وغيابه.
+                    <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="mr-3">
+                          <h3 className="text-sm font-medium text-amber-800">
+                            ملاحظة مهمة
+                          </h3>
+                          <div className="mt-1 text-sm text-amber-700">
+                            <p>عند إضافة الطالب من هنا، سيتم إضافته إلى قائمة الطلاب غير المعينين.</p>
+                            <p className="mt-1">لتعيين الطالب لفصل معين، يجب الذهاب إلى <strong>إدارة الفصول</strong> واستخدام زر "تعيين طلاب" أو "إضافة طالب جديد".</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {formData.role === 'teacher' && (
+                  <div>
+                    <strong className="text-green-600">معلم:</strong> يمكن للمعلم تسجيل حضور الطلاب في فصوله، وعرض التقارير المتعلقة بفصوله، وإدارة ملفه الشخصي.
+                  </div>
+                )}
+                {formData.role === 'school_admin' && (
+                  <div>
+                    <strong className="text-orange-600">مدير مدرسة:</strong> صلاحيات شاملة لإدارة المدرسة بما في ذلك إدارة المعلمين والطلاب والفصول، وعرض جميع التقارير والإحصائيات، وإرسال الإشعارات.
+                  </div>
+                )}
+                {formData.role === 'data_analyst' && (
+                  <div>
+                    <strong className="text-purple-600">محلل بيانات:</strong> صلاحيات متقدمة لتحليل البيانات وعرض التقارير المفصلة والإحصائيات، مع إمكانية الوصول لجميع بيانات الحضور والغياب في المدرسة.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+        <div>
+          <label className="label">كلمة المرور</label>
+          <input
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            className="input"
+            required
+          />
+        </div>
+        {(formData.role === 'teacher' || formData.role === 'school_admin' || formData.role === 'data_analyst') && (
+          <>
+            <div>
+              <label className="label">المادة التدرسية</label>
+              <input
+                type="text"
+                name="job_name"
+                value={formData.job_name}
+                onChange={handleChange}
+                className="input"
+                placeholder={formData.role === 'school_admin' ? 'مدير مدرسة' : formData.role === 'data_analyst' ? 'محلل بيانات' : 'الوظيفة'}
+                required={formData.role === 'teacher' || formData.role === 'data_analyst'}
+              />
+            </div>
+            <div>
+              <label className="label">عدد الحصص الأسبوعية</label>
+              <input
+                type="number"
+                name="week_Classes_Number"
+                value={formData.week_Classes_Number}
+                onChange={handleChange}
+                className="input"
+                placeholder={formData.role === 'school_admin' ? '0' : ''}
+              />
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between space-x-3 pt-4">
+        <button
+          type="button"
+          onClick={onClose}
+          className="btn btn-outline mr-2 ml-2"
+        >
+          إلغاء
+        </button>
+        <button
+          type="submit"
+          disabled={addUserMutation.isLoading}
+          className="btn btn-primary"
+        >
+          {addUserMutation.isLoading ? (
+            <>
+              <LoadingSpinner size="sm" />
+              <span className="mr-2">جاري الإضافة...</span>
+            </>
+          ) : (
+            'إضافة المستخدم'
+          )}
+        </button>
+      </div>
+    </form>
   );
 };
 

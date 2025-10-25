@@ -13,6 +13,7 @@ import { reportsAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDate, getTodayAPI, getCurrentWeekRange, getCurrentMonthRange } from '../../utils/helpers';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
+import Tabs from '../../components/UI/Tabs';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -339,23 +340,13 @@ const Reports = () => {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex flex-wrap gap-2 sm:gap-8">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setSelectedTab(tab.id)}
-              className={`py-2 px-2 sm:px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap ${
-                selectedTab === tab.id
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {tab.name}
-            </button>
-          ))}
-        </nav>
-      </div>
+      <Tabs
+        tabs={tabs}
+        selectedTab={selectedTab}
+        onTabChange={setSelectedTab}
+        variant="pills"
+        className="mb-6"
+      />
 
       {/* Date Range Selector */}
       <div className="card">

@@ -1,8 +1,0 @@
-//Initialize the Migrations Directory
-flask db init
-
-//Generate Migration Scripts
-flask db migrate -m "Initial migration."
-
-//pply Migrations
-flask db upgrade

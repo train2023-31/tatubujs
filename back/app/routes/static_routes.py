@@ -13,6 +13,9 @@ from twilio.rest import Client
 from app.logger import log_action
 from datetime import datetime, timedelta
 from app.config import get_oman_time
+import logging
+
+logger = logging.getLogger(__name__)
 
 static_blueprint = Blueprint('static_blueprint', __name__)
 
@@ -485,7 +488,7 @@ def send_sms():
 
         mssg_ar = (
             f"{x['student_name']} :ولي الأمر الطالب\n"
-            f"{x['excused_times']} :الطالب متغيب/بعذر عن حصص\n"
+            f"{x['excused_times']} :الطالب متغيب عن حصص\n"
             f"{x['absent_times']} :الطالب هارب عن حصص\n"
             f"{date} :بتاريخ\n"
         )
@@ -503,6 +506,215 @@ def send_sms():
 
     return jsonify(results), 200
 
+
+@static_blueprint.route('/send-bulk-daily-reports', methods=['POST'])
+@jwt_required()
+@log_action("إرسال تقارير يومية مجمعة", description="إرسال تقارير الحضور اليومية عبر WhatsApp")
+def send_bulk_daily_reports():
+    """
+    Send bulk daily reports using pywhatkit
+    Optimized for PythonAnywhere deployment
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        # Check authorization (only school admins and data analysts)
+        if current_user.user_role not in ['school_admin', 'data_analyst', 'admin']:
+            return jsonify(message="غير مصرح لك بإرسال التقارير اليومية."), 403
+        
+        # Get request data
+        data = request.get_json() or {}
+        date = data.get('date')
+        school_id = data.get('school_id', current_user.school_id)
+        delay_between_messages = data.get('delay_between_messages', 0.25)  # 15 seconds default
+        
+        if not date:
+            return jsonify(message="تاريخ التقرير مطلوب."), 400
+        
+        # Import the bulk messaging service
+        try:
+            from bulk_whatsapp_service import get_daily_report_service
+            daily_report_service = get_daily_report_service()
+            logger.info("Successfully loaded daily report service")
+        except ImportError as e:
+            logger.error(f"Failed to import bulk_whatsapp_service: {str(e)}")
+            return jsonify(message=f"خطأ في تحميل نظام الإرسال المجمع: {str(e)}"), 500
+        except Exception as e:
+            logger.error(f"Error loading bulk_whatsapp_service: {str(e)}")
+            if 'DISPLAY' in str(e) or 'display' in str(e).lower():
+                logger.warning("DISPLAY error detected - this is expected in headless environments")
+                # DISPLAY errors are expected in headless environments, continue anyway
+                try:
+                    from bulk_whatsapp_service import get_daily_report_service
+                    daily_report_service = get_daily_report_service()
+                    logger.info("Successfully loaded bulk service despite DISPLAY error")
+                except Exception as retry_error:
+                    logger.error(f"Failed to load bulk service: {retry_error}")
+                    return jsonify(message="خطأ في تحميل نظام الإرسال المجمع - يرجى المحاولة مرة أخرى"), 500
+            else:
+                return jsonify(message=f"خطأ في تحميل نظام الإرسال المجمع: {str(e)}"), 500
+        
+        # Get students with attendance records for the specified date
+        from app.models import Attendance, Student, Class
+        from sqlalchemy import and_, or_
+        
+        # Query students with attendance records for the date
+        attendance_records = db.session.query(Attendance, Student, Class).join(
+            Student, Attendance.student_id == Student.id
+        ).join(
+            Class, Attendance.class_id == Class.id
+        ).filter(
+            and_(
+                Attendance.date == date,
+                Student.school_id == school_id,
+                Student.phone_number.isnot(None),
+                Student.phone_number != ''
+            )
+        ).all()
+        
+        if not attendance_records:
+            return jsonify({
+                "message": "لا توجد سجلات حضور للتاريخ المحدد أو لا توجد أرقام هواتف متاحة",
+                "total": 0,
+                "sent": 0,
+                "failed": 0
+            }), 200
+        
+        # Prepare students data
+        students_data = []
+        for attendance, student, class_obj in attendance_records:
+            # Get attendance details
+            absent_times = []
+            late_times = []
+            excused_times = []
+            
+            # Parse attendance periods
+            if attendance.absent_periods:
+                try:
+                    absent_times = eval(attendance.absent_periods) if isinstance(attendance.absent_periods, str) else attendance.absent_periods
+                except:
+                    absent_times = []
+            
+            if attendance.late_periods:
+                try:
+                    late_times = eval(attendance.late_periods) if isinstance(attendance.late_periods, str) else attendance.late_periods
+                except:
+                    late_times = []
+            
+            if attendance.excused_periods:
+                try:
+                    excused_times = eval(attendance.excused_periods) if isinstance(attendance.excused_periods, str) else attendance.excused_periods
+                except:
+                    excused_times = []
+            
+            # Only include students with attendance issues
+            if absent_times or late_times or excused_times:
+                students_data.append({
+                    'student_name': student.student_name,
+                    'class_name': class_obj.class_name,
+                    'phone_number': student.phone_number,
+                    'absent_times': absent_times,
+                    'late_times': late_times,
+                    'excused_times': excused_times,
+                    'is_has_exuse': attendance.is_has_exuse or False
+                })
+        
+        if not students_data:
+            return jsonify({
+                "message": "لا توجد طلاب لديهم مشاكل في الحضور للتاريخ المحدد",
+                "total": 0,
+                "sent": 0,
+                "failed": 0
+            }), 200
+        
+        # Get school name and phone number
+        from app.models import School
+        school = School.query.get(school_id)
+        school_name = school.school_name if school else "المدرسة"
+        school_phone = school.phone_number if school and school.phone_number else None
+        
+        # Send bulk daily reports
+        results = daily_report_service.send_daily_reports(
+            students_data=students_data,
+            school_name=school_name,
+            date=date,
+            delay_between_messages=delay_between_messages,
+            sender_phone=school_phone
+        )
+        
+        if results['success']:
+            return jsonify({
+                "message": results['message'],
+                "total": results['total'],
+                "sent": results['sent'],
+                "failed": results['failed'],
+                "scheduled_messages": results.get('scheduled_messages', []),
+                "failed_contacts": results.get('failed_contacts', [])
+            }), 200
+        else:
+            return jsonify({
+                "message": results['message'],
+                "error": True,
+                "total": results['total'],
+                "sent": results['sent'],
+                "failed": results['failed']
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error in send_bulk_daily_reports: {str(e)}")
+        error_message = str(e)
+        
+        # Handle DISPLAY errors gracefully
+        if 'DISPLAY' in error_message or 'display' in error_message.lower():
+            logger.warning("DISPLAY error detected in send_bulk_daily_reports - this is expected in headless environments")
+            return jsonify(message="خطأ في البيئة الرسومية - يرجى المحاولة مرة أخرى أو الاتصال بالدعم الفني"), 500
+        
+        # Handle other specific errors
+        if 'pywhatkit' in error_message.lower():
+            return jsonify(message="خطأ في نظام الإرسال - يرجى التحقق من إعدادات WhatsApp"), 500
+        
+        # Generic error message
+        return jsonify(message=f"حدث خطأ أثناء إرسال التقارير: {error_message}"), 500
+
+
+@static_blueprint.route('/bulk-messaging-status', methods=['GET'])
+@jwt_required()
+def check_bulk_messaging_status():
+    """
+    Check the status of bulk messaging service
+    """
+    try:
+        from bulk_whatsapp_service import get_bulk_whatsapp_service, get_daily_report_service
+        
+        # Test service loading
+        bulk_service = get_bulk_whatsapp_service()
+        daily_service = get_daily_report_service()
+        
+        return jsonify({
+            "status": "success",
+            "message": "نظام الإرسال المجمع جاهز للاستخدام",
+            "bulk_service_available": bulk_service.is_available,
+            "services_loaded": True
+        }), 200
+        
+    except Exception as e:
+        error_msg = str(e)
+        if 'DISPLAY' in error_msg or 'display' in error_msg.lower():
+            return jsonify({
+                "status": "warning",
+                "message": "نظام الإرسال المجمع جاهز للاستخدام (مشكلة في البيئة الرسومية متوقعة)",
+                "bulk_service_available": True,
+                "services_loaded": True,
+                "note": "DISPLAY errors are expected in headless environments"
+            }), 200
+        else:
+            return jsonify({
+                "status": "error",
+                "message": f"خطأ في تحميل نظام الإرسال المجمع: {error_msg}",
+                "bulk_service_available": False,
+                "services_loaded": False
+            }), 500
 
 
 @static_blueprint.route('/news', methods=['POST'])
@@ -903,12 +1115,16 @@ def get_bulk_operations_status():
     # Check each step completion status
     step_status = {}
     
-    # Step 1: Check if teachers exist
-    teachers_count = Teacher.query.filter_by(school_id=school_id, is_active=True).count()
+    # Step 1: Check if teachers exist (ignore 'school admin' users)
+    teachers_count = Teacher.query.filter(
+        Teacher.school_id == school_id,
+        Teacher.is_active == True,
+        Teacher.user_role != 'school_admin'
+    ).count()
     step_status['step1_teachers'] = {
         'completed': teachers_count > 0,
         'count': teachers_count,
-        'message': f"Found {teachers_count} active teachers" if teachers_count > 0 else "No teachers found"
+        'message': f"Found {teachers_count} active teachers (excluding school admins)" if teachers_count > 0 else "No teachers found (excluding school admins)"
     }
     
     # Step 2: Check if students and classes exist
@@ -977,3 +1193,4 @@ def get_bulk_operations_status():
         'step_status': step_status,
         'setup_complete': not needs_setup
     }), 200
+

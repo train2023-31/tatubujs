@@ -21,6 +21,7 @@ import { formatDate, getTodayAPI } from '../../utils/helpers';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import DataTable from '../../components/UI/DataTable';
 import Modal from '../../components/UI/Modal';
+import Tabs from '../../components/UI/Tabs';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import toast from 'react-hot-toast';
@@ -644,27 +645,13 @@ const AttendanceDetails = () => {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setSelectedTab(tab.id)}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
-                  selectedTab === tab.id
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Icon className="h-4 w-4 ml-1" />
-                <span>{tab.name}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+      <Tabs
+        tabs={tabs}
+        selectedTab={selectedTab}
+        onTabChange={setSelectedTab}
+        variant="modern"
+        className="mb-6"
+      />
 
       {/* Filters */}
       <div className="card">

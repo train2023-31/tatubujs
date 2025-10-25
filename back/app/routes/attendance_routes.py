@@ -316,7 +316,7 @@ def get_attendance_summary_all_classes():
             and_(
                 Attendance.class_id.in_(class_ids),
                 Attendance.date == selected_date,
-                or_(Attendance.is_Acsent == True, Attendance.is_Excus == True)
+                or_(Attendance.is_Acsent == True, Attendance.is_Excus == True, Attendance.is_late == True)
             )
         ).all()
 

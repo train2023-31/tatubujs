@@ -412,6 +412,9 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClassData, setSelectedClassData] = useState(null);
+  const [isStudentListModalOpen, setIsStudentListModalOpen] = useState(false);
+  const [selectedStudentList, setSelectedStudentList] = useState(null);
+  const [selectedListType, setSelectedListType] = useState('');
 
 
   // Local function to safely call needsSetup
@@ -439,11 +442,54 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
     setIsModalOpen(true);
   };
 
+
+  // Handle viewing student lists from summary cards
+  const handleViewStudentList = (listType) => {
+    if (!attendanceSummary?.attendance_summary) return;
+    
+    // Collect all students of the specified type from all classes
+    const allStudents = [];
+    attendanceSummary.attendance_summary.forEach(classData => {
+      if (classData.absent_students) {
+        classData.absent_students.forEach(student => {
+          if (listType === 'absent' && student.is_absent) {
+            allStudents.push({
+              ...student,
+              class_name: classData.class_name
+            });
+          } else if (listType === 'late' && student.is_late) {
+            allStudents.push({
+              ...student,
+              class_name: classData.class_name
+            });
+          } else if (listType === 'excuse' && student.is_excused) {
+            allStudents.push({
+              ...student,
+              class_name: classData.class_name
+            });
+          }
+        });
+      }
+    });
+    
+    setSelectedStudentList(allStudents);
+    setSelectedListType(listType);
+    setIsStudentListModalOpen(true);
+  };
+
   // Close modal
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedClassData(null);
   };
+
+  // Close student list modal
+  const handleCloseStudentListModal = () => {
+    setIsStudentListModalOpen(false);
+    setSelectedStudentList(null);
+    setSelectedListType('');
+  };
+
 
   if (loading || summaryLoading || bulkOpsLoading) {
     return (
@@ -528,7 +574,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                 <p className="text-sm text-gray-600 mb-3">
                   {bulkOpsStatus?.step_status?.step2_students_classes?.completed 
                     ? `تم إضافة ${bulkOpsStatus.step_status.step2_students_classes.students_count} طالب و ${bulkOpsStatus.step_status.step2_students_classes.classes_count} فصل`
-                    : 'أضف طلاب مدرستك وقم بإنشاء الفصول وتوزيع الطلاب عليها'
+                    : 'أضف طلاب مدرستك، قم برفع قوائم الفصول ويتم توزيع الطلاب عليها تلقائياً'
                   }
                 </p>
                 {!bulkOpsStatus?.step_status?.step2_students_classes?.completed && (
@@ -711,18 +757,24 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
           value={schoolStats?.number_of_absents || 0}
           icon={Clock}
           color="red"
+          showEyeIcon={true}
+          onEyeClick={() => handleViewStudentList('absent')}
         />
         <StatCard
           title="الطلاب المتأخرين"
           value={schoolStats?.number_of_lates || 0}
           icon={TrendingUp}
           color="yellow"
+          showEyeIcon={true}
+          onEyeClick={() => handleViewStudentList('late')}
         />
         <StatCard
           title="الطلاب الغائبين"
           value={schoolStats?.number_of_excus || 0}
           icon={AlertCircle}
           color="orange"
+          showEyeIcon={true}
+          onEyeClick={() => handleViewStudentList('excuse')}
         />
       </div>
 
@@ -790,6 +842,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                             <Eye className="h-4 w-4 text-blue-600" />
                         </button>
                       </td>
+       
                     </tr>
                   )) || schoolStats.classes.sort((a, b) => a.id - b.id).map((classData, index) => (
                     <tr key={index}>
@@ -826,6 +879,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                           <Eye className="h-4 w-4" />
                         </button>
                       </td>
+             
                     </tr>
                   ))}
                 </tbody>
@@ -890,18 +944,18 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
         </div>
       )}
 
-      {/* Absent Students Modal */}
+      {/* Absent and Late Students Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        title={`الطلاب الغائبين - ${selectedClassData?.class_name || ''}`}
+        title={`الطلاب الغائبين والمتأخرين - ${selectedClassData?.class_name || ''}`}
         size="lg"
       >
         <div className="space-y-4">
           {summaryLoading ? (
             <div className="flex items-center justify-center py-9">
               <LoadingSpinner />
-              <span className="mr-3 text-gray-500">جاري تحميل بيانات الطلاب الغائبين...</span>
+              <span className="mr-3 text-gray-500">جاري تحميل بيانات الطلاب الغائبين والمتأخرين...</span>
             </div>
           ) : selectedClassData?.absent_students ? (
             <div className="space-y-4">
@@ -919,13 +973,12 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           حصص الهروب
                         </th>
-           
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          حصص التأخر
+                        </th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           حصص الغياب
                         </th>
-                        {/* <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          حالة العذر
-                        </th> */}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -980,7 +1033,11 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                                   {sortedAbsentPeriods.join(', ')}
                                 </span>
                               </td>
-                            
+                              <td className="px-4 py-3 whitespace-nowrap text-center">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                  {sortedLatePeriods.join(', ')}
+                                </span>
+                              </td>
                               <td className="px-4 py-3 whitespace-nowrap text-center">
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                   {sortedExcusedPeriods.join(', ')}
@@ -1005,7 +1062,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
               ) : (
                 <div className="text-center py-8">
                   <div className="text-gray-500 text-lg">🎉</div>
-                  <p className="text-gray-500 mt-2">لا يوجد طلاب غائبين في هذا الفصل</p>
+                  <p className="text-gray-500 mt-2">لا يوجد طلاب غائبين أو متأخرين في هذا الفصل</p>
                 </div>
               )}
             </div>
@@ -1016,6 +1073,138 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
           )}
         </div>
       </Modal>
+
+      {/* Student List Modal */}
+      <Modal
+        isOpen={isStudentListModalOpen}
+        onClose={handleCloseStudentListModal}
+        title={`قائمة الطلاب ${selectedListType === 'absent' ? 'الهاربين' : selectedListType === 'late' ? 'المتأخرين' : 'الغائبين'}`}
+        size="lg"
+      >
+        <div className="space-y-4">
+          {summaryLoading ? (
+            <div className="flex items-center justify-center py-9">
+              <LoadingSpinner />
+              <span className="mr-3 text-gray-500">جاري تحميل بيانات الطلاب...</span>
+    </div>
+          ) : selectedStudentList && selectedStudentList.length > 0 ? (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center space-x-2">
+                  <div className="flex-shrink-0">
+                    {selectedListType === 'absent' && <Clock className="h-5 w-5 text-red-600" />}
+                    {selectedListType === 'late' && <TrendingUp className="h-5 w-5 text-yellow-600" />}
+                    {selectedListType === 'excuse' && <AlertCircle className="h-5 w-5 text-orange-600" />}
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-blue-900">
+                      إجمالي الطلاب: {selectedStudentList.length}
+                    </h4>
+                    <p className="text-sm text-blue-700">
+                      {selectedListType === 'absent' && 'الطلاب الذين هربوا من الحصص'}
+                      {selectedListType === 'late' && 'الطلاب الذين تأخروا عن الحصص'}
+                      {selectedListType === 'excuse' && 'الطلاب الذين لديهم عذر للغياب'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Students List */}
+              <div className="max-h-96 overflow-y-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b sticky top-0">
+                    <tr>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        اسم الطالب
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        الفصل
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        الحصص
+                      </th>
+                      {selectedListType === 'excuse' && (
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          ملاحظة العذر
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {(() => {
+                      // Group students by student_id and combine their data
+                      const groupedStudents = selectedStudentList.reduce((acc, student) => {
+                        const studentId = student.student_id;
+                        
+                        if (!acc[studentId]) {
+                          acc[studentId] = {
+                            student_id: studentId,
+                            student_name: student.student_name,
+                            class_name: student.class_name,
+                            class_time_nums: [],
+                            excuse_note: student.excuse_note || ''
+                          };
+                        }
+                        
+                        // Add class_time_num to the array
+                        if (student.class_time_num) {
+                          acc[studentId].class_time_nums.push(student.class_time_num);
+                        }
+                        
+                        return acc;
+                      }, {});
+                      
+                      // Convert to array and sort class_time_nums
+                      return Object.values(groupedStudents).map((student, index) => {
+                        const sortedPeriods = student.class_time_nums.sort((a, b) => a - b);
+                        
+                        return (
+                          <tr key={student.student_id || index} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {student.student_name || 'غير محدد'}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                              {student.class_name || 'غير محدد'}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-center">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                selectedListType === 'absent' ? 'bg-red-100 text-red-800' :
+                                selectedListType === 'late' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-orange-100 text-orange-800'
+                              }`}>
+                                {sortedPeriods.join(', ')}
+                              </span>
+                            </td>
+                            {selectedListType === 'excuse' && (
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                {student.excuse_note ? (
+                                  <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                    {student.excuse_note}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="text-gray-500 text-lg">🎉</div>
+              <p className="text-gray-500 mt-2">
+                لا يوجد طلاب {selectedListType === 'absent' ? 'هاربين' : selectedListType === 'late' ? 'متأخرين' : 'غائبين'} اليوم
+              </p>
+            </div>
+          )}
+        </div>
+      </Modal>
+
     </div>
   );
 };
@@ -1102,7 +1291,7 @@ const TeacherDashboard = ({ teacherAttendance, loading, selectedDate, setSelecte
 };
 
 // Stat Card Component
-const StatCard = ({ title, value, icon: Icon, color }) => {
+const StatCard = ({ title, value, icon: Icon, color, showEyeIcon = false, onEyeClick }) => {
   const colorClasses = {
     blue: 'bg-blue-500 text-white',
     green: 'bg-green-500 text-white',
@@ -1115,7 +1304,8 @@ const StatCard = ({ title, value, icon: Icon, color }) => {
   return (
     <div className="card">
       <div className="card-body p-3 sm:p-4">
-        <div className="flex items-center">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center flex-1">
           <div className={`p-2 sm:p-3 rounded-lg ${colorClasses[color]} flex-shrink-0`}>
             <Icon className="h-4 w-4 sm:h-6 sm:w-6" />
           </div>
@@ -1123,6 +1313,16 @@ const StatCard = ({ title, value, icon: Icon, color }) => {
             <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">{title}</p>
             <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">{value}</p>
           </div>
+          </div>
+          {showEyeIcon && (
+            <button
+              onClick={onEyeClick}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              title="عرض قائمة الطلاب"
+            >
+              <Eye className="h-4 w-4 text-gray-600 hover:text-blue-600" />
+            </button>
+          )}
         </div>
       </div>
     </div>

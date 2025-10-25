@@ -19,6 +19,7 @@ import * as XLSX from 'xlsx';
 import { authAPI, classesAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
+import Tabs from '../../components/UI/Tabs';
 import toast from 'react-hot-toast';
 
 const BulkOperations = () => {
@@ -170,18 +171,24 @@ const BulkOperations = () => {
     setResults([]);
 
     let processedData = uploadedData;
+    const fieldMapping = getFieldMapping();
 
-    // Map Arabic field names to correct format for assign case
-    if (selectedTab === 'assign') {
+    // Map Arabic field names to correct format for all cases
+    if (selectedTab === 'teachers') {
+      processedData = uploadedData.map(row => {
+        const mappedRow = {};
+        Object.entries(fieldMapping).forEach(([arabicField, englishField]) => {
+          mappedRow[englishField] = row[arabicField] || '';
+        });
+        return mappedRow;
+      });
+    } else if (selectedTab === 'assign') {
       processedData = uploadedData.map(row => ({
         username: row['الرقم المدرسي'] || '',
         fullName: row['الاســـــــــــم'] || '',
         class: `${row['اسم الصف'] || ''} ${row['الشعبة'] || ''}`.trim()
       }));
-    }
-
-    // Map Arabic field names to correct format for phones case
-    if (selectedTab === 'phones') {
+    } else if (selectedTab === 'phones') {
       processedData = uploadedData.map(row => ({
         username: row['الرقم المدرسي'] || '',
         phone_number: row['الهاتف النقال'] || ''
@@ -191,7 +198,7 @@ const BulkOperations = () => {
     switch (selectedTab) {
       case 'teachers':
         setProcessingStage('جاري تسجيل المعلمين...');
-        bulkRegisterTeachersMutation.mutate(uploadedData);
+        bulkRegisterTeachersMutation.mutate(processedData);
         break;
       case 'assign':
         await handleAssignStudentsProcess(processedData);
@@ -266,10 +273,39 @@ const BulkOperations = () => {
     toast.success('تم تحميل النموذج بنجاح');
   };
 
+  // Arabic field names mapping
+  const getFieldMapping = () => {
+    switch (selectedTab) {
+      case 'teachers':
+        return {
+          'اسم المستخدم': 'username',
+          'الاسم الكامل': 'fullName',
+          'البريد الإلكتروني': 'email',
+          'رقم الهاتف': 'phone_number',
+          'المسمى الوظيفي': 'job_name',
+          'عدد الحصص الأسبوعية': 'week_Classes_Number'
+        };
+      case 'assign':
+        return {
+          'الرقم المدرسي': 'username',
+          'الاســـــــــــم': 'fullName',
+          'الشعبة': 'section',
+          'اسم الصف': 'class_name'
+        };
+      case 'phones':
+        return {
+          'الرقم المدرسي': 'username',
+          'الهاتف النقال': 'phone_number'
+        };
+      default:
+        return {};
+    }
+  };
+
   const getExpectedHeaders = () => {
     switch (selectedTab) {
       case 'teachers':
-        return ['username', 'fullName', 'email', 'phone_number', 'job_name', 'week_Classes_Number'];
+        return ['اسم المستخدم', 'الاسم الكامل', 'البريد الإلكتروني', 'رقم الهاتف', 'المسمى الوظيفي', 'عدد الحصص الأسبوعية'];
       case 'assign':
         return ['الرقم المدرسي', 'الاســـــــــــم', 'الشعبة', 'اسم الصف'];
       case 'phones':
@@ -277,6 +313,12 @@ const BulkOperations = () => {
       default:
         return [];
     }
+  };
+
+  // Get display headers for data preview
+  const getDisplayHeaders = () => {
+    if (uploadedData.length === 0) return [];
+    return Object.keys(uploadedData[0] || {}).filter(key => key !== '_rowIndex');
   };
 
   const getStatusIcon = (flag) => {
@@ -474,31 +516,17 @@ const BulkOperations = () => {
       )}
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setSelectedTab(tab.id);
-                  setUploadedData([]);
-                  setResults([]);
-                }}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
-                  selectedTab === tab.id
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Icon className="h-4 w-4 ml-1" />
-                <span>{tab.name}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+      <Tabs
+        tabs={tabs}
+        selectedTab={selectedTab}
+        onTabChange={(tabId) => {
+          setSelectedTab(tabId);
+          setUploadedData([]);
+          setResults([]);
+        }}
+        variant="modern"
+        className="mb-6"
+      />
 
       {/* Instructions */}
       <div className="card">
@@ -641,10 +669,10 @@ const BulkOperations = () => {
           <div className="card-body">
             <div className="overflow-x-auto">
               <table className="table">
-                <thead className="table-header">
+                <thead className="table-header text-right">
                   <tr>
-                    {Object.keys(uploadedData[0] || {}).map((key, index) => (
-                      <th key={index} className="table-header-cell">
+                    {getDisplayHeaders().map((key, index) => (
+                      <th key={index} className="table-header-cell text-right">
                         {key}
                       </th>
                     ))}
@@ -653,9 +681,9 @@ const BulkOperations = () => {
                 <tbody className="table-body">
                   {uploadedData.slice(0, 10).map((row, index) => (
                     <tr key={index}>
-                      {Object.values(row).map((value, cellIndex) => (
+                      {getDisplayHeaders().map((key, cellIndex) => (
                         <td key={cellIndex} className="table-cell">
-                          {value}
+                          {row[key]}
                         </td>
                       ))}
                     </tr>
