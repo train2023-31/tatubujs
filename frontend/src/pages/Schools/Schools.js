@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { Plus, Building, Edit, Trash2, ToggleLeft, ToggleRight, Eye, FileText, UserPlus } from 'lucide-react';
+import { Plus, Building, Edit, Trash2, ToggleLeft, ToggleRight, Eye, FileText, UserPlus, Search, Smartphone, Settings } from 'lucide-react';
 import { classesAPI, authAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import DataTable from '../../components/UI/DataTable';
@@ -8,6 +8,8 @@ import Modal from '../../components/UI/Modal';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import Invoice from '../../components/UI/Invoice';
 import SearchableSelect from '../../components/UI/SearchableSelect';
+import SmsConfiguration from '../../components/UI/SmsConfiguration';
+import SmsOperations from '../../components/UI/SmsOperations';
 import toast from 'react-hot-toast';
 
 const Schools = () => {
@@ -18,7 +20,11 @@ const Schools = () => {
   const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [isSmsConfigModalOpen, setIsSmsConfigModalOpen] = useState(false);
+  const [isSmsOperationsModalOpen, setIsSmsOperationsModalOpen] = useState(false);
   const [selectedSchool, setSelectedSchool] = useState(null);
+  const [searchFilter, setSearchFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // Fetch schools data
   const { data: schools, isLoading: schoolsLoading } = useQuery(
@@ -27,11 +33,35 @@ const Schools = () => {
     { enabled: !!user && user.role === 'admin' }
   );
 
-  // Fetch logs data
+  // Filter and sort schools data
+  const filteredAndSortedSchools = React.useMemo(() => {
+    if (!schools) return [];
+    
+    let filtered = schools;
+    
+    // Apply search filter
+    if (searchFilter.trim()) {
+      filtered = filtered.filter(school => 
+        school.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
+        (school.address && school.address.toLowerCase().includes(searchFilter.toLowerCase()))
+      );
+    }
+    
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      const isActive = statusFilter === 'active';
+      filtered = filtered.filter(school => school.is_active === isActive);
+    }
+    
+    // Sort by name in descending order (Z to A)
+    return filtered.sort((a, b) => b.name.localeCompare(a.name, 'ar'));
+  }, [schools, searchFilter, statusFilter]);
+
+  // Fetch logs data for selected school
   const { data: logs, isLoading: logsLoading } = useQuery(
-    'logs',
-    authAPI.viewLogs,
-    { enabled: !!user && isLogsModalOpen }
+    ['logs', selectedSchool?.id],
+    () => authAPI.viewLogs({ school_id: selectedSchool?.id }),
+    { enabled: !!user && isLogsModalOpen && !!selectedSchool?.id }
   );
 
   // Create school mutation
@@ -157,6 +187,26 @@ const Schools = () => {
           <button
             onClick={() => {
               setSelectedSchool(row);
+              setIsSmsConfigModalOpen(true);
+            }}
+            className="text-blue-600 hover:text-blue-900 mr-2"
+            title="إعدادات SMS"
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => {
+              setSelectedSchool(row);
+              setIsSmsOperationsModalOpen(true);
+            }}
+            className="text-indigo-600 hover:text-indigo-900 mr-2"
+            title="إرسال تقارير SMS"
+          >
+            <Smartphone className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => {
+              setSelectedSchool(row);
               setIsAddUserModalOpen(true);
             }}
             className="text-purple-600 hover:text-purple-900 mr-2"
@@ -206,12 +256,65 @@ const Schools = () => {
         </button>
       </div>
 
+      {/* Search and Filter */}
+      <div className="card">
+        <div className="card-body">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
+            <div className="flex-1 w-full sm:w-auto">
+              <div className="relative">
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="البحث عن مدرسة بالاسم أو العنوان..."
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  className="input pr-10"
+                />
+              </div>
+            </div>
+            <div className="w-full sm:w-auto">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="input mr-2 w-full sm:w-auto"
+              >
+                <option value="all">جميع المدارس</option>
+                <option value="active">المدارس النشطة</option>
+                <option value="inactive">المدارس غير النشطة</option>
+              </select>
+            </div>
+            {(searchFilter || statusFilter !== 'all') && (
+              <button
+                onClick={() => {
+                  setSearchFilter('');
+                  setStatusFilter('all');
+                }}
+                className="btn btn-outline btn-sm w-full sm:w-auto"
+              >
+                مسح جميع الفلاتر
+              </button>
+            )}
+          </div>
+          {(searchFilter || statusFilter !== 'all') && (
+            <div className="mt-2 text-sm text-gray-600">
+              عرض {filteredAndSortedSchools.length} من أصل {schools?.length || 0} مدرسة
+              {searchFilter && (
+                <span className="mr-2">• البحث: "{searchFilter}"</span>
+              )}
+              {statusFilter !== 'all' && (
+                <span className="mr-2">• الحالة: {statusFilter === 'active' ? 'نشطة' : 'غير نشطة'}</span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Data Table */}
       <DataTable
-        data={schools || []}
+        data={filteredAndSortedSchools}
         columns={columns}
         loading={schoolsLoading}
-        emptyMessage="لا توجد مدارس"
+        emptyMessage={searchFilter ? "لا توجد مدارس تطابق البحث" : "لا توجد مدارس"}
       />
 
       {/* Add School Modal */}
@@ -309,6 +412,27 @@ const Schools = () => {
           />
         )}
       </Modal>
+
+      {/* SMS Configuration Modal */}
+      <SmsConfiguration
+        isOpen={isSmsConfigModalOpen}
+        onClose={() => {
+          setIsSmsConfigModalOpen(false);
+          setSelectedSchool(null);
+        }}
+        schoolId={selectedSchool?.id}
+      />
+
+      {/* SMS Operations Modal */}
+      <SmsOperations
+        isOpen={isSmsOperationsModalOpen}
+        onClose={() => {
+          setIsSmsOperationsModalOpen(false);
+          setSelectedSchool(null);
+        }}
+        schoolId={selectedSchool?.id}
+        selectedDate={new Date().toISOString().split('T')[0]}
+      />
     </div>
   );
 };

@@ -9,6 +9,7 @@ from collections import defaultdict
 from app.logger import log_action
 from app.config import get_oman_time
 from sqlalchemy import func , or_ ,case, and_
+from ibulk_sms_service import get_attendance_sms_service, get_ibulk_sms_service
 
 
 
@@ -1616,3 +1617,226 @@ def get_my_profile():
         "classes": classes_data,
         "total_classes": len(classes_data)
     }), 200
+
+
+@attendance_blueprint.route('/send-daily-sms-reports', methods=['POST'])
+@jwt_required()
+@log_action("إرسال", description="إرسال تقارير الحضور اليومية عبر SMS")
+def send_daily_sms_reports():
+    """
+    Send daily attendance reports via SMS to students with attendance issues
+    """
+    # Get authenticated user
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    # Ensure only authorized roles can send SMS reports
+    if user.user_role not in ['admin', 'school_admin', 'teacher', 'data_analyst']:
+        return jsonify({
+            "message": {
+                "en": "Unauthorized access.",
+                "ar": "ليس لديك صلاحية الوصول."
+            },
+            "flag": 1
+        }), 403
+
+    # Parse request data
+    data = request.get_json()
+    
+    # Check if this is bulk selected students data (array format)
+    if isinstance(data, list) and len(data) > 0 and 'phone' in data[0]:
+        # Handle bulk selected students SMS
+        school_id = user.school_id
+        
+        try:
+            # Initialize SMS service
+            sms_service = get_ibulk_sms_service(school_id)
+            
+            # Send bulk SMS to selected students
+            results = sms_service.send_bulk_sms(data, '{message}')
+            
+            return jsonify({
+                "message": {
+                    "en": results.get('message', 'Bulk SMS sent successfully'),
+                    "ar": results.get('message', 'تم إرسال الرسائل المجمعة بنجاح')
+                },
+                "results": results,
+                "flag": 3
+            }), 200
+            
+        except Exception as e:
+            return jsonify({
+                "message": {
+                    "en": f"Error sending bulk SMS: {str(e)}",
+                    "ar": f"خطأ في إرسال الرسائل المجمعة: {str(e)}"
+                },
+                "flag": 4
+            }), 500
+    
+    # Handle regular daily reports (object format)
+    date_str = data.get('date')
+    school_id = data.get('school_id', user.school_id)
+
+    # Validate school_id for admin users
+    if user.user_role == 'admin' and not school_id:
+        return jsonify({
+            "message": {
+                "en": "School ID is required for admins.",
+                "ar": "معرف المدرسة مطلوب للمسؤولين."
+            },
+            "flag": 2
+        }), 400
+
+    # Use today's date if not provided
+    if not date_str:
+        date_str = date.today().isoformat()
+
+    try:
+        # Initialize SMS service
+        sms_service = get_attendance_sms_service(school_id)
+        
+        # Send daily reports
+        results = sms_service.send_daily_attendance_reports(date_str)
+        
+        return jsonify({
+            "message": {
+                "en": results.get('message', 'SMS reports sent successfully'),
+                "ar": results.get('message', 'تم إرسال التقارير بنجاح')
+            },
+            "results": results,
+            "date": date_str,
+            "school_id": school_id,
+            "flag": 3
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "message": {
+                "en": f"Error sending SMS reports: {str(e)}",
+                "ar": f"خطأ في إرسال التقارير: {str(e)}"
+            },
+            "flag": 4
+        }), 500
+
+
+@attendance_blueprint.route('/check-sms-balance', methods=['GET'])
+@jwt_required()
+def check_sms_balance():
+    """
+    Check SMS account balance for a school
+    """
+    # Get authenticated user
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    # Ensure only authorized roles can check SMS balance
+    if user.user_role not in ['admin', 'school_admin', 'teacher', 'data_analyst']:
+        return jsonify({
+            "message": {
+                "en": "Unauthorized access.",
+                "ar": "ليس لديك صلاحية الوصول."
+            },
+            "flag": 1
+        }), 403
+
+    # Get school_id
+    school_id = request.args.get('school_id', user.school_id)
+    
+    if user.user_role == 'admin' and not school_id:
+        return jsonify({
+            "message": {
+                "en": "School ID is required for admins.",
+                "ar": "معرف المدرسة مطلوب للمسؤولين."
+            },
+            "flag": 2
+        }), 400
+
+    try:
+        # Initialize SMS service
+        sms_service = get_ibulk_sms_service(school_id)
+        
+        # Check balance
+        balance_result = sms_service.check_balance()
+        
+        return jsonify({
+            "message": {
+                "en": balance_result.get('message', 'Balance checked successfully'),
+                "ar": balance_result.get('message', 'تم فحص الرصيد بنجاح')
+            },
+            "balance_info": balance_result,
+            "school_id": school_id,
+            "flag": 3
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "message": {
+                "en": f"Error checking SMS balance: {str(e)}",
+                "ar": f"خطأ في فحص رصيد SMS: {str(e)}"
+            },
+            "flag": 4
+        }), 500
+
+
+@attendance_blueprint.route('/send-test-sms', methods=['POST'])
+@jwt_required()
+@log_action("اختبار", description="إرسال رسالة SMS تجريبية")
+def send_test_sms():
+    """
+    Send a test SMS message
+    """
+    # Get authenticated user
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    # Ensure only authorized roles can send test SMS
+    if user.user_role not in ['admin', 'school_admin']:
+        return jsonify({
+            "message": {
+                "en": "Unauthorized access.",
+                "ar": "ليس لديك صلاحية الوصول."
+            },
+            "flag": 1
+        }), 403
+
+    # Parse request data
+    data = request.get_json()
+    phone_number = data.get('phone_number')
+    message = data.get('message', 'رسالة تجريبية من نظام إدارة الحضور')
+    school_id = data.get('school_id', user.school_id)
+
+    if not phone_number:
+        return jsonify({
+            "message": {
+                "en": "Phone number is required.",
+                "ar": "رقم الهاتف مطلوب."
+            },
+            "flag": 2
+        }), 400
+
+    try:
+        # Initialize SMS service
+        sms_service = get_ibulk_sms_service(school_id)
+        
+        # Send test SMS
+        result = sms_service.send_single_sms(phone_number, message)
+        
+        return jsonify({
+            "message": {
+                "en": result.get('message', 'Test SMS sent successfully'),
+                "ar": result.get('message', 'تم إرسال الرسالة التجريبية بنجاح')
+            },
+            "result": result,
+            "phone_number": phone_number,
+            "school_id": school_id,
+            "flag": 3
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "message": {
+                "en": f"Error sending test SMS: {str(e)}",
+                "ar": f"خطأ في إرسال الرسالة التجريبية: {str(e)}"
+            },
+            "flag": 4
+        }), 500

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, BookOpen, Users, Edit, Trash2, UserPlus, Eye, UserMinus, UserCheck } from 'lucide-react';
 import { classesAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
@@ -11,6 +12,7 @@ import toast from 'react-hot-toast';
 const Classes = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedTab, setSelectedTab] = useState('classes');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -19,6 +21,14 @@ const Classes = () => {
   const [isRemoveStudentsModalOpen, setIsRemoveStudentsModalOpen] = useState(false);
   const [isAddNewStudentModalOpen, setIsAddNewStudentModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+
+  // Handle URL parameters on component mount
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    if (tabFromUrl && ['classes', 'subjects'].includes(tabFromUrl)) {
+      setSelectedTab(tabFromUrl);
+    }
+  }, [searchParams]);
 
   // Fetch data
   const { data: classes, isLoading: classesLoading } = useQuery(
@@ -313,7 +323,11 @@ const Classes = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setSelectedTab(tab.id)}
+              onClick={() => {
+                setSelectedTab(tab.id);
+                // Update URL parameters
+                setSearchParams({ tab: tab.id });
+              }}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 selectedTab === tab.id
                   ? 'border-primary-500 text-primary-600'
@@ -510,7 +524,7 @@ const AddSubjectForm = ({ onClose, onSubmit, loading, existingSubjects = [] }) =
     name: '',
   });
   const [selectedSuggestions, setSelectedSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(true);
   const [validationError, setValidationError] = useState('');
 
   // Common subject suggestions
@@ -529,7 +543,8 @@ const AddSubjectForm = ({ onClose, onSubmit, loading, existingSubjects = [] }) =
     'تقنية المعلومات / الحاسب الآلي',
     'الفنون التشكيلية',
     'المهارات الموسيقية',
-    'الرياضة المدرسية'
+    'الرياضة المدرسية',
+    'حصة إحتياط'
   ];
 
   // Normalize Arabic text for comparison (treat ا and أ as same)

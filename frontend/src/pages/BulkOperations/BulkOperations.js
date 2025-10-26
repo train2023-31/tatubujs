@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from 'react-query';
+import { useSearchParams } from 'react-router-dom';
 import { 
   Upload, 
   Download, 
@@ -25,6 +26,7 @@ import toast from 'react-hot-toast';
 const BulkOperations = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedTab, setSelectedTab] = useState('teachers');
   const [uploadedData, setUploadedData] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -33,6 +35,14 @@ const BulkOperations = () => {
   const [showVideoGuide, setShowVideoGuide] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(false);
+
+  // Handle URL parameters on component mount
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    if (tabFromUrl && ['teachers', 'assign', 'phones'].includes(tabFromUrl)) {
+      setSelectedTab(tabFromUrl);
+    }
+  }, [searchParams]);
 
   // Bulk register teachers mutation
   const bulkRegisterTeachersMutation = useMutation(
@@ -523,6 +533,8 @@ const BulkOperations = () => {
           setSelectedTab(tabId);
           setUploadedData([]);
           setResults([]);
+          // Update URL parameters
+          setSearchParams({ tab: tabId });
         }}
         variant="modern"
         className="mb-6"

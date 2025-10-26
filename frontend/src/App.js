@@ -24,6 +24,7 @@ import DeleteSchoolData from './pages/DeleteSchoolData/DeleteSchoolData';
 import ViewLogs from './pages/ViewLogs/ViewLogs';
 import VersionFeatures from './pages/VersionFeatures/VersionFeatures';
 import WhatsAppMessaging from './pages/WhatsAppMessaging/WhatsAppMessaging';
+import SmsConfiguration from './pages/SmsConfiguration/SmsConfiguration';
 import LoadingSpinner from './components/UI/LoadingSpinner';
 
 // Create a client
@@ -231,6 +232,16 @@ function App() {
                   element={
                     <ProtectedRoute allowedRoles={['school_admin']}>
                       <SMS />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* SMS Configuration - School Admin */}
+                <Route 
+                  path="sms-configuration" 
+                  element={
+                    <ProtectedRoute allowedRoles={['school_admin']}>
+                      <SmsConfiguration />
                     </ProtectedRoute>
                   } 
                 />

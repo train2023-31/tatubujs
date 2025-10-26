@@ -90,6 +90,16 @@ class School(db.Model):
     phone_number = db.Column(db.String(20))
     password = db.Column(db.String(255), nullable=False)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
+    
+    # iBulk SMS Configuration Fields
+    ibulk_sms_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    ibulk_username = db.Column(db.String(100), nullable=True)
+    ibulk_password = db.Column(db.String(255), nullable=True)
+    ibulk_sender_id = db.Column(db.String(11), nullable=True)  # Max 11 characters alphanumeric
+    ibulk_api_url = db.Column(db.String(255), nullable=True, default='https://ismartsms.net/api/send')
+    ibulk_balance_threshold = db.Column(db.Float, nullable=True, default=10.0)  # Minimum balance threshold
+    ibulk_last_balance_check = db.Column(db.DateTime, nullable=True)
+    ibulk_current_balance = db.Column(db.Float, nullable=True, default=0.0)
 
     # Relationships
     students = db.relationship('Student', back_populates='school', lazy='dynamic')
@@ -104,7 +114,13 @@ class School(db.Model):
             "id": self.id,
             "name": self.name,
             "address": self.address,
-            "is_active": self.is_active
+            "phone_number": self.phone_number,
+            "is_active": self.is_active,
+            "ibulk_sms_enabled": self.ibulk_sms_enabled,
+            "ibulk_username": self.ibulk_username,
+            "ibulk_sender_id": self.ibulk_sender_id,
+            "ibulk_current_balance": self.ibulk_current_balance,
+            "ibulk_last_balance_check": self.ibulk_last_balance_check.isoformat() if self.ibulk_last_balance_check else None
         }
 
 class Class(db.Model):

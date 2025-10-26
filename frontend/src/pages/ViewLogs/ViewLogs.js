@@ -90,7 +90,7 @@ const ViewLogs = () => {
   // Fetch logs data with pagination
   const { data: logsResponse, isLoading, error } = useQuery(
     ['viewLogs', currentPage, pageSize, daysFilter],
-    () => authAPI.viewLogs(currentPage, pageSize, daysFilter),
+    () => authAPI.viewLogs({ page: currentPage, per_page: pageSize, days: daysFilter }),
     {
       enabled: !!user && (user.role === 'school_admin' || user.role === 'admin' || user.role === 'data_analyst'),
       refetchInterval: 30000, // Refetch every 30 seconds

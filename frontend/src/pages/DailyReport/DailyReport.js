@@ -14,7 +14,9 @@ import {
   MessageCircle,
   Search,
   Filter,
-  XCircle
+  XCircle,
+  Smartphone,
+  Send
 } from 'lucide-react';
 import { attendanceAPI, classesAPI, authAPI, reportsAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
@@ -45,6 +47,12 @@ const DailyReport = () => {
   });
   const [isSendingBulkWhatsApp, setIsSendingBulkWhatsApp] = useState(false);
   const [showBulkWhatsAppModal, setShowBulkWhatsAppModal] = useState(false);
+  const [isSendingBulkSms, setIsSendingBulkSms] = useState(false);
+  const [showBulkSmsModal, setShowBulkSmsModal] = useState(false);
+  const [smsResults, setSmsResults] = useState(null);
+  const [sendingSmsToStudent, setSendingSmsToStudent] = useState(new Set());
+  const [selectedStudents, setSelectedStudents] = useState(new Set());
+  const [isSendingBulkSelectedSms, setIsSendingBulkSelectedSms] = useState(false);
   const reportRef = useRef(null);
 
   // Bulk WhatsApp messaging mutation for daily reports
@@ -80,6 +88,93 @@ const DailyReport = () => {
       onError: (error) => {
         toast.error(error.response?.data?.message || 'فشل في إرسال التقارير اليومية');
         setIsSendingBulkWhatsApp(false);
+      },
+    }
+  );
+
+  // Bulk SMS messaging mutation for daily reports
+  const sendBulkSmsMutation = useMutation(
+    (data) => authAPI.sendDailySmsReports(data),
+    {
+      onSuccess: (response) => {
+        setSmsResults(response.results);
+        toast.success(response.message.ar || 'تم إرسال التقارير عبر SMS بنجاح');
+        setIsSendingBulkSms(false);
+        setShowBulkSmsModal(false);
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message?.ar || 'فشل في إرسال التقارير عبر SMS');
+        setIsSendingBulkSms(false);
+      },
+    }
+  );
+
+  // Individual SMS messaging mutation
+  const sendIndividualSmsMutation = useMutation(
+    (data) => authAPI.sendTestSms(data),
+    {
+      onSuccess: (response, variables) => {
+        toast.success(response.message.ar || 'تم إرسال الرسالة عبر SMS بنجاح');
+        // Find the student_id from the phone number to clear the loading state
+        const studentRecord = filteredData.find(record => {
+          let phoneNumber = record.phone_number.replace(/[^0-9]/g, '');
+          if (!phoneNumber.startsWith('968')) {
+            if (phoneNumber.length === 8) {
+              phoneNumber = '968' + phoneNumber;
+            } else if (phoneNumber.length === 9 && phoneNumber.startsWith('9')) {
+              phoneNumber = '968' + phoneNumber;
+            }
+          }
+          return phoneNumber === variables.phone_number;
+        });
+        
+        if (studentRecord) {
+          setSendingSmsToStudent(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(studentRecord.student_id);
+            return newSet;
+          });
+        }
+      },
+      onError: (error, variables) => {
+        toast.error(error.response?.data?.message?.ar || 'فشل في إرسال الرسالة عبر SMS');
+        // Find the student_id from the phone number to clear the loading state
+        const studentRecord = filteredData.find(record => {
+          let phoneNumber = record.phone_number.replace(/[^0-9]/g, '');
+          if (!phoneNumber.startsWith('968')) {
+            if (phoneNumber.length === 8) {
+              phoneNumber = '968' + phoneNumber;
+            } else if (phoneNumber.length === 9 && phoneNumber.startsWith('9')) {
+              phoneNumber = '968' + phoneNumber;
+            }
+          }
+          return phoneNumber === variables.phone_number;
+        });
+        
+        if (studentRecord) {
+          setSendingSmsToStudent(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(studentRecord.student_id);
+            return newSet;
+          });
+        }
+      },
+    }
+  );
+
+  // Bulk SMS to selected students mutation
+  const sendBulkSelectedSmsMutation = useMutation(
+    (studentData) => authAPI.sendDailySmsReports(studentData),
+    {
+      onSuccess: (response) => {
+        setSmsResults(response.results);
+        toast.success(response.message.ar || 'تم إرسال التقارير عبر SMS بنجاح');
+        setIsSendingBulkSelectedSms(false);
+        setSelectedStudents(new Set());
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message?.ar || 'فشل في إرسال التقارير عبر SMS');
+        setIsSendingBulkSelectedSms(false);
       },
     }
   );
@@ -405,6 +500,159 @@ ${attendanceStatus}
     sendBulkWhatsAppMutation.mutate(data);
   };
 
+  const handleBulkSmsSend = () => {
+    setIsSendingBulkSms(true);
+    setSmsResults(null);
+    
+    const data = {
+      date: selectedDate,
+      school_id: user?.school_id
+    };
+
+    sendBulkSmsMutation.mutate(data);
+  };
+
+  const handleIndividualSmsSend = (record) => {
+    if (!record.phone_number) {
+      toast.error('رقم الهاتف غير متوفر لهذا الطالب');
+      return;
+    }
+
+    setSendingSmsToStudent(prev => new Set(prev).add(record.student_id));
+    
+    const message = generateSmsMessage(record);
+    
+    // Format phone number to include 968 country code if not present
+    let phoneNumber = record.phone_number.replace(/[^0-9]/g, ''); // Remove all non-numeric characters
+    
+    // Add 968 country code if not present
+    if (!phoneNumber.startsWith('968')) {
+      if (phoneNumber.length === 8) {
+        phoneNumber = '968' + phoneNumber;
+      } else if (phoneNumber.length === 9 && phoneNumber.startsWith('9')) {
+        phoneNumber = '968' + phoneNumber;
+      }
+    }
+    
+    const data = {
+      phone_number: phoneNumber,
+      message: message
+    };
+
+    sendIndividualSmsMutation.mutate(data);
+  };
+
+  const generateSmsMessage = (record) => {
+    const schoolName = user?.school_name || 'المدرسة';
+    const studentName = record.student_name || 'الطالب';
+    const className = record.class_name || 'الصف';
+    const date = formatDate(selectedDate, 'dd/MM/yyyy', 'ar');
+    
+    const haribTimes = record.absent_times || record.absentTimes || record.absent_periods || [];
+    const lateTimes = record.late_times || record.lateTimes || record.late_periods || [];
+    const ghaibTimes = record.excused_times || record.excusedTimes || record.excused_periods || [];
+    const hasExcuse = record.is_has_exuse || record.is_has_exuse || false;
+    
+    let attendanceStatus = '';
+    
+    if (haribTimes.length > 0) {
+      attendanceStatus += ` هارب في الحصص: ${haribTimes.sort((a, b) => a - b).join(', ')}\n`;
+    }
+    
+    if (lateTimes.length > 0) {
+      attendanceStatus += ` متأخر في الحصص: ${lateTimes.sort((a, b) => a - b).join(', ')}\n`;
+    }
+    
+    if (ghaibTimes.length > 0) {
+      attendanceStatus += ` غائب في الحصص: ${ghaibTimes.sort((a, b) => a - b).join(', ')}\n`;
+    }
+    
+    if (haribTimes.length === 0 && lateTimes.length === 0 && ghaibTimes.length === 0) {
+      attendanceStatus = ' حضر جميع الحصص';
+    }
+    
+    const excuseStatus = hasExcuse ? ' لديه عذر' : ' لا يوجد عذر';
+    
+    const message = `تقرير الحضور اليومي
+
+المدرسة: ${schoolName}
+الطالب/ة: ${studentName}
+الصف: ${className}
+التاريخ: ${date}
+
+حالة الحضور:${attendanceStatus}
+
+حالة العذر: ${excuseStatus}
+
+---
+تم إرسال هذا التقرير من نظام إدارة الحضور`;
+
+    return message;
+  };
+
+  // Bulk selection handlers
+  const handleSelectStudent = (studentId) => {
+    setSelectedStudents(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(studentId)) {
+        newSet.delete(studentId);
+      } else {
+        newSet.add(studentId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAllStudents = () => {
+    const studentsWithPhoneNumbers = filteredData
+      .filter(record => record.student_id && record.status !== "no record yet" && record.phone_number);
+    
+    if (selectedStudents.size === studentsWithPhoneNumbers.length) {
+      // If all are selected, deselect all
+      setSelectedStudents(new Set());
+    } else {
+      // Select all students with phone numbers
+      setSelectedStudents(new Set(studentsWithPhoneNumbers.map(record => record.student_id)));
+    }
+  };
+
+  const handleSendBulkSelectedSms = () => {
+    if (selectedStudents.size === 0) {
+      toast.error('يرجى اختيار طالب واحد على الأقل');
+      return;
+    }
+
+    const selectedStudentData = filteredData
+      .filter(record => selectedStudents.has(record.student_id) && record.phone_number)
+      .map(record => {
+        // Format phone number to include 968 country code if not present
+        let phoneNumber = record.phone_number.replace(/[^0-9]/g, ''); // Remove all non-numeric characters
+        
+        // Add 968 country code if not present
+        if (!phoneNumber.startsWith('968')) {
+          if (phoneNumber.length === 8) {
+            phoneNumber = '968' + phoneNumber;
+          } else if (phoneNumber.length === 9 && phoneNumber.startsWith('9')) {
+            phoneNumber = '968' + phoneNumber;
+          }
+        }
+
+        return {
+          phone: phoneNumber,
+          message: generateSmsMessage(record)
+        };
+      });
+
+    if (selectedStudentData.length === 0) {
+      toast.error('لا يوجد طلاب مختارين لديهم أرقام هواتف صحيحة');
+      return;
+    }
+
+    setIsSendingBulkSelectedSms(true);
+    setSmsResults(null);
+    sendBulkSelectedSmsMutation.mutate(selectedStudentData);
+  };
+
   const handleDownloadPDF = async () => {
     if (!reportRef.current) return;
     
@@ -631,6 +879,33 @@ ${attendanceStatus}
           >
             <Eye className="h-5 w-5 mr-2" />
             معاينة التقرير
+          </button>
+          
+          <button
+            onClick={() => setShowBulkSmsModal(true)}
+            disabled={isLoading}
+            className="btn btn-primary mr-2"
+          >
+            <Smartphone className="h-5 w-5 ml-2" />
+            إرسال تقارير SMS
+          </button>
+          
+          <button
+            onClick={handleSendBulkSelectedSms}
+            disabled={isLoading || selectedStudents.size === 0 || isSendingBulkSelectedSms}
+            className="btn btn-secondary mr-2"
+          >
+            {isSendingBulkSelectedSms ? (
+              <>
+                <LoadingSpinner size="sm" />
+                <span className="mr-2">جاري الإرسال...</span>
+              </>
+            ) : (
+              <>
+                <Send className="h-5 w-5 ml-2" />
+                إرسال للمختارين ({selectedStudents.size})
+              </>
+            )}
           </button>
           
            {/*<button
@@ -960,6 +1235,14 @@ ${attendanceStatus}
               <table className="w-full">
                 <thead className="bg-gray-50 border-b sticky top-0 z-10 shadow-md">
                   <tr>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <input
+                        type="checkbox"
+                        checked={selectedStudents.size > 0 && selectedStudents.size === filteredData.filter(record => record.student_id && record.status !== "no record yet" && record.phone_number).length}
+                        onChange={handleSelectAllStudents}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                    </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                       الصف ↕
                     </th>
@@ -989,6 +1272,9 @@ ${attendanceStatus}
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       WhatsApp
                     </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      SMS
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1012,6 +1298,15 @@ ${attendanceStatus}
                       
                       return (
                         <tr key={record.student_id || index} className={rowColorClass}>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedStudents.has(record.student_id)}
+                              onChange={() => handleSelectStudent(record.student_id)}
+                              disabled={!record.phone_number}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
+                            />
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {record.class_name || 'غير محدد'}
                           </td>
@@ -1182,6 +1477,20 @@ ${attendanceStatus}
                               <MessageCircle className="h-4 w-4" />
                             </button>
                           </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <button
+                              onClick={() => handleIndividualSmsSend(record)}
+                              disabled={sendingSmsToStudent.has(record.student_id) || !record.phone_number}
+                              className="inline-flex items-center justify-center w-8 h-8 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                              title={!record.phone_number ? "رقم الهاتف غير متوفر" : "إرسال تقرير الحضور عبر SMS"}
+                            >
+                              {sendingSmsToStudent.has(record.student_id) ? (
+                                <LoadingSpinner size="sm" />
+                              ) : (
+                                <Smartphone className="h-4 w-4" />
+                              )}
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -1323,6 +1632,184 @@ ${attendanceStatus}
                 <>
                   <MessageCircle className="h-5 w-5 mr-2" />
                   إرسال التقارير المجمعة
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Bulk SMS Modal */}
+      <Modal
+        isOpen={showBulkSmsModal}
+        onClose={() => {
+          setShowBulkSmsModal(false);
+          setSmsResults(null);
+        }}
+        title="إرسال تقارير يومية مجمعة عبر SMS"
+        size="lg"
+      >
+        <div className="space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <Smartphone className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-2">تعليمات الاستخدام:</p>
+                <ul className="space-y-1 list-disc list-inside">
+                  <li>سيتم إرسال الرسائل عبر خدمة iBulk SMS من Omantel</li>
+                  <li>تأكد من تكوين إعدادات SMS للمدرسة مسبقاً</li>
+                  <li>تأكد من وجود رصيد كافي في حساب SMS</li>
+                  <li>الرسائل ستُرسل للطلاب الذين لديهم مشاكل في الحضور فقط</li>
+                  <li>يشمل النظام الهارب والغائب والمتأخر</li>
+                  <li>سيتم إرسال الرسائل مع توقف قصير بين كل رسالة</li>
+                  <li>الرسائل باللغة العربية ومخصصة لكل طالب</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <Calendar className="h-5 w-5 text-yellow-600 mt-0.5" />
+              <div className="text-sm text-yellow-800">
+                <p className="font-medium mb-1">سيتم إرسال الإشعارات للطلاب المتغيبين في:</p>
+                <p className="font-bold">{formatDate(selectedDate, 'dd/MM/yyyy', 'ar')}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">تنسيق الرسالة الافتراضي:</h4>
+            <div className="text-sm text-gray-900 whitespace-pre-line bg-white p-3 rounded border">
+تقرير الحضور اليومي
+
+المدرسة: [اسم المدرسة]
+الطالب/ة: [اسم الطالب]
+الصف: [اسم الصف]
+التاريخ: [التاريخ]
+
+حالة الحضور:
+هارب في الحصص: 1, 3
+متأخر في الحصص: 2
+غائب في الحصص: 4
+
+حالة العذر: لديه عذر / لا يوجد عذر
+
+---
+تم إرسال هذا التقرير من نظام إدارة الحضور
+            </div>
+          </div>
+
+          {/* SMS Results */}
+          {smsResults && (
+            <div className="border-t pt-6">
+              <h4 className="text-lg font-semibold text-gray-900 mb-4">نتائج الإرسال</h4>
+              
+              {/* Summary */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-blue-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-600">{smsResults.total}</div>
+                  <div className="text-sm text-blue-800">إجمالي الرسائل</div>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-green-600">{smsResults.success}</div>
+                  <div className="text-sm text-green-800">تم الإرسال</div>
+                </div>
+                <div className="bg-red-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-red-600">{smsResults.failed}</div>
+                  <div className="text-sm text-red-800">فشل الإرسال</div>
+                </div>
+              </div>
+
+              {/* Success Rate */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">معدل النجاح</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {smsResults.total > 0 ? Math.round((smsResults.success / smsResults.total) * 100) : 0}%
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                    style={{ 
+                      width: `${smsResults.total > 0 ? (smsResults.success / smsResults.total) * 100 : 0}%` 
+                    }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Failed Contacts */}
+              {smsResults.failed_contacts && smsResults.failed_contacts.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 space-x-reverse mb-3">
+                    <XCircle className="w-5 h-5 text-red-500" />
+                    <h5 className="font-medium text-red-800">الرسائل الفاشلة</h5>
+                  </div>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {smsResults.failed_contacts.map((contact, index) => (
+                      <div key={index} className="flex items-center justify-between text-sm">
+                        <div>
+                          <span className="font-medium text-gray-900">{contact.name}</span>
+                          <span className="text-gray-600 mr-2">({contact.phone})</span>
+                        </div>
+                        <span className="text-red-600 text-xs">{contact.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sent Messages */}
+              {smsResults.sent_messages && smsResults.sent_messages.length > 0 && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 space-x-reverse mb-3">
+                    <Send className="w-5 h-5 text-green-500" />
+                    <h5 className="font-medium text-green-800">الرسائل المرسلة</h5>
+                  </div>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {smsResults.sent_messages.map((message, index) => (
+                      <div key={index} className="flex items-center justify-between text-sm">
+                        <div>
+                          <span className="font-medium text-gray-900">{message.name}</span>
+                          <span className="text-gray-600 mr-2">({message.phone})</span>
+                        </div>
+                        <span className="text-green-600 text-xs">
+                          {message.timestamp ? new Date(message.timestamp).toLocaleTimeString('ar-SA') : 'تم الإرسال'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between space-x-3">
+            <button
+              onClick={() => {
+                setShowBulkSmsModal(false);
+                setSmsResults(null);
+              }}
+              className="btn btn-outline"
+              disabled={isSendingBulkSms}
+            >
+              إغلاق
+            </button>
+            <button
+              onClick={handleBulkSmsSend}
+              disabled={isSendingBulkSms}
+              className="btn btn-primary"
+            >
+              {isSendingBulkSms ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  <span className="mr-2">جاري الإرسال...</span>
+                </>
+              ) : (
+                <>
+                  <Smartphone className="h-5 w-5 mr-2" />
+                  إرسال التقارير عبر SMS
                 </>
               )}
             </button>
@@ -1478,7 +1965,14 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName, filters, 
                 
                 {/* Students */}
                 {students.length > 0 ? (
-                  students.map((record, index) => {
+                  students
+                    .sort((a, b) => {
+                      // Sort by Arabic student names alphabetically
+                      const nameA = (a.student_name || '').trim();
+                      const nameB = (b.student_name || '').trim();
+                      return nameA.localeCompare(nameB, 'ar', { sensitivity: 'base' });
+                    })
+                    .map((record, index) => {
                     const haribTimes = record.absent_times || record.absentTimes || record.absent_periods || [];
                     const hasExcuse = record.is_has_exuse || record.is_has_exuse || false;
                     

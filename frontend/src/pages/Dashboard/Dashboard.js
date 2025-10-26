@@ -544,7 +544,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                 </p>
                 {!bulkOpsStatus?.step_status?.step1_teachers?.completed && (
                   <button 
-                    onClick={() => navigate('/app/bulk-operations')}
+                    onClick={() => navigate('/app/bulk-operations?tab=teachers')} 
                     className="btn btn-sm btn-primary w-full"
                   >
                     <UserCheck className="h-4 w-4 mr-1 ml-1" />
@@ -579,7 +579,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                 </p>
                 {!bulkOpsStatus?.step_status?.step2_students_classes?.completed && (
                   <button 
-                    onClick={() => navigate('/app/bulk-operations')}
+                    onClick={() => navigate('/app/bulk-operations?tab=assign')}
                     className="btn btn-sm btn-primary w-full"
                   >
                     <Users className="h-4 w-4 mr-1 ml-1" />
@@ -614,7 +614,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                 </p>
                 {!bulkOpsStatus?.step_status?.step3_phone_numbers?.completed && (
                   <button 
-                    onClick={() => navigate('/app/bulk-operations')}
+                    onClick={() => navigate('/app/bulk-operations?tab=phones')}
                     className="btn btn-sm btn-primary w-full"
                   >
                     <Phone className="h-4 w-4 mr-1 ml-1" />
@@ -649,7 +649,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                 </p>
                 {!bulkOpsStatus?.step_status?.step4_subjects?.completed && (
                   <button 
-                    onClick={() => navigate('/app/classes')}
+                    onClick={() => navigate('/app/classes?tab=subjects')}
                     className="btn btn-sm btn-primary w-full"
                   >
                     <BookOpen className="h-4 w-4 mr-1 ml-1" />
@@ -718,6 +718,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
       )}
 
       {/* News Widget */}
+      
       <NewsWidget 
         limit={3} 
         onViewAll={() => navigate('/app/news')}

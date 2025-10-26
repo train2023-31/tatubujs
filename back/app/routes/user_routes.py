@@ -34,9 +34,9 @@ def get_users_of_my_school():
         teachers = Teacher.query.filter_by(school_id=school_id).all()
 
     elif user.user_role == 'admin':
-        # Admin can fetch all users from all schools
-        students = Student.query.all()
-        teachers = Teacher.query.all()
+        # Admin can fetch only school admin users
+        teachers = Teacher.query.filter_by(user_role='school_admin').all()
+        students = []
 
     else:
         # Users with insufficient permissions

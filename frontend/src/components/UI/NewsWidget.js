@@ -5,10 +5,12 @@ import { reportsAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import LoadingSpinner from './LoadingSpinner';
 import { formatDate } from '../../utils/helpers';
+import { useNavigate } from 'react-router-dom';
+
 
 const NewsWidget = ({ limit = 3, showHeader = true, onViewAll }) => {
   const { user } = useAuth();
-
+  const navigate = useNavigate();
   // Fetch news data
   const { data: news, isLoading: newsLoading } = useQuery(
     'news',
@@ -51,9 +53,11 @@ const NewsWidget = ({ limit = 3, showHeader = true, onViewAll }) => {
   if (newsLoading) {
     return (
       <div className="card">
+        
         {showHeader && (
           <div className="card-header">
             <h3 className="text-lg font-medium text-gray-900">الأخبار والإعلانات</h3>
+            
           </div>
         )}
         <div className="card-body">
@@ -70,9 +74,24 @@ const NewsWidget = ({ limit = 3, showHeader = true, onViewAll }) => {
     return (
       <div className="card">
         {showHeader && (
-          <div className="card-header">
+          <div className="card-header flex items-center justify-between">
             <h3 className="text-lg font-medium text-gray-900">الأخبار والإعلانات</h3>
+            <button
+              onClick={() => navigate('/app/news')}
+              className="btn btn-primary btn-sm "
+              // فقط للمديرين ومدراء المدارس
+              disabled={user?.role !== 'admin' && user?.role !== 'school_admin'}
+              title="عرض جميع الأخبار"
+            >
+              <span className="inline-flex items-center">
+                <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+                </svg>
+                عرض جميع الأخبار
+              </span>
+            </button>
           </div>
+          
         )}
         <div className="card-body">
           <div className="text-center py-8">

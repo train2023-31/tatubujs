@@ -58,12 +58,28 @@ export const authAPI = {
   getUserById: (userId) => api.get(`/auth/getUser/${userId}`).then(res => res.data),
   deleteSchoolData: (options) => api.delete('/auth/delete_school_data', { data: { delete_options: options } }),
   toggleSchoolStatus: (schoolId) => api.put(`/auth/toggle_school_status/${schoolId}`),
-  viewLogs: (page = 1, per_page = 50, days = 30) => 
-    api.get('/auth/view_logs', { 
-      params: { page, per_page, days } 
-    }).then(res => res.data),
+  viewLogs: (params = {}) => {
+    const { page = 1, per_page = 50, days = 30, school_id } = params;
+    const queryParams = { page, per_page, days };
+    if (school_id) {
+      queryParams.school_id = school_id;
+    }
+    return api.get('/auth/view_logs', { 
+      params: queryParams 
+    }).then(res => res.data);
+  },
   sendAbsenceNotifications: (data) => api.post('/auth/send-absence-notifications', data),
   getAbsenceStats: (params) => api.get('/auth/get-absence-stats', { params }).then(res => res.data),
+  
+  // SMS Configuration API
+  getSmsConfig: (schoolId) => api.get('/static/sms-config', { params: { school_id: schoolId } }).then(res => res.data),
+  updateSmsConfig: (data) => api.put('/static/sms-config', data).then(res => res.data),
+  testSmsConnection: (data) => api.post('/static/test-sms-connection', data).then(res => res.data),
+  
+  // SMS Operations API
+  sendDailySmsReports: (data) => api.post('/attendance/send-daily-sms-reports', data).then(res => res.data),
+  checkSmsBalance: (schoolId) => api.get('/attendance/check-sms-balance', { params: { school_id: schoolId } }).then(res => res.data),
+  sendTestSms: (data) => api.post('/attendance/send-test-sms', data).then(res => res.data),
 };
 
 // Users API
