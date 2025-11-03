@@ -26,11 +26,14 @@
     "xlsx": "^0.18.5"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "build:versioned": "npm run generate-version && react-scripts build",
+    "start": "react-app-rewired start",
+    "start:https": "node scripts/dev-server-https.js",
+    "dev": "node scripts/dev-server-https.js",
+    "build": "react-app-rewired build",
+    "build:versioned": "npm run generate-version && react-app-rewired build",
     "build:secure": "npm run build:versioned && npm run post-build && npm run secure-build",
     "generate-version": "node scripts/generate-version.js",
+    "generate-ssl": "node scripts/generate-ssl-cert.js",
     "deploy": "node scripts/deploy.js",
     "deploy:simple": "npm run build:versioned && npm run post-build",
     "deploy:secure": "npm run build:secure",
@@ -60,6 +63,8 @@
   "devDependencies": {
     "autoprefixer": "^10.4.14",
     "postcss": "^8.4.24",
+    "react-app-rewired": "^2.2.1",
+    "selfsigned": "^2.4.1",
     "tailwindcss": "^3.3.3"
   },
   "proxy": "http://localhost:5000"

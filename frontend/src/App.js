@@ -26,13 +26,34 @@ import VersionFeatures from './pages/VersionFeatures/VersionFeatures';
 import WhatsAppMessaging from './pages/WhatsAppMessaging/WhatsAppMessaging';
 import SmsConfiguration from './pages/SmsConfiguration/SmsConfiguration';
 import LoadingSpinner from './components/UI/LoadingSpinner';
+import cacheManager from './utils/cacheManager';
 
-// Create a client
+// Detect mobile device for mobile-friendly configuration
+const isMobileDevice = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  ) || window.innerWidth <= 768;
+};
+
+// Create a client with mobile-friendly defaults
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: isMobileDevice() ? 3 : 1, // Retry more on mobile (3 times) due to network instability
+      retryDelay: (attemptIndex) => {
+        // Exponential backoff: 1s, 2s, 4s on mobile, faster on desktop
+        const baseDelay = isMobileDevice() ? 1000 : 500;
+        return Math.min(baseDelay * Math.pow(2, attemptIndex), 8000);
+      },
       refetchOnWindowFocus: false,
+      refetchOnReconnect: true, // Refetch when connection restored (important for mobile)
+      staleTime: isMobileDevice() ? 30000 : 0, // Cache data longer on mobile (30s) to reduce requests
+      cacheTime: isMobileDevice() ? 5 * 60 * 1000 : 5 * 60 * 1000, // 5 minutes cache
+      refetchOnMount: true, // Always refetch on mount (ensures fresh data)
+    },
+    mutations: {
+      retry: isMobileDevice() ? 2 : 1, // Retry mutations more on mobile
+      retryDelay: isMobileDevice() ? 2000 : 1000,
     },
   },
 });
@@ -78,6 +99,79 @@ const PublicRoute = ({ children }) => {
 
   return children;
 };
+
+// Online/Offline detection for mobile networks
+const setupOnlineDetection = () => {
+  // Listen for online/offline events
+  window.addEventListener('online', async () => {
+    console.log('Connection restored - clearing cache and refreshing data...');
+    // Clear caches when connection restored (mobile browsers cache aggressively)
+    await cacheManager.clearQueryCache(queryClient);
+    // Invalidate all queries to refetch fresh data
+    queryClient.invalidateQueries();
+    console.log('✅ Data refreshed after connection restored');
+  });
+
+  window.addEventListener('offline', () => {
+    console.warn('Connection lost - app will retry when connection is restored');
+  });
+};
+
+// Mobile cache management: Clear cache if needed on load
+const initializeCacheManagement = async () => {
+  // Check if we should clear cache (new version, clearCache param, etc.)
+  if (cacheManager.shouldClearCache()) {
+    console.log('🔄 New version detected - clearing cache...');
+    // Don't fully clear on mobile (would cause reload loop), just clear query cache
+    cacheManager.clearQueryCache(queryClient);
+  }
+
+  // Store current version
+  const currentVersion = process.env.REACT_APP_VERSION || '1.0.2';
+  localStorage.setItem('app_version', currentVersion);
+
+  // Clear caches periodically on mobile (every 24 hours)
+  const lastCacheClear = localStorage.getItem('last_cache_clear');
+  const now = Date.now();
+  const oneDay = 24 * 60 * 60 * 1000;
+
+  if (!lastCacheClear || (now - parseInt(lastCacheClear)) > oneDay) {
+    if (cacheManager.isMobileDevice()) {
+      console.log('🔄 Periodic cache clear (mobile)');
+      // On mobile, only clear query cache to avoid reload issues
+      cacheManager.clearQueryCache(queryClient);
+      localStorage.setItem('last_cache_clear', now.toString());
+    }
+  }
+
+  // Expose cache clearing function globally for manual use
+  window.clearAppCache = async () => {
+    try {
+      // Store queryClient in window for cache manager to access
+      window.queryClient = queryClient;
+      
+      if (cacheManager.isMobileDevice()) {
+        // On mobile, show confirmation and then clear
+        const confirmed = window.confirm('هل تريد مسح ذاكرة التخزين المؤقت؟ سيتم إعادة تحميل الصفحة.');
+        if (confirmed) {
+          await cacheManager.clearCacheAndReload();
+        }
+      } else {
+        // Desktop: clear and reload
+        await cacheManager.clearCacheAndReload();
+      }
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+      alert('حدث خطأ أثناء مسح ذاكرة التخزين المؤقت. يرجى إعادة تحميل الصفحة يدوياً.');
+    }
+  };
+};
+
+// Initialize cache management
+initializeCacheManagement();
+
+// Initialize online detection
+setupOnlineDetection();
 
 function App() {
   return (

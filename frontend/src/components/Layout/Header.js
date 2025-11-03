@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, Bell, User, LogOut, Star } from 'lucide-react';
+import { Menu, Bell, User, LogOut, Star, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { getRoleDisplayName } from '../../utils/helpers';
+import toast from 'react-hot-toast';
 
 const Header = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
@@ -58,6 +59,48 @@ const Header = ({ onMenuClick }) => {
 
         {/* Left side - User menu */}
         <div className="flex items-center space-x-2 space-x-reverse">
+          {/* Cache clear button (mobile-friendly) */}
+          <button
+            onClick={async () => {
+              try {
+                toast.loading('جاري مسح ذاكرة التخزين المؤقت...', { id: 'cache-clear' });
+                
+                // Directly clear cache without confirmation (user clicked button intentionally)
+                const cacheManager = await import('../../utils/cacheManager');
+                
+                if (cacheManager.default?.isMobileDevice()) {
+                  // Mobile: Clear with cache busting URL
+                  const timestamp = Date.now();
+                  const currentUrl = new URL(window.location.href);
+                  currentUrl.searchParams.set('cb', timestamp.toString());
+                  currentUrl.searchParams.set('_', timestamp.toString());
+                  
+                  // Clear React Query cache first
+                  if (window.queryClient) {
+                    cacheManager.default.clearQueryCache(window.queryClient);
+                  }
+                  
+                  // Reload with cache busting (this will bypass all caches)
+                  window.location.replace(currentUrl.toString());
+                } else {
+                  // Desktop: Use full cache clearing
+                  if (window.queryClient) {
+                    cacheManager.default.clearQueryCache(window.queryClient);
+                  }
+                  await cacheManager.default.clearCacheAndReload();
+                }
+              } catch (error) {
+                console.error('Error clearing cache:', error);
+                toast.error('فشل مسح ذاكرة التخزين المؤقت', { id: 'cache-clear' });
+              }
+            }}
+            className="p-1.5 lg:p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-1.5 transition-colors duration-200"
+            title="مسح ذاكرة التخزين المؤقت وتحديث الصفحة"
+          > 
+            <RefreshCw className="h-4 w-4 lg:h-5 lg:w-5" />
+            <span className="text-xs lg:text-sm hidden sm:inline">تحديث</span>
+          </button>
+          
           <button
             onClick={() => navigate('/app/version-features')}
             className="p-1.5 lg:p-2 text-gray-400 hover:text-yellow-500 hover:bg-yellow-50 rounded-full focus:outline-none focus:ring-2 focus:ring-yellow-500 flex items-center gap-1.5 transition-colors duration-200"

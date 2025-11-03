@@ -1,11 +1,12 @@
 # app/__init__.py
 
-from flask import Flask ,send_from_directory
+from flask import Flask, send_from_directory, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 import os
+import re
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
@@ -15,27 +16,40 @@ migrate = Migrate()
 jwt = JWTManager()
 
 def create_app():
- 
+
     app = Flask(__name__ ,static_folder="../front/dist", template_folder="../front/dist")
     app.config.from_object('app.config.Config')
-    
-    # Configure CORS with specific origins for better security
-    CORS(app, 
-         supports_credentials=True,
-         origins=[
-             "http://localhost:8080",  # Vue dev server
-             "http://localhost:3000",  # Alternative dev port
-             "https://sultan00095.pythonanywhere.com",  # Your PythonAnywhere domain
-             "https://*.pythonanywhere.com",  # PythonAnywhere subdomains
-             "https://tatubu.com",  # Your production domain
-             "https://www.tatubu.com",  # Your production domain with www
-             "https://*.hostinger.com",  # Hostinger domains
-             "https://*.000webhostapp.com"  # Hostinger free hosting
-         ],
-         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "content_type"],
-         expose_headers=["Content-Type", "Authorization"]
-    )
+
+    # --- CORS Configuration ---
+    # Initialize CORS to handle OPTIONS requests and credentials globally.
+    # We will set the specific origin header manually in an after_request hook.
+    CORS(app, supports_credentials=True)
+
+    @app.after_request
+    def after_request_func(response):
+        origin = request.headers.get('Origin')
+        
+        allowed_origins_re = [
+            # This pattern now correctly matches the apex domain (e.g., https://tatubu.com)
+            # AND any subdomains (e.g., https://www.tatubu.com)
+            re.compile(r"^https://(.+\.)*tatubu\.com$"),
+            re.compile(r"^https://(.+\.)*pythonanywhere\.com$"),
+            re.compile(r"^https://(.+\.)*hostinger\.com$"),
+            re.compile(r"^https://(.+\.)*000webhostapp\.com$"),
+            re.compile(r"^https://(.+\.)*vercel\.app$"),
+            # Also match localhost for development
+            re.compile(r"^https?://localhost:?[0-9]*$"),
+        ]
+
+        if origin:
+            for regex in allowed_origins_re:
+                if regex.match(origin):
+                    response.headers['Access-Control-Allow-Origin'] = origin
+                    break
+        
+        return response
+
+
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
@@ -59,17 +73,32 @@ def create_app():
     app.register_blueprint(class_blueprint, url_prefix='/api/classes')
     app.register_blueprint(attendance_blueprint, url_prefix='/api/attendance')
     app.register_blueprint(user_blueprint, url_prefix='/api/users')  # Register under '/api/users'
-    app.register_blueprint(static_blueprint, url_prefix='/api/static')  
+    app.register_blueprint(static_blueprint, url_prefix='/api/static')
 
+
+    # --- Security Headers ---
     @app.after_request
     def add_security_headers(response):
-        """Add security headers to all responses."""
-        response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['X-Frame-Options'] = 'DENY'
-        response.headers['X-XSS-Protection'] = '1; mode=block'
-        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://sultan00095.pythonanywhere.com https://*.pythonanywhere.com;"
+        """Add security headers. CORS is handled by the Flask-CORS extension."""
+        response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        response.headers.setdefault('X-Frame-Options', 'DENY')
+        response.headers.setdefault('X-XSS-Protection', '1; mode=block')
+        response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+        response.headers.setdefault('Referrer-Policy', 'origin-when-cross-origin')
+        
+        # CSP is important but can be complex. Ensure it includes all necessary sources.
+        response.headers.setdefault(
+            'Content-Security-Policy',
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: blob: https://*; "
+            "connect-src 'self' https://api.tatubu.com https://*.tatubu.com "
+            "http://localhost:3000 http://localhost:5000;"
+        )
         return response
+
 
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
@@ -82,6 +111,12 @@ def create_app():
         else:
             return send_from_directory(app.static_folder, "index.html")
 
+
+    # --- Rate Limiting Defaults ---
+    @limiter.request_filter
+    def exempt_static_files():
+        """Exclude static assets from rate limiting."""
+        return request.path.startswith('/static/') or request.path.endswith(('.js', '.css', '.png', '.jpg', '.svg'))
 
 
     return app

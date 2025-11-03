@@ -25,7 +25,7 @@ const SmsConfiguration = ({ isOpen, onClose, schoolId }) => {
     ibulk_username: '',
     ibulk_password: '',
     ibulk_sender_id: '',
-    ibulk_api_url: 'https://ismartsms.net/api/send',
+    ibulk_api_url: 'https://ismartsms.net/RestApi/api/SMS/PostSMS',
     ibulk_balance_threshold: 10.0
   });
   const [testPhone, setTestPhone] = useState('');
@@ -328,7 +328,7 @@ const SmsConfiguration = ({ isOpen, onClose, schoolId }) => {
               value={smsConfig.ibulk_api_url}
               onChange={(e) => handleInputChange('ibulk_api_url', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="https://ismartsms.net/api/send"
+              placeholder="https://ismartsms.net/RestApi/api/SMS/PostSMS"
             />
           </div>
 

@@ -1,20 +1,67 @@
 import axios from 'axios';
 
-// Create axios instance
+// Detect if running on mobile device
+const isMobile = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  ) || window.innerWidth <= 768;
+};
+
+// Add cache-busting parameter for mobile requests
+const addCacheBuster = (url) => {
+  if (!url) return url;
+  
+  // Add timestamp to prevent mobile browser caching
+  try {
+    const urlObj = new URL(url, window.location.origin);
+    // Add or update cache buster parameter
+    urlObj.searchParams.set('_cb', Date.now().toString());
+    return urlObj.pathname + urlObj.search + urlObj.hash;
+  } catch (error) {
+    // Fallback for relative URLs
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}_cb=${Date.now()}`;
+  }
+};
+
+// Create axios instance with mobile-friendly configuration
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://sultan00095.pythonanywhere.com/api',
+  baseURL: process.env.REACT_APP_API_URL || 'https://api.tatubu.com/api',
+  credentials: 'include', // Allow cookies to be sent
+  timeout: isMobile() ? 60000 : 30000, // 60s on mobile, 30s on desktop (mobile networks are slower)
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor to add auth token
+// Request interceptor to add auth token and cache busting for mobile
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Ensure proper headers for mobile browsers (helps with CORS)
+    config.headers['Content-Type'] = config.headers['Content-Type'] || 'application/json';
+    config.headers['Accept'] = 'application/json';
+    
+    // Mobile browsers need explicit origin handling
+    if (isMobile()) {
+      // Don't set Origin header manually (browser handles it), but ensure credentials are sent
+      config.withCredentials = true;
+      
+      // Add cache-busting for mobile browsers (they cache aggressively)
+      // Only for GET requests (POST/PUT/DELETE don't get cached)
+      if (config.method?.toLowerCase() === 'get') {
+        config.url = addCacheBuster(config.url);
+        // Prevent caching on mobile
+        config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+        config.headers['Pragma'] = 'no-cache';
+        config.headers['Expires'] = '0';
+      }
+    }
+    
     return config;
   },
   (error) => {
@@ -22,10 +69,33 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle auth errors
+// Response interceptor to handle auth errors and network issues
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Handle network errors (common on mobile)
+    if (!error.response) {
+      // Network error (no internet, timeout, etc.)
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        console.warn('Request timeout - this may be due to slow mobile network');
+        // Retry once for timeout errors
+        if (!originalRequest._retry && originalRequest.method !== 'post') {
+          originalRequest._retry = true;
+          // Increase timeout for retry on mobile
+          originalRequest.timeout = isMobile() ? 90000 : 45000;
+          return api(originalRequest);
+        }
+      }
+      
+      // If it's a network error (offline), return a more user-friendly error
+      if (error.message === 'Network Error') {
+        error.message = 'خطأ في الاتصال بالشبكة. يرجى التحقق من اتصال الإنترنت الخاص بك.';
+      }
+    }
+
+    // Handle HTTP errors
     if (error.response?.status === 401) {
       // Don't redirect if we're already on login page or if it's a login request
       const isLoginRequest = error.config?.url?.includes('/auth/login');
@@ -36,6 +106,22 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
     }
+
+    // Retry on 500 errors (server errors - might be temporary on mobile)
+    if (error.response?.status === 500 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      // Wait 2 seconds before retry (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return api(originalRequest);
+    }
+
+    // Retry on 503 errors (service unavailable - common on mobile networks)
+    if (error.response?.status === 503 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      return api(originalRequest);
+    }
+
     return Promise.reject(error);
   }
 );

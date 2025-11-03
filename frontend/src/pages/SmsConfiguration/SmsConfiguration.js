@@ -13,7 +13,10 @@ import {
   CheckCircle,
   XCircle,
   RefreshCw,
-  MessageSquare
+  MessageSquare,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { authAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
@@ -36,7 +39,7 @@ const SmsConfiguration = () => {
     ibulk_username: '',
     ibulk_password: '',
     ibulk_sender_id: '',
-    ibulk_api_url: 'https://ismartsms.net/api/send',
+    ibulk_api_url: 'https://ismartsms.net/RestApi/api/SMS/PostSMS',
     ibulk_balance_threshold: 10.0
   });
   
@@ -48,6 +51,7 @@ const SmsConfiguration = () => {
   const [isSendingTestSms, setIsSendingTestSms] = useState(false);
   const [testResults, setTestResults] = useState(null);
   const [balanceInfo, setBalanceInfo] = useState(null);
+  const [isInstructionsExpanded, setIsInstructionsExpanded] = useState(false);
   const [testSmsData, setTestSmsData] = useState({
     phone_number: '',
     message: 'هذه رسالة تجريبية من نظام إدارة الحضور'
@@ -71,7 +75,7 @@ const SmsConfiguration = () => {
           ibulk_username: smsConfigData.ibulk_username || '',
           ibulk_password: smsConfigData.ibulk_password || '',
           ibulk_sender_id: smsConfigData.ibulk_sender_id || '',
-          ibulk_api_url: smsConfigData.ibulk_api_url || 'https://ismartsms.net/api/send',
+          ibulk_api_url: smsConfigData.ibulk_api_url || 'https://ismartsms.net/RestApi/api/SMS/PostSMS',
           ibulk_balance_threshold: smsConfigData.ibulk_balance_threshold || 10.0
         });
         
@@ -361,6 +365,78 @@ const SmsConfiguration = () => {
         </div>
       </div>
 
+      {/* Instructions - Collapsible at the top */}
+      <div className="card">
+        <div 
+          className="card-header cursor-pointer hover:bg-gray-50 transition-colors"
+          onClick={() => setIsInstructionsExpanded(!isInstructionsExpanded)}
+        >
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center space-x-3">
+              <AlertCircle className="h-6 w-6 text-yellow-600" />
+              <h3 className="text-lg font-semibold text-gray-900">تعليمات مهمة</h3>
+            </div>
+            <button
+              type="button"
+              className="p-1 hover:bg-gray-200 rounded transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsInstructionsExpanded(!isInstructionsExpanded);
+              }}
+            >
+              {isInstructionsExpanded ? (
+                <ChevronUp className="h-5 w-5 text-gray-600" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-gray-600" />
+              )}
+            </button>
+          </div>
+        </div>
+        {isInstructionsExpanded && (
+          <div className="card-body">
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-800 mb-2">خطوات التكوين:</h4>
+                <ol className="list-decimal list-inside space-y-1 text-sm text-blue-700">
+                  <li>قم بالتسجيل في خدمة iBulk SMS من موقع ismartsms.net التابع لـ  Omantel</li>
+                  <li>احصل على بيانات الاعتماد (اسم المستخدم وكلمة المرور)</li>
+                  <li>أدخل معرف المرسل المخصص لك (حد أقصى 11 حرف)</li>
+                  <li>تأكد من صحة رابط API</li>
+                  <li>اضبط حد الرصيد الأدنى للتنبيهات</li>
+                  <li>اضغط على "اختبار الاتصال" للتأكد من صحة الإعدادات</li>
+                  <li>احفظ الإعدادات بعد التأكد من نجاح الاختبار</li>
+                </ol>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h4 className="font-medium text-yellow-800 mb-2">ملاحظات مهمة:</h4>
+                <ul className="list-disc list-inside space-y-1 text-sm text-yellow-700">
+                  <li>تأكد من وجود رصيد كافي في حساب iBulk SMS</li>
+                  <li>معرف المرسل يجب أن يكون معتمداً من قبل مزود الخدمة</li>
+                  <li>سيتم إرسال تنبيهات عند انخفاض الرصيد عن الحد المحدد</li>
+                  <li>يمكن اختبار الاتصال في أي وقت للتأكد من صحة الإعدادات</li>
+                </ul>
+              </div>
+
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 className="font-medium text-green-800 mb-2">مصادر إضافية:</h4>
+                <div className="text-sm text-green-700">
+                  <a 
+                    href="https://ismartsms.net/ibulk.html" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center space-x-2 space-x-reverse text-green-800 hover:text-green-900 underline font-medium"
+                  >
+                    <span>للمزيد من المعلومات حول خدمة iBulk SMS من Omantel</span>
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* SMS Status Card */}
       <div className="card">
         <div className="card-header">
@@ -483,7 +559,7 @@ const SmsConfiguration = () => {
                 value={config.ibulk_api_url}
                 onChange={(e) => handleInputChange('ibulk_api_url', e.target.value)}
                 className="input w-full"
-                placeholder="https://ismartsms.net/api/send"
+                placeholder="https://ismartsms.net/RestApi/api/SMS/PostSMS"
               />
             </div>
 
@@ -497,10 +573,10 @@ const SmsConfiguration = () => {
                   type="number"
                   value={config.ibulk_balance_threshold}
                   onChange={(e) => handleInputChange('ibulk_balance_threshold', parseFloat(e.target.value) || 0)}
-                  className="input w-full pl-8"
-                  placeholder="10.0"
+                  className="input w-full pl-8 text-left"
+                  placeholder="10"
                   min="0"
-                  step="0.1"
+                  step="1"
                 />
                 <DollarSign className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               </div>
@@ -643,42 +719,6 @@ const SmsConfiguration = () => {
                   </>
                 )}
               </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Instructions */}
-      <div className="card">
-        <div className="card-header">
-          <div className="flex items-center space-x-3">
-            <AlertCircle className="h-6 w-6 text-yellow-600" />
-            <h3 className="text-lg font-semibold text-gray-900">تعليمات مهمة</h3>
-          </div>
-        </div>
-        <div className="card-body">
-          <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="font-medium text-blue-800 mb-2">خطوات التكوين:</h4>
-              <ol className="list-decimal list-inside space-y-1 text-sm text-blue-700">
-                <li>قم بالتسجيل في خدمة iBulk SMS من موقع ismartsms.net</li>
-                <li>احصل على بيانات الاعتماد (اسم المستخدم وكلمة المرور)</li>
-                <li>أدخل معرف المرسل المخصص لك (حد أقصى 11 حرف)</li>
-                <li>تأكد من صحة رابط API</li>
-                <li>اضبط حد الرصيد الأدنى للتنبيهات</li>
-                <li>اضغط على "اختبار الاتصال" للتأكد من صحة الإعدادات</li>
-                <li>احفظ الإعدادات بعد التأكد من نجاح الاختبار</li>
-              </ol>
-            </div>
-
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <h4 className="font-medium text-yellow-800 mb-2">ملاحظات مهمة:</h4>
-              <ul className="list-disc list-inside space-y-1 text-sm text-yellow-700">
-                <li>تأكد من وجود رصيد كافي في حساب iBulk SMS</li>
-                <li>معرف المرسل يجب أن يكون معتمداً من قبل مزود الخدمة</li>
-                <li>سيتم إرسال تنبيهات عند انخفاض الرصيد عن الحد المحدد</li>
-                <li>يمكن اختبار الاتصال في أي وقت للتأكد من صحة الإعدادات</li>
-              </ul>
             </div>
           </div>
         </div>

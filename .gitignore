@@ -16,6 +16,16 @@ dist/
 .env.test.local
 .env.production.local
 
+# SSL certificates (local development only)
+localhost.crt
+localhost.key
+localhost.csr
+localhost.pfx
+*.crt
+*.key
+*.csr
+*.pfx
+
 # Python
 __pycache__/
 *.py[cod]

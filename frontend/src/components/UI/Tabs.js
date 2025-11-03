@@ -5,16 +5,16 @@ const Tabs = ({
   selectedTab, 
   onTabChange, 
   className = '',
-  variant = 'default' // 'default', 'pills', 'underline', 'modern'
+  variant = 'pills' // 'default', 'pills', 'underline', 'modern'
 }) => {
   const getTabStyles = (isActive) => {
-    const baseStyles = "relative px-4 py-2 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2";
+    const baseStyles = "relative px-4 py-2 text-sm font-medium transition-all duration-200 ";
     
     switch (variant) {
       case 'pills':
         return `${baseStyles} rounded-full ${
           isActive 
-            ? 'bg-primary-500 text-white shadow-md' 
+            ? 'border-primary-500 text-white shadow-md' 
             : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
         }`;
       
@@ -82,7 +82,7 @@ const Tabs = ({
               
               {/* Modern variant active indicator */}
               {variant === 'modern' && isActive && (
-                <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-primary-500 to-primary-600 opacity-10"></div>
+                <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-primary-500 to-primary-600 opacity-10 "></div>
               )}
             </button>
           );

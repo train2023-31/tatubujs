@@ -72,6 +72,11 @@ const Users = () => {
     usersAPI.getMySchoolUsers,
     {
       enabled: !!user,
+      retry: 3, // Retry more on mobile networks
+      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 8000),
+      staleTime: 30000, // Cache for 30 seconds to reduce mobile network usage
+      refetchOnMount: true, // Always fetch fresh data
+      refetchOnReconnect: true, // Refetch when connection restored
     }
   );
 

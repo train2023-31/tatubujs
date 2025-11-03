@@ -12,20 +12,21 @@ const indexPath = path.join(buildPath, 'index.html');
 if (fs.existsSync(indexPath)) {
   let indexContent = fs.readFileSync(indexPath, 'utf8');
   
-  // Add version meta tags
+  // Add version meta tags with aggressive cache control
   const versionMetaTags = `
     <meta name="build-version" content="${version.version}" />
     <meta name="build-time" content="${version.buildTime}" />
     <meta name="build-timestamp" content="${version.buildTimestamp}" />
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0, proxy-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />`;
+    <meta http-equiv="Expires" content="0" />
+    <meta http-equiv="Last-Modified" content="${version.buildTime}" />`;
   
   // Insert after <head> tag
   indexContent = indexContent.replace('<head>', `<head>${versionMetaTags}`);
   
   fs.writeFileSync(indexPath, indexContent);
-  console.log('✅ Updated index.html with version meta tags');
+  console.log('✅ Updated index.html with version meta tags and cache-busting headers');
 }
 
 // Copy version.json to build directory

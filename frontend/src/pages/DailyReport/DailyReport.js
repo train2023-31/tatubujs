@@ -881,14 +881,14 @@ ${attendanceStatus}
             معاينة التقرير
           </button>
           
-          <button
+          {/* <button
             onClick={() => setShowBulkSmsModal(true)}
             disabled={isLoading}
             className="btn btn-primary mr-2"
           >
             <Smartphone className="h-5 w-5 ml-2" />
             إرسال تقارير SMS
-          </button>
+          </button> */}
           
           <button
             onClick={handleSendBulkSelectedSms}

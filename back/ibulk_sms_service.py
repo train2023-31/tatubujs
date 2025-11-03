@@ -51,7 +51,7 @@ class IBulkSMSService:
                 return False
             
             # SMS is always enabled - no need to check ibulk_sms_enabled
-            self.api_url = self.school.ibulk_api_url or 'https://ismartsms.net/api/send'
+            self.api_url = self.school.ibulk_api_url or 'https://ismartsms.net/RestApi/api/SMS/PostSMS'
             self.username = self.school.ibulk_username
             self.password = self.school.ibulk_password
             self.sender_id = self.school.ibulk_sender_id
@@ -82,45 +82,173 @@ class IBulkSMSService:
                     'balance': 0.0
                 }
             
-            # iBulk SMS balance check endpoint
-            balance_url = 'https://ismartsms.net/api/balance'
+            # Generate possible balance URLs based on API URL pattern
+            possible_balance_urls = []
             
-            payload = {
-                'username': self.username,
-                'password': self.password
-            }
+            if self.api_url:
+                # Pattern 1: RestApi pattern (https://ismartsms.net/RestApi/api/SMS/PostSMS)
+                if '/RestApi/' in self.api_url and '/SMS/' in self.api_url:
+                    base_url = self.api_url.rsplit('/SMS/', 1)[0] + '/SMS'
+                    # Try different balance endpoint patterns
+                    possible_balance_urls.extend([
+                        f"{base_url}/GetBalance",
+                        f"{base_url}/Balance",
+                        f"{base_url}/CheckBalance",
+                        f"{base_url}/GetAccountBalance",
+                        f"{base_url}/AccountBalance",
+                        f"{base_url}/PostBalance",  # Some APIs use Post for balance too
+                        # Try using the same PostSMS endpoint with balance query parameter
+                        f"{self.api_url}?action=balance",
+                        f"{self.api_url}?type=balance"
+                    ])
+                # Pattern 2: Standard API pattern
+                elif '/PostSMS' in self.api_url:
+                    base_url = self.api_url.replace('/PostSMS', '')
+                    possible_balance_urls.extend([
+                        f"{base_url}/GetBalance",
+                        f"{base_url}/Balance",
+                        f"{base_url}/CheckBalance"
+                    ])
+                # Pattern 3: /send pattern
+                elif '/send' in self.api_url:
+                    base_url = self.api_url.replace('/send', '').replace('/api/send', '/api')
+                    possible_balance_urls.extend([
+                        f"{base_url}/balance",
+                        f"{base_url}/Balance",
+                        f"{base_url}/checkbalance"
+                    ])
             
-            response = requests.post(balance_url, data=payload, timeout=30)
+            # Add default URLs
+            possible_balance_urls.extend([
+                'https://ismartsms.net/RestApi/api/SMS/GetBalance',
+                'https://ismartsms.net/RestApi/api/SMS/Balance',
+                'https://ismartsms.net/api/balance',
+                'https://ismartsms.net/api/checkbalance'
+            ])
             
-            if response.status_code == 200:
-                try:
-                    balance_data = response.json()
-                    balance = float(balance_data.get('balance', 0.0))
-                    
-                    # Update school balance in database
-                    if self.school:
-                        self.school.ibulk_current_balance = balance
-                        self.school.ibulk_last_balance_check = get_oman_time().utcnow()
-                        db.session.commit()
-                    
-                    return {
-                        'success': True,
-                        'message': 'Balance retrieved successfully',
-                        'balance': balance,
-                        'currency': 'OMR'
-                    }
-                except json.JSONDecodeError:
-                    return {
-                        'success': False,
-                        'message': 'Invalid response format from SMS service',
-                        'balance': 0.0
-                    }
+            # Remove duplicates
+            seen = set()
+            possible_balance_urls = [url for url in possible_balance_urls if url not in seen and not seen.add(url)]
+            
+            # Prepare payload variants based on API documentation
+            # The API uses JSON with UserID/Password (not username/password)
+            payload_variants = [
+                {'UserID': self.username, 'Password': self.password},
+                {'UserName': self.username, 'Password': self.password},
+                {'username': self.username, 'password': self.password},
+            ]
+            
+            # Try each URL and payload combination
+            last_error = None
+            response = None
+            
+            for balance_url in possible_balance_urls:
+                for payload in payload_variants:
+                    try:
+                        logger.info(f"Trying balance check: {balance_url} with params: {list(payload.keys())}")
+                        # API uses JSON, not form-data
+                        response = requests.post(
+                            balance_url, 
+                            json=payload,  # Use json= instead of data=
+                            headers={'Content-Type': 'application/json'},
+                            timeout=30
+                        )
+                        logger.info(f"Response: {response.status_code}, body: {response.text[:200]}")
+                        
+                        if response.status_code in [200, 201]:
+                            try:
+                                response_data = response.json()
+                                
+                                # Check for error code in response
+                                # Note: API uses Code 1 for success (Message Pushed), Code 0 might also be success
+                                if 'Code' in response_data:
+                                    code = response_data.get('Code')
+                                    # Code 1 = success, Code 0 = success (some APIs), other codes = error
+                                    if code in [0, 1]:
+                                        # Success! Extract balance
+                                        balance = 0.0
+                                        
+                                        # Try different balance field names
+                                        if 'Balance' in response_data:
+                                            balance = float(response_data.get('Balance', 0.0))
+                                        elif 'balance' in response_data:
+                                            balance = float(response_data.get('balance', 0.0))
+                                        elif 'Data' in response_data and isinstance(response_data['Data'], dict):
+                                            if 'Balance' in response_data['Data']:
+                                                balance = float(response_data['Data'].get('Balance', 0.0))
+                                        
+                                        if balance > 0 or 'Balance' in str(response_data):
+                                            # Update school balance
+                                            if self.school:
+                                                self.school.ibulk_current_balance = balance
+                                                self.school.ibulk_last_balance_check = get_oman_time().utcnow()
+                                                db.session.commit()
+                                            
+                                            logger.info(f"Balance retrieved successfully: {balance} OMR")
+                                            return {
+                                                'success': True,
+                                                'message': 'Balance retrieved successfully',
+                                                'balance': balance,
+                                                'currency': 'OMR'
+                                            }
+                                    else:
+                                        # Non-zero code means error - map to human-readable message
+                                        error_msg = self._get_error_message(code, response_data.get('Message', 'Unknown error'))
+                                        last_error = f"Code {code}: {error_msg}"
+                                        logger.warning(f"Balance check returned error code {code}: {error_msg}")
+                                        # Continue to try next URL/payload
+                                        continue
+                                else:
+                                    # No Code field, try to extract balance directly
+                                    if 'Balance' in response_data:
+                                        balance = float(response_data.get('Balance', 0.0))
+                                        if self.school:
+                                            self.school.ibulk_current_balance = balance
+                                            self.school.ibulk_last_balance_check = get_oman_time().utcnow()
+                                            db.session.commit()
+                                        return {
+                                            'success': True,
+                                            'message': 'Balance retrieved successfully',
+                                            'balance': balance,
+                                            'currency': 'OMR'
+                                        }
+                            except json.JSONDecodeError:
+                                logger.warning(f"Invalid JSON response from {balance_url}")
+                                continue
+                        elif response.status_code != 404:
+                            # Non-404 error, might be auth issue - don't try other payloads for this URL
+                            try:
+                                error_data = response.json()
+                                if 'Code' in error_data:
+                                    code = error_data.get('Code')
+                                    error_msg = self._get_error_message(code, error_data.get('Message', 'Unknown'))
+                                    last_error = f"Code {code}: {error_msg}"
+                                else:
+                                    last_error = f"HTTP {response.status_code}: {response.text[:100]}"
+                            except:
+                                last_error = f"HTTP {response.status_code}: {response.text[:100]}"
+                            break  # Try next URL
+                    except requests.RequestException as e:
+                        logger.warning(f"Connection error to {balance_url}: {str(e)}")
+                        continue
+            
+            # All attempts failed
+            if last_error:
+                # If we got Code 11, it likely means balance endpoint doesn't exist
+                if 'Code 11' in last_error:
+                    error_msg = f"Balance check failed: {last_error}. The balance endpoint may not be available in this API version. Please check with your SMS provider."
+                else:
+                    error_msg = f"SMS service error: {last_error}"
             else:
-                return {
-                    'success': False,
-                    'message': f'SMS service error: {response.status_code}',
-                    'balance': 0.0
-                }
+                error_msg = "SMS service error: Could not connect to balance endpoint"
+            
+            logger.error(f"Balance check failed after trying all endpoints: {error_msg}")
+            
+            return {
+                'success': False,
+                'message': error_msg,
+                'balance': 0.0
+            }
                 
         except requests.RequestException as e:
             logger.error(f"Error checking SMS balance: {str(e)}")
@@ -159,42 +287,73 @@ class IBulkSMSService:
             # Format phone number for Oman (+968)
             formatted_phone = self._format_phone_number(phone_number)
             
-            # Prepare SMS payload
+            # Prepare SMS payload according to API documentation
+            # API expects: UserID, Password, Message, Language, MobileNo (array), RecipientType
             payload = {
-                'username': self.username,
-                'password': self.password,
-                'to': formatted_phone,
-                'message': message,
-                'sender': self.sender_id or 'SCHOOL'
+                'UserID': self.username,
+                'Password': self.password,
+                'Message': message,
+                'Language': '64',  # Default language code (can be made configurable)
+                'MobileNo': [formatted_phone],  # Array of phone numbers
+                'RecipientType': '1',  # Default recipient type
+                'ScheddateTime': ''  # Empty for immediate send
             }
             
-            # Send SMS
-            response = requests.post(self.api_url, data=payload, timeout=30)
+            # Add sender ID if configured (some APIs might support it)
+            if self.sender_id:
+                payload['SenderID'] = self.sender_id
             
-            if response.status_code == 200:
+            # Send SMS using JSON format
+            response = requests.post(
+                self.api_url, 
+                json=payload,  # Use json= instead of data=
+                headers={'Content-Type': 'application/json', 'Cache-Control': 'no-cache'},
+                timeout=30
+            )
+            
+            # API returns 200/201 for successful requests, but checks Code field in response
+            if response.status_code in [200, 201]:
                 try:
                     result_data = response.json()
-                    message_id = result_data.get('message_id', 'unknown')
                     
-                    logger.info(f"SMS sent successfully to {formatted_phone}, Message ID: {message_id}")
+                    # Check Code field: Code 1 = success (Message Pushed), other codes = error
+                    code = result_data.get('Code', -1)
                     
-                    return {
-                        'success': True,
-                        'message': 'SMS sent successfully',
-                        'message_id': message_id,
-                        'phone': formatted_phone
-                    }
+                    if code == 1:
+                        # Success! Extract message ID if available
+                        message_id = result_data.get('MessageID', result_data.get('message_id', 'unknown'))
+                        message_text = result_data.get('Message', 'SMS sent successfully')
+                        
+                        logger.info(f"SMS sent successfully to {formatted_phone}, Code: {code}, Message: {message_text}")
+                        
+                        return {
+                            'success': True,
+                            'message': message_text or 'SMS sent successfully',
+                            'message_id': message_id,
+                            'phone': formatted_phone
+                        }
+                    else:
+                        # Error code in response - map to human-readable message
+                        error_message = self._get_error_message(code, result_data.get('Message', 'Unknown error'))
+                        logger.error(f"SMS send failed: Code {code} - {error_message}")
+                        
+                        return {
+                            'success': False,
+                            'message': f'SMS service error (Code {code}): {error_message}',
+                            'message_id': None
+                        }
                 except json.JSONDecodeError:
+                    logger.error(f"Invalid JSON response: {response.text[:200]}")
                     return {
                         'success': False,
                         'message': 'Invalid response format from SMS service',
                         'message_id': None
                     }
             else:
-                logger.error(f"SMS send failed: {response.status_code} - {response.text}")
+                logger.error(f"SMS send failed: HTTP {response.status_code} - {response.text[:200]}")
                 return {
                     'success': False,
-                    'message': f'SMS service error: {response.status_code}',
+                    'message': f'SMS service error: HTTP {response.status_code}',
                     'message_id': None
                 }
                 
@@ -293,6 +452,50 @@ class IBulkSMSService:
         
         logger.info(f"Bulk SMS completed. Success: {results['success']}, Failed: {results['failed']}")
         return results
+    
+    def _get_error_message(self, code: int, default_message: str = '') -> str:
+        """
+        Map error codes to human-readable messages based on API documentation
+        
+        Args:
+            code (int): Error code from API
+            default_message (str): Default message if code not found
+            
+        Returns:
+            str: Human-readable error message
+        """
+        error_messages = {
+            1: 'Message Pushed successfully',
+            2: 'Company Not Exists. Please check the company.',
+            3: 'User or Password is wrong',
+            4: 'Credit is Low',
+            5: 'Message is blank',
+            6: 'Message Length Exceeded',
+            7: 'Account is Inactive',
+            8: 'Mobile No length is empty',
+            9: 'Invalid Mobile No',
+            10: 'Invalid Language',
+            11: 'Unknown Error',
+            12: 'Account is Blocked by administrator, concurrent failure of login',
+            13: 'Account Expired',
+            14: 'Credit Expired',
+            15: 'Invalid Http request or Parameter fields are wrong',
+            16: 'Invalid date time parameter',
+            18: 'Web Service User not registered',
+            20: 'Client IP Address has been blocked',
+            21: 'Client IP is outside Oman, Outside Oman IP is not allowed to access web service',
+            22: 'Wrong Flash message parameter, Please pass "y" for flash sms',
+            23: 'Mobile Number Optout by the customer. SMS Not Sent.'
+        }
+        
+        # Return mapped message or default
+        message = error_messages.get(code, default_message or f'Unknown error (Code {code})')
+        
+        # For balance check, Code 11 often means endpoint doesn't exist
+        if code == 11:
+            return f'{message} - Balance endpoint may not exist or use different parameters'
+        
+        return message
     
     def _format_phone_number(self, phone: str) -> str:
         """

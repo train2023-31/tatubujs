@@ -50,14 +50,28 @@ const Attendance = () => {
   const { data: classes, isLoading: classesLoading } = useQuery(
     'classes',
     classesAPI.getMyClasses,
-    { enabled: !!user }
+    { 
+      enabled: !!user,
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 8000),
+      staleTime: 30000,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
+    }
   );
 
   // Fetch subjects
   const { data: subjects, isLoading: subjectsLoading } = useQuery(
     'subjects',
     classesAPI.getAllSubjects,
-    { enabled: !!user }
+    { 
+      enabled: !!user,
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 8000),
+      staleTime: 30000,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
+    }
   );
 
   // Fetch class students
@@ -66,6 +80,11 @@ const Attendance = () => {
     () => classesAPI.getClassStudents(selectedClass),
     { 
       enabled: !!selectedClass,
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 8000),
+      staleTime: 30000,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
       onSuccess: (data) => {
         // Initialize attendance records
         const initialRecords = data.map(student => ({
@@ -91,6 +110,11 @@ const Attendance = () => {
     }),
     { 
       enabled: !!selectedClass,
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 8000),
+      staleTime: 30000,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
       onSuccess: (data) => {
         // You can process the class attendance data here
       },
@@ -110,6 +134,11 @@ const Attendance = () => {
     }),
     { 
       enabled: !!selectedClass && !!selectedSubject,
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 8000),
+      staleTime: 30000,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
       onSuccess: (data) => {
         if (data.class_time_data && data.class_time_data[selectedTime]) {
           const existingRecords = data.class_time_data[selectedTime].attendance || [];
@@ -273,6 +302,26 @@ const Attendance = () => {
   };
 
   const classTimeOptions = getClassTimeOptions();
+
+  // Sort attendance records by student name in Arabic
+  const getSortedAttendanceRecords = () => {
+    if (!classStudents || attendanceRecords.length === 0) return attendanceRecords;
+    
+    return [...attendanceRecords].sort((a, b) => {
+      const studentA = classStudents.find(s => s.id === a.student_id);
+      const studentB = classStudents.find(s => s.id === b.student_id);
+      
+      if (!studentA || !studentB) return 0;
+      
+      // Sort by Arabic name using localeCompare with Arabic locale
+      return (studentA.fullName || '').localeCompare(studentB.fullName || '', 'ar', {
+        numeric: true,
+        sensitivity: 'base'
+      });
+    });
+  };
+
+  const sortedAttendanceRecords = getSortedAttendanceRecords();
 
   return (
     <div className="space-y-6">
@@ -639,7 +688,7 @@ const Attendance = () => {
                       </tr>
                     </thead>
                     <tbody className="table-body">
-                      {attendanceRecords.map((record, index) => {
+                      {sortedAttendanceRecords.map((record, index) => {
                         const student = classStudents.find(s => s.id === record.student_id);
                         const status = getAttendanceStatus(record);
                         const isUnmarked = !(record.is_present || record.is_Acsent || record.is_Excus || record.is_late);
@@ -776,7 +825,7 @@ const Attendance = () => {
                 {/* Mobile Card View */}
                 <div className="md:hidden">
                   <div className="space-y-2">
-                    {attendanceRecords.map((record, index) => {
+                    {sortedAttendanceRecords.map((record, index) => {
                       const student = classStudents.find(s => s.id === record.student_id);
                       const status = getAttendanceStatus(record);
                       const isUnmarked = !(record.is_present || record.is_Acsent || record.is_Excus || record.is_late);

@@ -96,7 +96,7 @@ class School(db.Model):
     ibulk_username = db.Column(db.String(100), nullable=True)
     ibulk_password = db.Column(db.String(255), nullable=True)
     ibulk_sender_id = db.Column(db.String(11), nullable=True)  # Max 11 characters alphanumeric
-    ibulk_api_url = db.Column(db.String(255), nullable=True, default='https://ismartsms.net/api/send')
+    ibulk_api_url = db.Column(db.String(255), nullable=True, default='https://ismartsms.net/RestApi/api/SMS/PostSMS')
     ibulk_balance_threshold = db.Column(db.Float, nullable=True, default=10.0)  # Minimum balance threshold
     ibulk_last_balance_check = db.Column(db.DateTime, nullable=True)
     ibulk_current_balance = db.Column(db.Float, nullable=True, default=0.0)

@@ -39,6 +39,7 @@ const addSecurityHeaders = (buildPath) => {
     <meta http-equiv="X-Frame-Options" content="DENY" />
     <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
     <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.tatubu.com https://*.tatubu.com https://sultan00095.pythonanywhere.com https://*.pythonanywhere.com https://*.hostinger.com https://*.000webhostapp.com http://localhost:5000 http://localhost:3000" />
     <meta name="robots" content="noindex, nofollow" />`;
     
     // Insert after <head> tag

@@ -29,25 +29,36 @@ RewriteEngine On
 
 # Cache control headers
 <IfModule mod_headers.c>
-    # HTML files - no cache
+    # HTML files - no cache (always fresh for security headers and CSP)
     <FilesMatch "\.(html|htm)$">
-        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Cache-Control "no-cache, no-store, must-revalidate, max-age=0"
         Header set Pragma "no-cache"
         Header set Expires "0"
+        Header unset ETag
+        Header set ETag ""
     </FilesMatch>
     
-    # Static assets - long cache
+    # Static assets - long cache with version hashes
     <FilesMatch "\.(css|js|png|jpg|jpeg|gif|svg|woff|woff2)$">
-        Header set Cache-Control "public, max-age=31536000"
+        Header set Cache-Control "public, max-age=31536000, immutable"
     </FilesMatch>
     
     # Version endpoint - no cache
     <FilesMatch "version\.json$">
-        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Cache-Control "no-cache, no-store, must-revalidate, max-age=0"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+    
+    # .htaccess and config files - never cache
+    <FilesMatch "^(\.htaccess|\.htaccess-permissive|web\.config)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate, max-age=0"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
     </FilesMatch>
 </IfModule>
 
-# Security headers
+# Security headers (always set, bypass cache)
 <IfModule mod_headers.c>
     # Prevent MIME type sniffing
     Header always set X-Content-Type-Options "nosniff"
@@ -58,11 +69,16 @@ RewriteEngine On
     # XSS Protection
     Header always set X-XSS-Protection "1; mode=block"
     
-    # Referrer Policy
-    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    # Referrer Policy - More permissive for mobile browsers
+    # Mobile browsers need referrer for proper API authentication
+    Header always set Referrer-Policy "origin-when-cross-origin"
     
-    # Content Security Policy (adjust as needed)
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://sultan00095.pythonanywhere.com https://*.pythonanywhere.com https://*.hostinger.com https://*.000webhostapp.com"
+    # Content Security Policy with cache-busting version
+    # Update the version number (v2) when CSP changes to force cache refresh
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.tatubu.com https://*.tatubu.com https://sultan00095.pythonanywhere.com https://*.pythonanywhere.com https://*.hostinger.com https://*.000webhostapp.com http://localhost:5000 http://localhost:3000"
+    
+    # Force immediate cache revalidation for security headers (never cache)
+    Header always set Cache-Control "no-cache, no-store, must-revalidate, max-age=0, proxy-revalidate"
     
     # Remove server signature
     Header unset Server
