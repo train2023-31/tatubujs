@@ -1626,94 +1626,208 @@ def send_daily_sms_reports():
     """
     Send daily attendance reports via SMS to students with attendance issues
     """
-    # Get authenticated user
-    user_id = get_jwt_identity()
-    user = User.query.get(user_id)
-
-    # Ensure only authorized roles can send SMS reports
-    if user.user_role not in ['admin', 'school_admin', 'teacher', 'data_analyst']:
-        return jsonify({
-            "message": {
-                "en": "Unauthorized access.",
-                "ar": "ليس لديك صلاحية الوصول."
-            },
-            "flag": 1
-        }), 403
-
-    # Parse request data
-    data = request.get_json()
-    
-    # Check if this is bulk selected students data (array format)
-    if isinstance(data, list) and len(data) > 0 and 'phone' in data[0]:
-        # Handle bulk selected students SMS
-        school_id = user.school_id
+    try:
+        # Get authenticated user
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
         
+        if not user:
+            return jsonify({
+                "message": {
+                    "en": "User not found.",
+                    "ar": "المستخدم غير موجود."
+                },
+                "flag": 1
+            }), 404
+
+        # Ensure only authorized roles can send SMS reports
+        if user.user_role not in ['admin', 'school_admin', 'teacher', 'data_analyst']:
+            return jsonify({
+                "message": {
+                    "en": "Unauthorized access.",
+                    "ar": "ليس لديك صلاحية الوصول."
+                },
+                "flag": 1
+            }), 403
+
+        # Parse request data
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                "message": {
+                    "en": "Request data is required.",
+                    "ar": "بيانات الطلب مطلوبة."
+                },
+                "flag": 2
+            }), 400
+        
+        # Check if this is bulk selected students data (array format)
+        if isinstance(data, list) and len(data) > 0 and 'phone' in data[0]:
+            # Handle bulk selected students SMS
+            school_id = user.school_id
+            
+            if not school_id:
+                return jsonify({
+                    "message": {
+                        "en": "School ID is required.",
+                        "ar": "معرف المدرسة مطلوب."
+                    },
+                    "flag": 2
+                }), 400
+            
+            try:
+                # Initialize SMS service
+                sms_service = get_ibulk_sms_service(school_id)
+                
+                # Check if SMS service is configured
+                if not sms_service.is_configured():
+                    return jsonify({
+                        "message": {
+                            "en": "SMS service is not configured. Please configure SMS settings first.",
+                            "ar": "خدمة SMS غير مُعدّة. يرجى إعداد إعدادات SMS أولاً."
+                        },
+                        "flag": 4
+                    }), 400
+                
+                # Send bulk SMS to selected students
+                results = sms_service.send_bulk_sms(data, '{message}')
+                
+                # Check if results indicate failure
+                if not results.get('success', False) and results.get('failed', 0) == results.get('total', 0):
+                    return jsonify({
+                        "message": {
+                            "en": f"Failed to send SMS messages. {results.get('message', 'All messages failed.')}",
+                            "ar": f"فشل في إرسال رسائل SMS. أولا تأكد من إعدادات SMS ثم أعد المحاولة {results.get('message', 'فشلت جميع الرسائل.')}"
+                        },
+                        "results": results,
+                        "flag": 4
+                    }), 500
+                
+                return jsonify({
+                    "message": {
+                        "en": results.get('message', 'Bulk SMS sent successfully'),
+                        "ar": results.get('message', 'تم إرسال الرسائل  بنجاح')
+                    },
+                    "results": results,
+                    "flag": 3
+                }), 200
+                
+            except ValueError as e:
+                # Handle validation errors
+                return jsonify({
+                    "message": {
+                        "en": f"Validation error: {str(e)}",
+                        "ar": f"خطأ في التحقق: {str(e)}"
+                    },
+                    "flag": 4
+                }), 400
+            except Exception as e:
+                # Log the error for debugging
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error sending bulk SMS: {str(e)}", exc_info=True)
+                
+                return jsonify({
+                    "message": {
+                        "en": f"Error sending bulk SMS: {str(e)}",
+                        "ar": f"خطأ في إرسال الرسائل المجمعة: {str(e)}"
+                    },
+                    "flag": 4
+                }), 500
+        
+        # Handle regular daily reports (object format)
+        date_str = data.get('date')
+        school_id = data.get('school_id', user.school_id)
+
+        # Validate school_id for admin users
+        if user.user_role == 'admin' and not school_id:
+            return jsonify({
+                "message": {
+                    "en": "School ID is required for admins.",
+                    "ar": "معرف المدرسة مطلوب للمسؤولين."
+                },
+                "flag": 2
+            }), 400
+
+        # Use today's date if not provided
+        if not date_str:
+            date_str = date.today().isoformat()
+
         try:
             # Initialize SMS service
-            sms_service = get_ibulk_sms_service(school_id)
+            sms_service = get_attendance_sms_service(school_id)
             
-            # Send bulk SMS to selected students
-            results = sms_service.send_bulk_sms(data, '{message}')
+            # Check if SMS service is configured
+            if not sms_service.sms_service.is_configured():
+                return jsonify({
+                    "message": {
+                        "en": "SMS service is not configured. Please configure SMS settings first.",
+                        "ar": "خدمة SMS غير مُعدّة. يرجى إعداد إعدادات SMS أولاً."
+                    },
+                    "flag": 4
+                }), 400
+            
+            # Send daily reports
+            results = sms_service.send_daily_attendance_reports(date_str)
+            
+            # Check if results indicate failure
+            if not results.get('success', False):
+                return jsonify({
+                    "message": {
+                        "en": f"Failed to send SMS reports. {results.get('message', 'Unknown error occurred.')}",
+                        "ar": f"فشل في إرسال التقارير. بعد تأكد من إعدادات SMS أعد المحاولة {results.get('message', 'حدث خطأ غير معروف.')}"
+                    },
+                    "results": results,
+                    "date": date_str,
+                    "school_id": school_id,
+                    "flag": 4
+                }), 500
             
             return jsonify({
                 "message": {
-                    "en": results.get('message', 'Bulk SMS sent successfully'),
-                    "ar": results.get('message', 'تم إرسال الرسائل المجمعة بنجاح')
+                    "en": results.get('message', 'SMS reports sent successfully'),
+                    "ar": results.get('message', 'تم إرسال التقارير بنجاح')
                 },
                 "results": results,
+                "date": date_str,
+                "school_id": school_id,
                 "flag": 3
             }), 200
-            
-        except Exception as e:
+
+        except ValueError as e:
+            # Handle validation errors
             return jsonify({
                 "message": {
-                    "en": f"Error sending bulk SMS: {str(e)}",
-                    "ar": f"خطأ في إرسال الرسائل المجمعة: {str(e)}"
+                    "en": f"Validation error: {str(e)}",
+                    "ar": f"خطأ في التحقق: {str(e)}"
+                },
+                "flag": 4
+            }), 400
+        except Exception as e:
+            # Log the error for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error sending SMS reports: {str(e)}", exc_info=True)
+            
+            return jsonify({
+                "message": {
+                    "en": f"Error sending SMS reports: {str(e)}",
+                    "ar": f"خطأ في إرسال التقارير: {str(e)}"
                 },
                 "flag": 4
             }), 500
-    
-    # Handle regular daily reports (object format)
-    date_str = data.get('date')
-    school_id = data.get('school_id', user.school_id)
-
-    # Validate school_id for admin users
-    if user.user_role == 'admin' and not school_id:
-        return jsonify({
-            "message": {
-                "en": "School ID is required for admins.",
-                "ar": "معرف المدرسة مطلوب للمسؤولين."
-            },
-            "flag": 2
-        }), 400
-
-    # Use today's date if not provided
-    if not date_str:
-        date_str = date.today().isoformat()
-
-    try:
-        # Initialize SMS service
-        sms_service = get_attendance_sms_service(school_id)
-        
-        # Send daily reports
-        results = sms_service.send_daily_attendance_reports(date_str)
-        
-        return jsonify({
-            "message": {
-                "en": results.get('message', 'SMS reports sent successfully'),
-                "ar": results.get('message', 'تم إرسال التقارير بنجاح')
-            },
-            "results": results,
-            "date": date_str,
-            "school_id": school_id,
-            "flag": 3
-        }), 200
-
+            
     except Exception as e:
+        # Catch any unexpected errors
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Unexpected error in send_daily_sms_reports: {str(e)}", exc_info=True)
+        
         return jsonify({
             "message": {
-                "en": f"Error sending SMS reports: {str(e)}",
-                "ar": f"خطأ في إرسال التقارير: {str(e)}"
+                "en": f"An unexpected error occurred: {str(e)}",
+                "ar": f"حدث خطأ غير متوقع: {str(e)}"
             },
             "flag": 4
         }), 500
@@ -1785,58 +1899,138 @@ def send_test_sms():
     """
     Send a test SMS message
     """
-    # Get authenticated user
-    user_id = get_jwt_identity()
-    user = User.query.get(user_id)
-
-    # Ensure only authorized roles can send test SMS
-    if user.user_role not in ['admin', 'school_admin']:
-        return jsonify({
-            "message": {
-                "en": "Unauthorized access.",
-                "ar": "ليس لديك صلاحية الوصول."
-            },
-            "flag": 1
-        }), 403
-
-    # Parse request data
-    data = request.get_json()
-    phone_number = data.get('phone_number')
-    message = data.get('message', 'رسالة تجريبية من نظام إدارة الحضور')
-    school_id = data.get('school_id', user.school_id)
-
-    if not phone_number:
-        return jsonify({
-            "message": {
-                "en": "Phone number is required.",
-                "ar": "رقم الهاتف مطلوب."
-            },
-            "flag": 2
-        }), 400
-
     try:
-        # Initialize SMS service
-        sms_service = get_ibulk_sms_service(school_id)
+        # Get authenticated user
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
         
-        # Send test SMS
-        result = sms_service.send_single_sms(phone_number, message)
-        
-        return jsonify({
-            "message": {
-                "en": result.get('message', 'Test SMS sent successfully'),
-                "ar": result.get('message', 'تم إرسال الرسالة التجريبية بنجاح')
-            },
-            "result": result,
-            "phone_number": phone_number,
-            "school_id": school_id,
-            "flag": 3
-        }), 200
+        if not user:
+            return jsonify({
+                "message": {
+                    "en": "User not found.",
+                    "ar": "المستخدم غير موجود."
+                },
+                "flag": 1
+            }), 404
 
+        # Ensure only authorized roles can send test SMS
+        if user.user_role not in ['admin', 'school_admin']:
+            return jsonify({
+                "message": {
+                    "en": "Unauthorized access.",
+                    "ar": "ليس لديك صلاحية الوصول."
+                },
+                "flag": 1
+            }), 403
+
+        # Parse request data
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                "message": {
+                    "en": "Request data is required.",
+                    "ar": "بيانات الطلب مطلوبة."
+                },
+                "flag": 2
+            }), 400
+        
+        phone_number = data.get('phone_number')
+        message = data.get('message', 'رسالة تجريبية من نظام إدارة الحضور')
+        school_id = data.get('school_id', user.school_id)
+
+        if not phone_number:
+            return jsonify({
+                "message": {
+                    "en": "Phone number is required.",
+                    "ar": "رقم الهاتف مطلوب."
+                },
+                "flag": 2
+            }), 400
+        
+        if not school_id:
+            return jsonify({
+                "message": {
+                    "en": "School ID is required.",
+                    "ar": "معرف المدرسة مطلوب."
+                },
+                "flag": 2
+            }), 400
+
+        try:
+            # Initialize SMS service
+            sms_service = get_ibulk_sms_service(school_id)
+            
+            # Check if SMS service is configured
+            if not sms_service.is_configured():
+                return jsonify({
+                    "message": {
+                        "en": "SMS service is not configured. Please configure SMS settings first.",
+                        "ar": "خدمة SMS غير مُعدّة. يرجى إعداد إعدادات SMS أولاً."
+                    },
+                    "flag": 4
+                }), 400
+            
+            # Send test SMS
+            result = sms_service.send_single_sms(phone_number, message)
+            
+            # Check if result indicates failure
+            if not result.get('success', False):
+                return jsonify({
+                    "message": {
+                        "en": f"Failed to send test SMS. {result.get('message', 'Unknown error occurred.')}",
+                        "ar": f"فشل في إرسال الرسالة التجريبية. بعد تأكد من إعدادات SMS أعد المحاولة {result.get('message', 'حدث خطأ غير معروف.')}"
+                    },
+                    "result": result,
+                    "phone_number": phone_number,
+                    "school_id": school_id,
+                    "flag": 4
+                }), 500
+            
+            return jsonify({
+                "message": {
+                    "en": result.get('message', 'Test SMS sent successfully'),
+                    "ar": result.get('message', 'تم إرسال الرسالة التجريبية بنجاح')
+                },
+                "result": result,
+                "phone_number": phone_number,
+                "school_id": school_id,
+                "flag": 3
+            }), 200
+
+        except ValueError as e:
+            # Handle validation errors
+            return jsonify({
+                "message": {
+                    "en": f"Validation error: {str(e)}",
+                    "ar": f"خطأ في التحقق: {str(e)}"
+                },
+                "flag": 4
+            }), 400
+        except Exception as e:
+            # Log the error for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error sending test SMS: {str(e)}", exc_info=True)
+            
+            return jsonify({
+                "message": {
+                    "en": f"Error sending test SMS: {str(e)}",
+                    "ar": f"خطأ في إرسال الرسالة التجريبية: {str(e)}"
+                },
+                "flag": 4
+            }), 500
+            
     except Exception as e:
+        # Catch any unexpected errors
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Unexpected error in send_test_sms: {str(e)}", exc_info=True)
+        
         return jsonify({
             "message": {
-                "en": f"Error sending test SMS: {str(e)}",
-                "ar": f"خطأ في إرسال الرسالة التجريبية: {str(e)}"
+                "en": f"An unexpected error occurred: {str(e)}",
+                "ar": f"حدث خطأ غير متوقع: {str(e)}"
             },
             "flag": 4
         }), 500

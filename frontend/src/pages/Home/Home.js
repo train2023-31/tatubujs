@@ -47,7 +47,8 @@ import {
   Share2,
   ExternalLink,
   Menu,
-  X
+  X,
+  Sparkles
 } from 'lucide-react';
 
 const Home = () => {
@@ -150,6 +151,22 @@ const Home = () => {
       description: "إرسال رسائل نصية فورية للآباء عند غياب أو تأخر أبنائهم",
       color: "purple",
       benefits: ["إشعارات فورية", "رسائل مخصصة", "تتبع الرسائل", "قوالب جاهزة"]
+    },
+    {
+      icon: MessageCircle,
+      title: "إرسال رسائل مخصصة",
+      description: "إرسال رسائل SMS مخصصة للطلاب مع إمكانية تعديل الرسالة لكل طالب",
+      color: "indigo",
+      benefits: ["رسائل مخصصة", "تعديل فردي", "معاينة قبل الإرسال", "تتبع الحالة"],
+      isNew: true
+    },
+    {
+      icon: FileText,
+      title: "سجل ملاحظات الطالب",
+      description: "عرض وتعديل ملاحظات السلوك مع سجل حضور شامل وقوالب جاهزة",
+      color: "teal",
+      benefits: ["ملاحظات السلوك", "سجل الحضور", "قوالب جاهزة", "تحميل CSV"],
+      isNew: true
     },
     {
       icon: Users,
@@ -273,7 +290,8 @@ const Home = () => {
       purple: 'bg-purple-500 text-white',
       orange: 'bg-orange-500 text-white',
       teal: 'bg-teal-500 text-white',
-      red: 'bg-red-500 text-white'
+      red: 'bg-red-500 text-white',
+      indigo: 'bg-indigo-500 text-white'
     };
     return colors[color] || colors.blue;
   };
@@ -587,14 +605,28 @@ const Home = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
             {features.map((feature, index) => (
-              <div key={index} className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30">
+              <div key={index} className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30 relative">
+                {/* New Feature Badge */}
+                {feature.isNew && (
+                  <div className="absolute top-0 left-0 right-0 w-full flex justify-end z-10">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-tl-md border-l-4 border-yellow-400 text-xs font-semibold bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-md animate-pulse">
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      جديد
+                    </span>
+                  </div>
+                )}
                 <div className="p-4 md:p-6 text-center">
                   <div className={`inline-flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-lg mb-3 md:mb-4 ${getColorClasses(feature.color)}`}>
                     <feature.icon className="h-5 w-5 md:h-6 md:w-6" />
                   </div>
-                  <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">
-                    {feature.title}
-                  </h3>
+                  <div className="flex items-center justify-center space-x-2 mb-2 md:mb-3">
+                    <h3 className="text-lg md:text-xl font-semibold text-gray-900">
+                      {feature.title}
+                    </h3>
+                    {feature.isNew && (
+                      <Sparkles className="h-3 w-3 text-yellow-500 flex-shrink-0" />
+                    )}
+                  </div>
                   <p className="text-sm md:text-base text-gray-600 mb-3 md:mb-4 leading-relaxed">
                     {feature.description}
                   </p>

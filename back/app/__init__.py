@@ -21,31 +21,84 @@ def create_app():
     app.config.from_object('app.config.Config')
 
     # --- CORS Configuration ---
-    # Initialize CORS to handle OPTIONS requests and credentials globally.
-    # We will set the specific origin header manually in an after_request hook.
-    CORS(app, supports_credentials=True)
+    # Define allowed origins explicitly (including all variations for mobile browsers)
+    allowed_origins_list = [
+        # Domain patterns (Flask-CORS supports regex patterns)
+        r"https://.*\.tatubu\.com",
+        r"https://.*\.pythonanywhere\.com",
+        r"https://.*\.hostinger\.com",
+        r"https://.*\.000webhostapp\.com",
+        r"https://.*\.vercel\.app",
+        # Localhost for development
+        r"https?://localhost(:\d+)?",
+        # IP address variations (mobile browsers may send with or without port)
+        r"https://38\.60\.243\.25:443",
+        r"https://38\.60\.243\.25",
+        r"http://38\.60\.243\.25:80",
+        r"http://38\.60\.243\.25",
+    ]
+    
+    # Initialize CORS with explicit origin patterns
+    CORS(app,
+         supports_credentials=True,
+         origins=allowed_origins_list,
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+         expose_headers=['Content-Type', 'Authorization'],
+         max_age=3600)
+    
+    # Helper function to check if origin is allowed (for manual fallback)
+    def cors_origin_check(origin):
+        """Check if origin is allowed, with special handling for mobile browsers"""
+        if not origin or origin == 'null':
+            return None
+        
+        # Normalize origin (remove trailing slash)
+        origin = origin.rstrip('/')
+        
+        # Check against allowed patterns
+        for pattern in allowed_origins_list:
+            if re.match(pattern, origin):
+                return origin
+        
+        return None
 
     @app.after_request
     def after_request_func(response):
+        """Additional CORS handling for mobile browsers that might not send Origin header"""
         origin = request.headers.get('Origin')
+        referer = request.headers.get('Referer')
         
-        allowed_origins_re = [
-            # This pattern now correctly matches the apex domain (e.g., https://tatubu.com)
-            # AND any subdomains (e.g., https://www.tatubu.com)
-            re.compile(r"^https://(.+\.)*tatubu\.com$"),
-            re.compile(r"^https://(.+\.)*pythonanywhere\.com$"),
-            re.compile(r"^https://(.+\.)*hostinger\.com$"),
-            re.compile(r"^https://(.+\.)*000webhostapp\.com$"),
-            re.compile(r"^https://(.+\.)*vercel\.app$"),
-            # Also match localhost for development
-            re.compile(r"^https?://localhost:?[0-9]*$"),
-        ]
-
+        # Debug logging (remove in production if needed)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"CORS Debug - Origin: {origin}, Referer: {referer}, Path: {request.path}")
+        
+        # Handle "null" origin
+        if origin == 'null':
+            origin = None
+        
+        # If no Origin header, try to extract from Referer (mobile browser fallback)
+        if not origin and referer:
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(referer)
+                origin = f"{parsed.scheme}://{parsed.netloc}"
+                logger.info(f"CORS Debug - Extracted origin from Referer: {origin}")
+            except Exception as e:
+                logger.warning(f"CORS Debug - Failed to parse Referer: {e}")
+        
+        # If we have an origin, check if it's allowed and set CORS headers
         if origin:
-            for regex in allowed_origins_re:
-                if regex.match(origin):
-                    response.headers['Access-Control-Allow-Origin'] = origin
-                    break
+            allowed_origin = cors_origin_check(origin)
+            if allowed_origin:
+                response.headers['Access-Control-Allow-Origin'] = allowed_origin
+                response.headers['Access-Control-Allow-Credentials'] = 'true'
+                logger.info(f"CORS Debug - Allowed origin: {allowed_origin}")
+            else:
+                logger.warning(f"CORS Debug - Origin not allowed: {origin}")
+        else:
+            logger.warning(f"CORS Debug - No origin found (Origin: {request.headers.get('Origin')}, Referer: {referer})")
         
         return response
 

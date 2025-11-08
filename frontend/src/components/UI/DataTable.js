@@ -70,8 +70,8 @@ const DataTable = ({
             <div key={rowIndex} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
               <div className="space-y-3">
                 {columns.map((column, colIndex) => {
-                  // Skip action columns on mobile for better UX
-                  if (column.key === 'actions' && columns.length > 3) {
+                  // Skip action columns on mobile - they will be shown at the bottom
+                  if (column.key === 'actions') {
                     return null;
                   }
                   
@@ -90,7 +90,7 @@ const DataTable = ({
                 {/* Show actions at the bottom for mobile */}
                 {columns.some(col => col.key === 'actions') && (
                   <div className="pt-3 border-t border-gray-100">
-                    <div className="flex justify-end space-x-2">
+                    <div className="flex flex-wrap justify-end gap-2">
                       {columns
                         .filter(col => col.key === 'actions')
                         .map((column, colIndex) => (

@@ -344,7 +344,7 @@ const Reports = () => {
         tabs={tabs}
         selectedTab={selectedTab}
         onTabChange={setSelectedTab}
-        variant="pills"
+        variant="modern"
         className="mb-6"
       />
 

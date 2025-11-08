@@ -18,13 +18,11 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { authAPI, classesAPI } from '../../services/api';
-import { useAuth } from '../../hooks/useAuth';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import Tabs from '../../components/UI/Tabs';
 import toast from 'react-hot-toast';
 
 const BulkOperations = () => {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedTab, setSelectedTab] = useState('teachers');
@@ -545,7 +543,7 @@ const BulkOperations = () => {
         <div className="card-header">
           <h3 className="text-lg font-medium text-gray-900">تعليمات التحميل</h3>
           <button 
-          className="btn btn-outline float-left"
+          className="btn btn-outline float-left bg-primary-500 text-white"
           onClick={handleDownloadTemplate}
         >
           <Download className="h-5 w-5 mr-2 ml-2" />
@@ -576,6 +574,44 @@ const BulkOperations = () => {
                 ))}
               </div>
             </div>
+
+            {/* Example for teachers */}
+            {selectedTab === 'teachers' && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-900 mb-3">مثال على البيانات:</h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        {getExpectedHeaders().map((header, index) => (
+                          <th key={index} className="px-3 py-2 text-right border border-gray-300 font-medium text-gray-700">
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="px-3 py-2 border border-gray-300 text-gray-800">teacher001  أو 9999##99</td>
+                        <td className="px-3 py-2 border border-gray-300 text-gray-800">أحمد محمد علي</td>
+                        <td className="px-3 py-2 border border-gray-300 text-gray-800">teacher001 أو 9999##99</td>
+                        <td className="px-3 py-2 border border-gray-300 text-gray-800">9999##99</td>
+                        <td className="px-3 py-2 border border-gray-300 text-gray-800">حاسب الي</td>
+                        <td className="px-3 py-2 border border-gray-300 text-gray-800">20</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-3 space-y-2">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                    <p className="text-sm text-blue-800 font-medium">
+                      💡 ملاحظة مهمة: يجب تعبئة  <strong>اسم المستخدم</strong> و <strong>البريد الإلكتروني</strong> وينصح أن يكونا رقم هاتف الملعم/ـة لسهولة تذكر تسجيل الدخول في النظام
+                    </p>
+                  </div>
+               
+                </div>
+              </div>
+            )}
             
             <div>
               <h4 className="text-sm font-medium text-gray-900 mb-2">نصائح:</h4>
@@ -585,6 +621,7 @@ const BulkOperations = () => {
                 <li>• لا تترك حقول مطلوبة فارغة</li>
                 <li>• تأكد من عدم تكرار أسماء المستخدمين</li>
                 <li>• استخدم الورقة الأولى في الملف فقط</li>
+          
                 {selectedTab === 'assign' && (
                   <>
                     <li>• سيتم إنشاء الفصول تلقائياً من (اسم الصف + الشعبة)</li>

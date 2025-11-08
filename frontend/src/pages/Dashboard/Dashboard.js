@@ -15,10 +15,17 @@ import {
   Eye,EyeOff ,
   CheckCircle,
   ArrowRight,
+  ArrowLeft,
   Settings,
   Download,
   Printer,
-  Phone
+  Phone,
+  MessageCircle,
+  BarChart3,
+  Star,
+  Building,
+  Newspaper,
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { reportsAPI, attendanceAPI, authAPI } from '../../services/api';
@@ -359,6 +366,44 @@ const AdminDashboard = ({ schoolStats, loading }) => {
 
   return (
     <div className="space-y-6">
+      {/* Quick Access Cards */}
+      <div className="card">
+        <div className="card-header">
+          <h3 className="text-lg font-medium text-gray-900">الوصول السريع</h3>
+        </div>
+        <div className="card-body">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <QuickAccessCard
+              title="إدارة المدارس"
+              description="إدارة المدارس المسجلة في النظام"
+              icon={Building}
+              color="blue"
+              onClick={() => navigate('/app/schools')}
+            />
+            <QuickAccessCard
+              title="إدارة المستخدمين"
+              description="إدارة المستخدمين والمعلمين"
+              icon={Users}
+              color="green"
+              onClick={() => navigate('/app/users')}
+            />
+            <QuickAccessCard
+              title="التقارير والإحصائيات"
+              description="عرض التقارير والإحصائيات الشاملة"
+              icon={BarChart3}
+              color="purple"
+              onClick={() => navigate('/app/reports')}
+            />
+            <QuickAccessCard
+              title="إدارة الأخبار"
+              description="إدارة الأخبار والإعلانات"
+              icon={Newspaper}
+              color="orange"
+              onClick={() => navigate('/app/news')}
+            />
+          </div>
+        </div>
+      </div>
       
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -724,6 +769,94 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
         onViewAll={() => navigate('/app/news')}
       />
 
+      {/* Quick Access Cards */}
+      <div className="card">
+        <div className="card-header">
+          <h3 className="text-lg font-medium text-gray-900">الوصول السريع</h3>
+        </div>
+        <div className="card-body">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            <QuickAccessCard
+              title="تسجيل الحضور"
+              description="تسجيل حضور الطلاب للفصول اليوم"
+              icon={ClipboardList}
+              color="blue"
+              onClick={onNavigateToAttendance}
+            />
+            <QuickAccessCard
+              title="تقارير الحضور"
+              description="عرض تفاصيل الحضور والغياب"
+              icon={Eye}
+              color="green"
+              onClick={onNavigateToAttendancesDetails}
+            />
+            <QuickAccessCard 
+              title="التقرير اليومي"
+              description=" عرض التقرير اليومي للحضور وإشعار اولياء أمور الطلاب الغائبين"
+              icon={FileText}
+              color="purple"
+              onClick={() => navigate('/app/daily-report')}
+            />
+            <QuickAccessCard
+              title="تقرير المعلمين"
+              description="عرض تقرير حضور المعلمين"
+              icon={Users}
+              color="orange"
+              onClick={() => navigate('/app/teacher-report')}
+              isNew={true}
+            />
+            <QuickAccessCard
+              title="إرسال رسائل مخصصة"
+              description="إرسال رسائل SMS للطلاب"
+              icon={MessageCircle}
+              color="indigo"
+              onClick={() => navigate('/app/bulk-messaging')}
+              borderColor="border-indigo-200"
+              isNew={true}
+            />
+            <QuickAccessCard
+              title="سجل ملاحظات الطالب"
+              description="عرض وتعديل ملاحظات السلوك"
+              icon={ClipboardList}
+              color="teal"
+              onClick={() => navigate('/app/student-notes-log')}
+              isNew={true}
+            />
+            <QuickAccessCard
+              title="إدارة الفصول"
+              description="إدارة الفصول والمواد الدراسية"
+              icon={BookOpen}
+              color="pink"
+              onClick={() => navigate('/app/classes')}
+            />
+            <QuickAccessCard
+              title="التقارير والإحصائيات"
+              description="عرض التقارير والإحصائيات الشاملة"
+              icon={BarChart3}
+              color="cyan"
+              onClick={() => navigate('/app/reports')}
+            />
+            <QuickAccessCard
+              title="إعدادات SMS"
+              description="إعدادات الرسائل القصيرة iBulk SMS from Omantel"
+              icon={Settings}
+              color="indigo"
+              onClick={() => navigate('/app/sms-configuration')}
+              isNew={true}
+            />
+            <QuickAccessCard
+            title="مميزات النظام"
+            description="عرض المميزات الجديدة في النظام"
+            icon={Sparkles}
+            color="yellow"
+            onClick={() => navigate('/app/version-features')}
+            isNew={true}
+            />
+           
+          </div>
+        </div>
+      </div>
+
       {/* Date Selector */}
       <div className="card">
         <div className="card-body">
@@ -950,7 +1083,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         title={`الطلاب الغائبين والمتأخرين - ${selectedClassData?.class_name || ''}`}
-        size="lg"
+        size="xl"
       >
         <div className="space-y-4">
           {summaryLoading ? (
@@ -1080,14 +1213,14 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
         isOpen={isStudentListModalOpen}
         onClose={handleCloseStudentListModal}
         title={`قائمة الطلاب ${selectedListType === 'absent' ? 'الهاربين' : selectedListType === 'late' ? 'المتأخرين' : 'الغائبين'}`}
-        size="lg"
+        size="xl"
       >
         <div className="space-y-4">
           {summaryLoading ? (
             <div className="flex items-center justify-center py-9">
               <LoadingSpinner />
               <span className="mr-3 text-gray-500">جاري تحميل بيانات الطلاب...</span>
-    </div>
+            </div>
           ) : selectedStudentList && selectedStudentList.length > 0 ? (
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -1104,9 +1237,74 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                     <p className="text-sm text-blue-700">
                       {selectedListType === 'absent' && 'الطلاب الذين هربوا من الحصص'}
                       {selectedListType === 'late' && 'الطلاب الذين تأخروا عن الحصص'}
-                      {selectedListType === 'excuse' && 'الطلاب الذين لديهم عذر للغياب'}
+                      {selectedListType === 'excuse' && 'الطلاب الغائبين عن الحصص'}
                     </p>
                   </div>
+                </div>
+                {/* Download Button */}
+                <div className="mt-4 flex justify-end">
+                  <button
+                    className="inline-flex items-center px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium transition"
+                    onClick={() => {
+                      // Generate CSV from grouped student data
+                      const groupedStudents = selectedStudentList.reduce((acc, student) => {
+                        const studentId = student.student_id;
+                        if (!acc[studentId]) {
+                          acc[studentId] = {
+                            student_id: studentId,
+                            student_name: student.student_name,
+                            class_name: student.class_name,
+                            class_time_nums: [],
+                            excuse_note: student.excuse_note || ''
+                          };
+                        }
+                        if (student.class_time_num) {
+                          acc[studentId].class_time_nums.push(student.class_time_num);
+                        }
+                        return acc;
+                      }, {});
+
+                      const csvRows = [];
+                      // Header
+                      let header = ['اسم الطالب', 'الفصل', 'الحصص'];
+                      if (selectedListType === 'excuse') header.push('ملاحظة العذر');
+                      csvRows.push(header.join(','));
+                      // Rows
+                      Object.values(groupedStudents).forEach(student => {
+                        const sortedPeriods = student.class_time_nums.sort((a, b) => a - b);
+                        let row = [
+                          `"${student.student_name || 'غير محدد'}"`,
+                          `"${student.class_name || 'غير محدد'}"`,
+                          `"${sortedPeriods.join(', ')}"`
+                        ];
+                        if (selectedListType === 'excuse') row.push(`"${student.excuse_note || '-'}"`);
+                        csvRows.push(row.join(','));
+                      });
+
+                      const csvContent = '\uFEFF' + csvRows.join('\n'); // Add BOM for Excel UTF-8 support
+                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+
+                      // Dynamic file name
+                      let listLabel =
+                        selectedListType === 'absent'
+                          ? 'الهاربين'
+                          : selectedListType === 'late'
+                          ? 'المتأخرين'
+                          : 'الغائبين';
+                      const today = new Date().toISOString().slice(0, 10);
+
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `قائمة الطلاب_${listLabel}_${selectedDate}.csv`; 
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      setTimeout(() => URL.revokeObjectURL(url), 2000);
+                    }}
+                  >
+                    تحميل القائمة كـ CSV
+                  </button>
                 </div>
               </div>
 
@@ -1136,7 +1334,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                       // Group students by student_id and combine their data
                       const groupedStudents = selectedStudentList.reduce((acc, student) => {
                         const studentId = student.student_id;
-                        
+
                         if (!acc[studentId]) {
                           acc[studentId] = {
                             student_id: studentId,
@@ -1146,19 +1344,19 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                             excuse_note: student.excuse_note || ''
                           };
                         }
-                        
+
                         // Add class_time_num to the array
                         if (student.class_time_num) {
                           acc[studentId].class_time_nums.push(student.class_time_num);
                         }
-                        
+
                         return acc;
                       }, {});
-                      
+
                       // Convert to array and sort class_time_nums
                       return Object.values(groupedStudents).map((student, index) => {
                         const sortedPeriods = student.class_time_nums.sort((a, b) => a - b);
-                        
+
                         return (
                           <tr key={student.student_id || index} className="hover:bg-gray-50">
                             <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -1232,6 +1430,32 @@ const TeacherDashboard = ({ teacherAttendance, loading, selectedDate, setSelecte
         onViewAll={() => navigate('/app/news')}
       />
 
+      {/* Quick Access Cards */}
+      <div className="card">
+        <div className="card-header">
+          <h3 className="text-lg font-medium text-gray-900">الوصول السريع</h3>
+        </div>
+        <div className="card-body">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+            <QuickAccessCard
+              title="تسجيل الحضور"
+              description="تسجيل حضور الطلاب للفصول اليوم"
+              icon={ClipboardList}
+              color="blue"
+              onClick={onNavigateToAttendance}
+            />
+            <QuickAccessCard
+              title="تقارير الحضور"
+              description="عرض تفاصيل الحضور والغياب"
+              icon={Eye}
+              color="green"
+              onClick={onNavigateToAttendancesDetails}
+            />
+        
+          </div>
+        </div>
+      </div>
+
       {/* Date Selector */}
       <div className="card">
         <div className="card-body">
@@ -1271,23 +1495,57 @@ const TeacherDashboard = ({ teacherAttendance, loading, selectedDate, setSelecte
         </div>
       )}
 
-      {/* Quick Actions */}
-      <div className="card">
-        <div className="card-header">
-          <h3 className="text-lg font-medium text-gray-900">الإجراءات السريعة</h3>
-        </div>
-        <div className="card-body">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button onClick={onNavigateToAttendance} className="btn btn-primary">
-              تسجيل حضور جديد
-            </button>
-            <button onClick={onNavigateToAttendancesDetails} className="btn btn-outline">
-              عرض تفاصيل الحضور
-            </button>
-          </div>
-        </div>
-      </div>
+
     </div>
+  );
+};
+
+// Quick Access Card Component
+const QuickAccessCard = ({ title, description, icon: Icon, color, onClick, isNew = false }) => {
+  const colorClasses = {
+    blue: 'bg-blue-500 text-white hover:bg-blue-600',
+    green: 'bg-green-500 text-white hover:bg-green-600',
+    purple: 'bg-purple-500 text-white hover:bg-purple-600',
+    orange: 'bg-orange-500 text-white hover:bg-orange-600',
+    indigo: 'bg-indigo-500 text-white hover:bg-indigo-600',
+    teal: 'bg-teal-500 text-white hover:bg-teal-600',
+    pink: 'bg-pink-500 text-white hover:bg-pink-600',
+    cyan: 'bg-cyan-500 text-white hover:bg-cyan-600',
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className="group relative p-4 bg-white border border-gray-200 rounded-lg hover:border-primary-300 hover:shadow-md transition-all duration-200 text-right"
+    >
+      {/* New Feature Badge */}
+      {isNew && (
+        <div className="absolute top-0 left-0 right-0 w-full flex justify-end">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-tl-md border-l-4 border-yellow-400 text-xs font-semibold bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-md animate-pulse">
+            <Sparkles className="h-3 w-3 mr-1" />
+            جديد
+          </span>
+        </div>
+      )}
+      
+      <div className="flex items-start space-x-3">
+        <div className={`p-2 rounded-lg ml-2 ${colorClasses[color]} flex-shrink-0 transition-transform duration-200 group-hover:scale-110`}>
+          <Icon className="h-5 w-5 " />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center space-x-2">
+            <h4 className="text-sm font-semibold text-gray-900 mb-1 group-hover:text-primary-600 transition-colors">
+              {title}
+            </h4>
+        
+          </div>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            {description}
+          </p>
+        </div>
+        <ArrowLeft className="h-4 w-4 text-gray-400 group-hover:text-primary-600 group-hover:translate-x-1 transition-all duration-200 flex-shrink-0 mt-1" />
+      </div>
+    </button>
   );
 };
 

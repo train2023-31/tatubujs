@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import ReactDOM from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from 'react-query';
 import { 
   Download, 
@@ -16,7 +17,10 @@ import {
   Filter,
   XCircle,
   Smartphone,
-  Send
+  Send,
+  AlertCircle,
+  Settings,
+  ExternalLink
 } from 'lucide-react';
 import { attendanceAPI, classesAPI, authAPI, reportsAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
@@ -31,6 +35,7 @@ import './DailyReport.css';
 const DailyReport = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(getTodayAPI());
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -53,6 +58,8 @@ const DailyReport = () => {
   const [sendingSmsToStudent, setSendingSmsToStudent] = useState(new Set());
   const [selectedStudents, setSelectedStudents] = useState(new Set());
   const [isSendingBulkSelectedSms, setIsSendingBulkSelectedSms] = useState(false);
+  const [showSmsConfirmModal, setShowSmsConfirmModal] = useState(false);
+  const [pendingSmsData, setPendingSmsData] = useState(null); // { type: 'single' | 'bulk', message, phone, record, studentData }
   const reportRef = useRef(null);
 
   // Bulk WhatsApp messaging mutation for daily reports
@@ -461,20 +468,48 @@ ${attendanceStatus}
     return message;
   };
 
+  // Detect if device is mobile
+  const isMobileDevice = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    ) || window.innerWidth <= 768;
+  };
+
   const handleWhatsAppClick = (record) => {
     const mssg_Ar = generateWhatsAppMessage(record);
     const phoneNumber = record.phone_number || '';
+    const isMobile = isMobileDevice();
     
     if (phoneNumber) {
-      // If phone number is available, create WhatsApp link with phone number using wa.me format
+      // If phone number is available, create WhatsApp link
       const cleanPhoneNumber = phoneNumber.replace(/[^0-9]/g, '');
       
       // Ensure phone number has country code if not present
       let formattedPhone = cleanPhoneNumber;
-      if (!cleanPhoneNumber.startsWith('968') && cleanPhoneNumber.length === 8) {
-        formattedPhone = '+968' + cleanPhoneNumber;
+      if (!cleanPhoneNumber.startsWith('968')) {
+        if (cleanPhoneNumber.length === 8) {
+          formattedPhone = '968' + cleanPhoneNumber;
+        } else if (cleanPhoneNumber.length === 9 && cleanPhoneNumber.startsWith('9')) {
+          formattedPhone = '968' + cleanPhoneNumber;
+        } else {
+          formattedPhone = cleanPhoneNumber;
+        }
       }
-      const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(mssg_Ar)}`;
+      
+      // Remove any + sign
+      const phoneForLink = formattedPhone.replace(/^\+/, '');
+      
+      let url;
+      if (isMobile) {
+        // On mobile: use wa.me (opens WhatsApp app or WhatsApp Web on mobile)
+        // Format: wa.me/968XXXXXXXXX?text=...
+        url = `https://wa.me/${phoneForLink}?text=${encodeURIComponent(mssg_Ar)}`;
+      } else {
+        // On desktop: use web.whatsapp.com (opens WhatsApp Web in browser)
+        // Format: web.whatsapp.com/send?phone=968XXXXXXXXX&text=...
+        url = `https://web.whatsapp.com/send?phone=${phoneForLink}&text=${encodeURIComponent(mssg_Ar)}`;
+      }
+      
       window.open(url, "_blank");
     } else {
       // If no phone number, open WhatsApp Web with the message
@@ -518,8 +553,6 @@ ${attendanceStatus}
       return;
     }
 
-    setSendingSmsToStudent(prev => new Set(prev).add(record.student_id));
-    
     const message = generateSmsMessage(record);
     
     // Format phone number to include 968 country code if not present
@@ -534,16 +567,32 @@ ${attendanceStatus}
       }
     }
     
+    // Show confirmation modal
+    setPendingSmsData({
+      type: 'single',
+      message: message,
+      phone: phoneNumber,
+      record: record
+    });
+    setShowSmsConfirmModal(true);
+  };
+
+  const confirmSendSingleSms = () => {
+    if (!pendingSmsData || pendingSmsData.type !== 'single') return;
+    
+    setSendingSmsToStudent(prev => new Set(prev).add(pendingSmsData.record.student_id));
+    
     const data = {
-      phone_number: phoneNumber,
-      message: message
+      phone_number: pendingSmsData.phone,
+      message: pendingSmsData.message
     };
 
     sendIndividualSmsMutation.mutate(data);
+    setShowSmsConfirmModal(false);
+    setPendingSmsData(null);
   };
 
   const generateSmsMessage = (record) => {
-    const schoolName = user?.school_name || 'المدرسة';
     const studentName = record.student_name || 'الطالب';
     const className = record.class_name || 'الصف';
     const date = formatDate(selectedDate, 'dd/MM/yyyy', 'ar');
@@ -553,39 +602,26 @@ ${attendanceStatus}
     const ghaibTimes = record.excused_times || record.excusedTimes || record.excused_periods || [];
     const hasExcuse = record.is_has_exuse || record.is_has_exuse || false;
     
-    let attendanceStatus = '';
-    
+    // Build compact attendance status
+    const parts = [];
     if (haribTimes.length > 0) {
-      attendanceStatus += ` هارب في الحصص: ${haribTimes.sort((a, b) => a - b).join(', ')}\n`;
+      parts.push(`هارب:${haribTimes.sort((a, b) => a - b).join(',')}`);
     }
-    
     if (lateTimes.length > 0) {
-      attendanceStatus += ` متأخر في الحصص: ${lateTimes.sort((a, b) => a - b).join(', ')}\n`;
+      parts.push(`متأخر:${lateTimes.sort((a, b) => a - b).join(',')}`);
     }
-    
     if (ghaibTimes.length > 0) {
-      attendanceStatus += ` غائب في الحصص: ${ghaibTimes.sort((a, b) => a - b).join(', ')}\n`;
+      parts.push(`غائب:${ghaibTimes.sort((a, b) => a - b).join(',')}`);
     }
     
-    if (haribTimes.length === 0 && lateTimes.length === 0 && ghaibTimes.length === 0) {
-      attendanceStatus = ' حضر جميع الحصص';
-    }
+    const attendanceStatus = parts.length > 0 ? parts.join(' ') : 'حاضر';
+    const excuseStatus = hasExcuse ? 'مع عذر' : 'بدون عذر';
     
-    const excuseStatus = hasExcuse ? ' لديه عذر' : ' لا يوجد عذر';
-    
-    const message = `تقرير الحضور اليومي
-
-المدرسة: ${schoolName}
-الطالب/ة: ${studentName}
-الصف: ${className}
-التاريخ: ${date}
-
-حالة الحضور:${attendanceStatus}
-
-حالة العذر: ${excuseStatus}
-
----
-تم إرسال هذا التقرير من نظام إدارة الحضور`;
+    // Shorter message format
+    const message = `${studentName} - ${className}
+${date}
+${attendanceStatus}
+${excuseStatus}`;
 
     return message;
   };
@@ -639,7 +675,9 @@ ${attendanceStatus}
 
         return {
           phone: phoneNumber,
-          message: generateSmsMessage(record)
+          message: generateSmsMessage(record),
+          student_name: record.student_name,
+          class_name: record.class_name
         };
       });
 
@@ -648,9 +686,31 @@ ${attendanceStatus}
       return;
     }
 
+    // Show confirmation modal with first message as preview
+    setPendingSmsData({
+      type: 'bulk',
+      studentData: selectedStudentData,
+      totalCount: selectedStudentData.length,
+      previewMessage: selectedStudentData[0]?.message || ''
+    });
+    setShowSmsConfirmModal(true);
+  };
+
+  const confirmSendBulkSms = () => {
+    if (!pendingSmsData || pendingSmsData.type !== 'bulk') return;
+    
     setIsSendingBulkSelectedSms(true);
     setSmsResults(null);
-    sendBulkSelectedSmsMutation.mutate(selectedStudentData);
+    
+    // Format data for API
+    const apiData = pendingSmsData.studentData.map(item => ({
+      phone: item.phone,
+      message: item.message
+    }));
+    
+    sendBulkSelectedSmsMutation.mutate(apiData);
+    setShowSmsConfirmModal(false);
+    setPendingSmsData(null);
   };
 
   const handleDownloadPDF = async () => {
@@ -1810,6 +1870,149 @@ ${attendanceStatus}
                 <>
                   <Smartphone className="h-5 w-5 mr-2" />
                   إرسال التقارير عبر SMS
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* SMS Confirmation Modal */}
+      <Modal
+        isOpen={showSmsConfirmModal}
+        onClose={() => {
+          setShowSmsConfirmModal(false);
+          setPendingSmsData(null);
+        }}
+        title={pendingSmsData?.type === 'single' ? 'تأكيد إرسال SMS' : `تأكيد إرسال SMS لـ ${pendingSmsData?.totalCount || 0} طالب`}
+        size="lg"
+      >
+        <div className="space-y-6">
+          {/* Warning/Info */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-2">
+                  {pendingSmsData?.type === 'single' 
+                    ? 'يرجى مراجعة الرسالة قبل الإرسال:' 
+                    : `سيتم إرسال ${pendingSmsData?.totalCount || 0} رسالة SMS. معاينة الرسالة الأولى:`}
+                </p>
+                {pendingSmsData?.type === 'bulk' && (
+                  <p className="text-xs text-blue-700 mt-1">
+                    ملاحظة: كل طالب سيحصل على رسالة مخصصة بناءً على بياناته
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* SMS Configuration Note */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 text-sm text-yellow-800">
+                <p className="font-medium mb-1">⚠️ تأكد من إعدادات SMS:</p>
+                <ul className="list-disc list-inside text-xs text-yellow-700 space-y-1 mt-2">
+                  <li>تم إعداد بيانات الاتصال (اسم المستخدم وكلمة المرور)</li>
+                  <li>تم إعداد Sender ID (معرّف المرسل) وموافق عليه من مزود الخدمة</li>
+                  <li>الرصيد كافٍ لإرسال الرسائل</li>
+                  <li>تم اختبار الاتصال بنجاح من صفحة إعدادات SMS</li>
+                </ul>
+                <div className="mt-3 pt-3 border-t border-yellow-200">
+                  <button
+                    onClick={() => {
+                      setShowSmsConfirmModal(false);
+                      navigate('/app/sms-configuration');
+                    }}
+                    className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-yellow-800 bg-yellow-100 hover:bg-yellow-200 border border-yellow-300 rounded-lg transition-colors duration-200"
+                  >
+                    <Settings className="h-4 w-4 ml-1.5" />
+                    <span>فتح صفحة إعدادات SMS</span>
+                    <ExternalLink className="h-3 w-3 mr-1.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Student Info (for single SMS) */}
+          {pendingSmsData?.type === 'single' && pendingSmsData?.record && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium text-gray-700">الطالب/ة:</span>
+                  <span className="mr-2 text-gray-900">{pendingSmsData.record.student_name}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700">الصف:</span>
+                  <span className="mr-2 text-gray-900">{pendingSmsData.record.class_name}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="font-medium text-gray-700">رقم الهاتف:</span>
+                  <span className="mr-2 text-gray-900">{pendingSmsData.phone}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bulk Info */}
+          {pendingSmsData?.type === 'bulk' && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="text-sm">
+                <div className="mb-2">
+                  <span className="font-medium text-gray-700">عدد الطلاب المختارين:</span>
+                  <span className="mr-2 text-gray-900 font-bold">{pendingSmsData.totalCount}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700">معاينة الرسالة (أول طالب):</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Message Preview */}
+          <div className="bg-white border-2 border-gray-200 rounded-lg p-4">
+            <div className="mb-2">
+              <span className="text-sm font-medium text-gray-700">معاينة الرسالة:</span>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-300">
+              <pre className="whitespace-pre-wrap text-sm text-gray-900 font-medium" dir="rtl">
+                {pendingSmsData?.message || pendingSmsData?.previewMessage || ''}
+              </pre>
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              <p>عدد الأحرف: {(pendingSmsData?.message || pendingSmsData?.previewMessage || '').length}</p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-between space-x-3 pt-4 border-t border-gray-200">
+            <button
+              onClick={() => {
+                setShowSmsConfirmModal(false);
+                setPendingSmsData(null);
+              }}
+              className="btn btn-outline"
+              disabled={isSendingBulkSelectedSms || sendingSmsToStudent.size > 0}
+            >
+              <X className="h-5 w-5 mr-2" />
+              إلغاء
+            </button>
+            <button
+              onClick={pendingSmsData?.type === 'single' ? confirmSendSingleSms : confirmSendBulkSms}
+              disabled={isSendingBulkSelectedSms || sendingSmsToStudent.size > 0}
+              className="btn btn-primary"
+            >
+              {isSendingBulkSelectedSms || sendingSmsToStudent.size > 0 ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  <span className="mr-2">جاري الإرسال...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="h-5 w-5 mr-2" />
+                  تأكيد وإرسال
                 </>
               )}
             </button>

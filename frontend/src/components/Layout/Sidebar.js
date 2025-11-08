@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavLink, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import { 
   Home, 
   Users, 
@@ -17,18 +17,24 @@ import {
   Trash2,
   Star,
   MessageCircle,
-  Settings
+  Settings,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasRole } from '../../utils/helpers';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { user } = useAuth();
+  const location = useLocation();
+  const [expandedCategories, setExpandedCategories] = useState(new Set());
 
   // Navigation groups for better organization
   const navigationGroups = [
     {
+      id: 'main',
       title: 'الرئيسية',
+      defaultExpanded: true,
       items: [
         {
           name: 'لوحة التحكم',
@@ -39,7 +45,9 @@ const Sidebar = ({ isOpen, onClose }) => {
       ]
     },
     {
+      id: 'management',
       title: 'الإدارة',
+      defaultExpanded: true,
       items: [
         {
           name: 'إدارة المدارس',
@@ -51,29 +59,25 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'إدارة المستخدمين',
           href: '/app/users',
           icon: Users,
-          roles: ['admin', 'school_admin', ],
+          roles: ['admin', 'school_admin'],
         },
         {
           name: 'إدارة الفصول والمواد',
           href: '/app/classes',
           icon: BookOpen,
-          roles: ['school_admin',],
+          roles: ['school_admin'],
         },
       ]
     },
     {
-      title: 'الحضور',
+      id: 'attendance',
+      title: 'الحضور والغياب',
+      defaultExpanded: true,
       items: [
         {
           name: 'تسجيل الحضور',
           href: '/app/attendance',
           icon: ClipboardList,
-          roles: ['teacher', 'school_admin', 'data_analyst'],
-        },
-        {
-          name: 'تقارير الحضور',
-          href: '/app/attendance-details',
-          icon: Eye,
           roles: ['teacher', 'school_admin', 'data_analyst'],
         },
         {
@@ -83,15 +87,23 @@ const Sidebar = ({ isOpen, onClose }) => {
           roles: ['school_admin', 'data_analyst'],
         },
         {
-          name: 'تقرير المعلمين',
-          href: '/app/teacher-report',
-          icon: Users,
+          name: 'تفاصيل الحضور',
+          href: '/app/attendance-details',
+          icon: Eye,
+          roles: ['teacher', 'school_admin', 'data_analyst'],
+        },
+        {
+          name: 'سجل ملاحظات الطالب',
+          href: '/app/student-notes-log',
+          icon: ClipboardList,
           roles: ['school_admin', 'data_analyst'],
         },
       ]
     },
     {
+      id: 'reports',
       title: 'التقارير',
+      defaultExpanded: true,
       items: [
         {
           name: 'التقارير والإحصائيات',
@@ -100,15 +112,23 @@ const Sidebar = ({ isOpen, onClose }) => {
           roles: ['admin', 'school_admin', 'data_analyst'],
         },
         
+        {
+          name: 'تقرير المعلمين',
+          href: '/app/teacher-report',
+          icon: Users,
+          roles: ['school_admin', 'data_analyst'],
+        },
       ]
     },
     {
-      title: 'الخدمات',
+      id: 'messaging',
+      title: 'الرسائل والاتصالات',
+      defaultExpanded: false,
       items: [
         {
-          name: 'إدارة الأخبار',
-          href: '/app/news',
-          icon: Newspaper,
+          name: 'إرسال رسائل مخصصة',
+          href: '/app/bulk-messaging',
+          icon: MessageCircle,
           roles: ['admin', 'school_admin', 'data_analyst'],
         },
         {
@@ -117,18 +137,19 @@ const Sidebar = ({ isOpen, onClose }) => {
           icon: Settings,
           roles: ['school_admin'],
         },
-        // {
-        //   name: 'إرسال إشعارات WhatsApp',
-        //   href: '/app/whatsapp-messaging',
-        //   icon: MessageCircle,
-        //   roles: ['admin', 'school_admin', 'data_analyst'],
-        // },
-        // {
-        //   name: 'الرسائل النصية',
-        //   href: '/app/sms',
-        //   icon: MessageSquare,
-        //   roles: ['school_admin'],
-        // },
+      ]
+    },
+    {
+      id: 'services',
+      title: 'الخدمات',
+      defaultExpanded: false,
+      items: [
+        {
+          name: 'إدارة الأخبار',
+          href: '/app/news',
+          icon: Newspaper,
+          roles: ['admin', 'school_admin', 'data_analyst'],
+        },
         {
           name: 'رفع وتحديث البيانات',
           href: '/app/bulk-operations',
@@ -141,6 +162,13 @@ const Sidebar = ({ isOpen, onClose }) => {
           icon: Trash2,
           roles: ['school_admin'],
         },
+      ]
+    },
+    {
+      id: 'system',
+      title: 'النظام',
+      defaultExpanded: false,
+      items: [
         {
           name: 'سجلات النظام',
           href: '/app/view-logs',
@@ -150,7 +178,9 @@ const Sidebar = ({ isOpen, onClose }) => {
       ]
     },
     {
+      id: 'account',
       title: 'الحساب',
+      defaultExpanded: false,
       items: [
         {
           name: 'الملف الشخصي',
@@ -167,6 +197,42 @@ const Sidebar = ({ isOpen, onClose }) => {
       ]
     },
   ];
+
+  // Initialize expanded categories based on defaultExpanded
+  useEffect(() => {
+    const initialExpanded = new Set();
+    navigationGroups.forEach(group => {
+      if (group.defaultExpanded) {
+        initialExpanded.add(group.id);
+      }
+    });
+    setExpandedCategories(initialExpanded);
+  }, []);
+
+  // Auto-expand category if current route matches an item in it
+  useEffect(() => {
+    navigationGroups.forEach(group => {
+      const hasActiveItem = group.items.some(item => 
+        location.pathname === item.href && hasRole(user, item.roles)
+      );
+      if (hasActiveItem) {
+        setExpandedCategories(prev => new Set([...prev, group.id]));
+      }
+    });
+  }, [location.pathname, user]);
+
+  // Toggle category expansion
+  const toggleCategory = (categoryId) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
+      } else {
+        newSet.add(categoryId);
+      }
+      return newSet;
+    });
+  };
 
   // Filter navigation groups based on user roles
   const filteredNavigationGroups = navigationGroups.map(group => ({
@@ -211,49 +277,66 @@ const Sidebar = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        <nav className="mt-4 sm:mt-6 px-2 sm:px-3 overflow-y-auto h-full">
-          <div className="space-y-4 sm:space-y-6">
-            {filteredNavigationGroups.map((group, groupIndex) => (
-              <div key={groupIndex} className="space-y-1">
-                {/* Group Title */}
-                <h3 className="px-2 sm:px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  {group.title}
-                </h3>
-                
-                {/* Separator Line */}
-                <div className="border-t border-gray-200 mx-2 sm:mx-3"></div>
-                
-                {/* Group Items */}
-                <div className="space-y-0.5 sm:space-y-1">
-                  {group.items.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <NavLink
-                        key={item.name}
-                        to={item.href}
-                        onClick={onClose}
-                        className={({ isActive }) =>
-                          `group mr-1 sm:mr-2 flex items-center px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md transition-colors duration-200 ${
-                            isActive
-                              ? 'bg-primary-100 text-primary-700 border-r-2 border-primary-600'
-                              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                          }`
-                        }
-                      >
-                        <Icon
-                          className={`ml-2 sm:ml-3 h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 ${
-                            window.location.pathname === item.href
-                              ? 'text-primary-500'
-                              : 'text-gray-400 group-hover:text-gray-500'
-                          }`}
-                        />
-                        <span className="truncate">{item.name}</span>
-                      </NavLink>
-                    );
-                  })}
+        <nav className="mt-4 sm:mt-6 px-2 sm:px-3 overflow-y-auto h-full pb-20">
+          <div className="space-y-2">
+            {filteredNavigationGroups.map((group) => {
+              const isExpanded = expandedCategories.has(group.id);
+              const hasActiveItem = group.items.some(item => 
+                location.pathname === item.href && hasRole(user, item.roles)
+              );
+              
+              return (
+                <div key={group.id} className="space-y-1">
+                  {/* Category Header - Clickable */}
+                  <button
+                    onClick={() => toggleCategory(group.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 uppercase tracking-wider rounded-md transition-colors duration-200 hover:bg-gray-100 ${
+                      hasActiveItem ? 'bg-primary-50 text-primary-700' : ''
+                    }`}
+                  >
+                    <span>{group.title}</span>
+                    {isExpanded ? (
+                      <ChevronUp className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                    )}
+                  </button>
+                  
+                  {/* Category Items - Collapsible */}
+                  {isExpanded && (
+                    <div className="space-y-0.5 sm:space-y-1 mr-2 border-b border-gray-200 pb-2">
+                      {group.items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = location.pathname === item.href;
+                        return (
+                          <NavLink
+                            key={item.name}
+                            to={item.href}
+                            onClick={onClose}
+                            className={({ isActive }) =>
+                              `group flex items-center px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md transition-colors duration-200 ${
+                                isActive
+                                  ? 'bg-primary-100 text-primary-700 border-r-2 border-primary-600'
+                                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                              }`
+                            }
+                          >
+                            <Icon
+                              className={`ml-2 sm:ml-3 h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 ${
+                                isActive
+                                  ? 'text-primary-500'
+                                  : 'text-gray-400 group-hover:text-gray-500'
+                              }`}
+                            />
+                            <span className="truncate">{item.name}</span>
+                          </NavLink>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </nav>
 

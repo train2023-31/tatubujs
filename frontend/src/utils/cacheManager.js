@@ -206,7 +206,7 @@ export const shouldClearCache = () => {
   
   // Check if version has changed (indicating new build)
   const storedVersion = localStorage.getItem('app_version');
-  const currentVersion = process.env.REACT_APP_VERSION || '1.0.2';
+  const currentVersion = process.env.REACT_APP_VERSION || '2.0.0';
   
   if (storedVersion && storedVersion !== currentVersion) {
     localStorage.setItem('app_version', currentVersion);

@@ -25,6 +25,8 @@ import ViewLogs from './pages/ViewLogs/ViewLogs';
 import VersionFeatures from './pages/VersionFeatures/VersionFeatures';
 import WhatsAppMessaging from './pages/WhatsAppMessaging/WhatsAppMessaging';
 import SmsConfiguration from './pages/SmsConfiguration/SmsConfiguration';
+import BulkMessaging from './pages/BulkMessaging/BulkMessaging';
+import StudentNotesLog from './pages/StudentNotesLog/StudentNotesLog';
 import LoadingSpinner from './components/UI/LoadingSpinner';
 import cacheManager from './utils/cacheManager';
 
@@ -127,7 +129,7 @@ const initializeCacheManagement = async () => {
   }
 
   // Store current version
-  const currentVersion = process.env.REACT_APP_VERSION || '1.0.2';
+  const currentVersion = process.env.REACT_APP_VERSION || '2.0.0';
   localStorage.setItem('app_version', currentVersion);
 
   // Clear caches periodically on mobile (every 24 hours)
@@ -356,6 +358,26 @@ function App() {
                   element={
                     <ProtectedRoute allowedRoles={['school_admin']}>
                       <BulkOperations />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Bulk Messaging - School Admin, Data Analyst, and Admin */}
+                <Route 
+                  path="bulk-messaging" 
+                  element={
+                    <ProtectedRoute allowedRoles={['school_admin', 'data_analyst', 'admin']}>
+                      <BulkMessaging />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Student Notes Log - School Admin and Data Analyst */}
+                <Route 
+                  path="student-notes-log" 
+                  element={
+                    <ProtectedRoute allowedRoles={['school_admin', 'data_analyst']}>
+                      <StudentNotesLog />
                     </ProtectedRoute>
                   } 
                 />

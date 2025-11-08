@@ -328,7 +328,7 @@ const SmsConfiguration = () => {
             <RefreshCw className="h-5 w-5 mr-2 ml-2" />
             إعادة تحميل الإعدادات
           </button>
-          <button
+          {/* <button
             onClick={handleCheckBalance}
             disabled={isCheckingBalance}
             className="btn btn-outline"
@@ -344,7 +344,7 @@ const SmsConfiguration = () => {
                 تحديث الرصيد
               </>
             )}
-          </button>
+          </button> */}
           <button
             onClick={handleSave}
             disabled={isSaving}
@@ -372,7 +372,7 @@ const SmsConfiguration = () => {
           onClick={() => setIsInstructionsExpanded(!isInstructionsExpanded)}
         >
           <div className="flex items-center justify-between w-full">
-            <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3">
               <AlertCircle className="h-6 w-6 text-yellow-600" />
               <h3 className="text-lg font-semibold text-gray-900">تعليمات مهمة</h3>
             </div>
@@ -393,20 +393,160 @@ const SmsConfiguration = () => {
           </div>
         </div>
         {isInstructionsExpanded && (
-          <div className="card-body">
+        <div className="card-body">
             <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-medium text-blue-800 mb-2">خطوات التكوين:</h4>
-                <ol className="list-decimal list-inside space-y-1 text-sm text-blue-700">
-                  <li>قم بالتسجيل في خدمة iBulk SMS من موقع ismartsms.net التابع لـ  Omantel</li>
-                  <li>احصل على بيانات الاعتماد (اسم المستخدم وكلمة المرور)</li>
-                  <li>أدخل معرف المرسل المخصص لك (حد أقصى 11 حرف)</li>
-                  <li>تأكد من صحة رابط API</li>
-                  <li>اضبط حد الرصيد الأدنى للتنبيهات</li>
-                  <li>اضغط على "اختبار الاتصال" للتأكد من صحة الإعدادات</li>
-                  <li>احفظ الإعدادات بعد التأكد من نجاح الاختبار</li>
-                </ol>
+              {/* Step-by-Step Guide */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+                <h4 className="font-bold text-lg text-blue-900 mb-4 flex items-center">
+                  <Settings className="h-5 w-5 ml-2" />
+                  دليل الإعداد خطوة بخطوة
+                </h4>
+                <div className="space-y-4">
+                  {/* Step 1 */}
+                  <div className="bg-white rounded-lg p-4 border-l-4 border-blue-500 shadow-sm">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-sm ml-3">
+                        1
+                      </div>
+                      <div className="flex-1">
+                        <h5 className="font-semibold text-gray-900 mb-1">التسجيل في خدمة iBulk SMS</h5>
+                        <p className="text-sm text-gray-700 mb-2">
+                          قم بزيارة موقع <a href="https://ismartsms.net" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">ismartsms.net</a> والتسجيل في خدمة iBulk SMS من Omantel
+                        </p>
+                        <ul className="text-xs text-gray-600 space-y-1 mr-5">
+                          <li>• ستحتاج إلى حساب مع Omantel/Infocomm</li>
+                          <li>• تأكد من تفعيل خدمة REST API لحسابك</li>
+                          <li>• إذا لم يكن لديك حساب، اتصل بـ Omantel على: <span className="font-medium">+968 24151020</span></li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className="bg-white rounded-lg p-4 border-l-4 border-green-500 shadow-sm">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm ml-3">
+                        2
+                      </div>
+                      <div className="flex-1">
+                        <h5 className="font-semibold text-gray-900 mb-1">الحصول على بيانات الاعتماد</h5>
+                        <p className="text-sm text-gray-700 mb-2">
+                          بعد التسجيل، ستحصل على:
+                        </p>
+                        <ul className="text-xs text-gray-600 space-y-1 mr-5">
+                          <li>• <span className="font-medium">اسم المستخدم (UserID)</span> - من مزود الخدمة</li>
+                          <li>• <span className="font-medium">كلمة المرور (Password)</span> - من مزود الخدمة</li>
+                          <li>• <span className="font-medium">معرف المرسل (SenderID)</span> - يجب أن يكون معتمداً من Omantel</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step 3 */}
+                  <div className="bg-white rounded-lg p-4 border-l-4 border-yellow-500 shadow-sm">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 w-8 h-8 bg-yellow-500 text-white rounded-full flex items-center justify-center font-bold text-sm ml-3">
+                        3
+                      </div>
+                      <div className="flex-1">
+                        <h5 className="font-semibold text-gray-900 mb-1">إدخال بيانات الاعتماد</h5>
+                        <p className="text-sm text-gray-700 mb-2">
+                          أدخل البيانات في النموذج أدناه:
+                        </p>
+                        <ul className="text-xs text-gray-600 space-y-1 mr-5">
+                          <li>• <span className="font-medium">اسم المستخدم:</span> أدخل اسم المستخدم الذي حصلت عليه من Omantel</li>
+                          <li>• <span className="font-medium">كلمة المرور:</span> أدخل كلمة المرور الخاصة بك</li>
+                          <li>• <span className="font-medium">معرف المرسل:</span> أدخل معرف المرسل المعتمد (حد أقصى 11 حرف)</li>
+                          <li>• <span className="font-medium">رابط API:</span> سيتم ملؤه تلقائياً (يمكنك تغييره إذا لزم الأمر)</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step 4 */}
+                  <div className="bg-white rounded-lg p-4 border-l-4 border-purple-500 shadow-sm">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center font-bold text-sm ml-3">
+                        4
+                      </div>
+                      <div className="flex-1">
+                        <h5 className="font-semibold text-gray-900 mb-1">ضبط حد الرصيد</h5>
+                        <p className="text-sm text-gray-700 mb-2">
+                          حدد الحد الأدنى للرصيد (بالريال العماني) الذي تريد أن تتلقى تنبيهاً عند انخفاضه
+                        </p>
+                        <ul className="text-xs text-gray-600 space-y-1 mr-5">
+                          <li>• القيمة الافتراضية: <span className="font-medium">10 OMR</span></li>
+                          <li>• سيتم إرسال تنبيه عند انخفاض الرصيد عن هذا الحد</li>
+                          <li>• يمكنك تغيير هذا الحد في أي وقت</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step 5 */}
+                  <div className="bg-white rounded-lg p-4 border-l-4 border-indigo-500 shadow-sm">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 w-8 h-8 bg-indigo-500 text-white rounded-full flex items-center justify-center font-bold text-sm ml-3">
+                        5
+                      </div>
+                      <div className="flex-1">
+                        <h5 className="font-semibold text-gray-900 mb-1">اختبار الاتصال</h5>
+                        <p className="text-sm text-gray-700 mb-2">
+                          اضغط على زر "اختبار الاتصال" للتحقق من صحة الإعدادات
+                        </p>
+                        <ul className="text-xs text-gray-600 space-y-1 mr-5">
+                          <li>• سيتم التحقق من بيانات الاعتماد مع مزود الخدمة</li>
+                          <li>• سيتم التحقق من الرصيد المتاح في حسابك</li>
+                          <li>• تأكد من ظهور رسالة <span className="text-green-600 font-medium">نجاح الاختبار</span> قبل المتابعة</li>
+                          <li>• إذا فشل الاختبار، تحقق من البيانات أو اتصل بمزود الخدمة</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step 6 */}
+                  <div className="bg-white rounded-lg p-4 border-l-4 border-pink-500 shadow-sm">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 w-8 h-8 bg-pink-500 text-white rounded-full flex items-center justify-center font-bold text-sm ml-3">
+                        6
+                      </div>
+                      <div className="flex-1">
+                        <h5 className="font-semibold text-gray-900 mb-1">حفظ الإعدادات</h5>
+                        <p className="text-sm text-gray-700 mb-2">
+                          بعد نجاح اختبار الاتصال، اضغط على "حفظ الإعدادات" في أسفل النموذج
+                        </p>
+                        <ul className="text-xs text-gray-600 space-y-1 mr-5">
+                          <li>• سيتم حفظ جميع الإعدادات في قاعدة البيانات</li>
+                          <li>• يمكنك الآن استخدام خدمة SMS في النظام</li>
+                          <li>• يمكنك تعديل الإعدادات في أي وقت</li>
+                        </ul>
+                      </div>
               </div>
+            </div>
+
+                  {/* Step 7 */}
+                  <div className="bg-white rounded-lg p-4 border-l-4 border-teal-500 shadow-sm">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 w-8 h-8 bg-teal-500 text-white rounded-full flex items-center justify-center font-bold text-sm ml-3">
+                        7
+                      </div>
+                      <div className="flex-1">
+                        <h5 className="font-semibold text-gray-900 mb-1">إرسال رسالة تجريبية (اختياري)</h5>
+                        <p className="text-sm text-gray-700 mb-2">
+                          يمكنك إرسال رسالة تجريبية للتأكد من أن كل شيء يعمل بشكل صحيح
+                        </p>
+                        <ul className="text-xs text-gray-600 space-y-1 mr-5">
+                          <li>• انتقل إلى قسم "اختبار إرسال SMS" في الأسفل</li>
+                          <li>• أدخل رقم هاتف صحيح (11 رقم: <span className="font-medium">968XXXXXXXXX</span>)</li>
+                          <li>• أدخل رسالة تجريبية أو استخدم الرسالة الافتراضية</li>
+                          <li>• اضغط على "إرسال رسالة تجريبية"</li>
+                          <li>• تأكد من استلام الرسالة على الهاتف</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+              </div>
+            </div>
 
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <h4 className="font-medium text-yellow-800 mb-2">ملاحظات مهمة:</h4>
@@ -430,60 +570,14 @@ const SmsConfiguration = () => {
                     <span>للمزيد من المعلومات حول خدمة iBulk SMS من Omantel</span>
                     <ExternalLink className="h-4 w-4" />
                   </a>
-                </div>
-              </div>
             </div>
           </div>
-        )}
-      </div>
-
-      {/* SMS Status Card */}
-      <div className="card">
-        <div className="card-header">
-          <div className="flex items-center space-x-3">
-            <Smartphone className="h-6 w-6 text-blue-600" />
-            <h3 className="text-lg font-semibold text-gray-900">حالة خدمة SMS</h3>
-          </div>
-        </div>
-        <div className="card-body">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* SMS Status */}
-            <div className="text-center">
-              <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                <CheckCircle className="h-4 w-4 mr-1" />
-                مفعل دائماً
-              </div>
-              <p className="text-sm text-gray-600 mt-2">حالة الخدمة</p>
-            </div>
-
-            {/* Current Balance */}
-            <div className="text-center">
-              <div className={`text-2xl font-bold ${getBalanceStatusColor()}`}>
-                {balanceInfo ? `${balanceInfo.current_balance.toFixed(2)} ر.ع` : 'غير محدد'}
-              </div>
-              <p className="text-sm text-gray-600 mt-2">الرصيد الحالي</p>
-            </div>
-
-            {/* Balance Status */}
-            <div className="text-center">
-              <div className={`text-lg font-medium ${getBalanceStatusColor()}`}>
-                {getBalanceStatusText()}
-              </div>
-              <p className="text-sm text-gray-600 mt-2">حالة الرصيد</p>
-            </div>
-          </div>
-
-          {/* Last Balance Check */}
-          {balanceInfo?.last_check && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <div className="flex items-center justify-center space-x-2 text-sm text-gray-600">
-                <Clock className="h-4 w-4" />
-                <span>آخر تحديث للرصيد: {formatDate(balanceInfo.last_check)}</span>
               </div>
             </div>
           )}
         </div>
-      </div>
+
+     
 
       {/* Configuration Form */}
       <div className="card">
@@ -566,7 +660,7 @@ const SmsConfiguration = () => {
             {/* Balance Threshold */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                حد الرصيد الأدنى
+                حد الرصيد الأدنى (OMR)
               </label>
               <div className="relative">
                 <input
@@ -580,7 +674,7 @@ const SmsConfiguration = () => {
                 />
                 <DollarSign className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               </div>
-              <p className="text-xs text-gray-500 mt-1">سيتم إرسال تنبيه عند انخفاض الرصيد عن هذا الحد</p>
+              <p className="text-xs text-gray-500 mt-1">سيتم إرسال تنبيه عند انخفاض الرصيد عن هذا الحد (بالريال العماني OMR)</p>
             </div>
           </div>
 

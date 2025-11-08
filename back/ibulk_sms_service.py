@@ -179,11 +179,11 @@ class IBulkSMSService:
                                         
                                         if balance > 0 or 'Balance' in str(response_data):
                                             # Update school balance
-                                            if self.school:
-                                                self.school.ibulk_current_balance = balance
-                                                self.school.ibulk_last_balance_check = get_oman_time().utcnow()
-                                                db.session.commit()
-                                            
+                    if self.school:
+                        self.school.ibulk_current_balance = balance
+                        self.school.ibulk_last_balance_check = get_oman_time().utcnow()
+                        db.session.commit()
+                    
                                             logger.info(f"Balance retrieved successfully: {balance} OMR")
                                             return {
                                                 'success': True,
@@ -206,13 +206,13 @@ class IBulkSMSService:
                                             self.school.ibulk_current_balance = balance
                                             self.school.ibulk_last_balance_check = get_oman_time().utcnow()
                                             db.session.commit()
-                                        return {
-                                            'success': True,
-                                            'message': 'Balance retrieved successfully',
-                                            'balance': balance,
-                                            'currency': 'OMR'
-                                        }
-                            except json.JSONDecodeError:
+                    return {
+                        'success': True,
+                        'message': 'Balance retrieved successfully',
+                        'balance': balance,
+                        'currency': 'OMR'
+                    }
+                except json.JSONDecodeError:
                                 logger.warning(f"Invalid JSON response from {balance_url}")
                                 continue
                         elif response.status_code != 404:
@@ -234,21 +234,24 @@ class IBulkSMSService:
             
             # All attempts failed
             if last_error:
-                # If we got Code 11, it likely means balance endpoint doesn't exist
-                if 'Code 11' in last_error:
-                    error_msg = f"Balance check failed: {last_error}. The balance endpoint may not be available in this API version. Please check with your SMS provider."
+                # If we got Code 11 or 404, it likely means balance endpoint doesn't exist
+                if 'Code 11' in last_error or '404' in last_error or 'HTML' in str(response.text[:100] if response else ''):
+                    error_msg = f"Balance endpoint not available: The balance check endpoint may not be available in this API version. This is normal - balance checking is optional."
+                    logger.info(f"Balance endpoint not available (this is OK): {error_msg}")
                 else:
                     error_msg = f"SMS service error: {last_error}"
+                    logger.warning(f"Balance check failed: {error_msg}")
             else:
                 error_msg = "SMS service error: Could not connect to balance endpoint"
+                logger.warning(f"Balance check failed: {error_msg}")
             
-            logger.error(f"Balance check failed after trying all endpoints: {error_msg}")
-            
-            return {
-                'success': False,
+            # Return failure but note that this is expected if endpoint doesn't exist
+                return {
+                    'success': False,
                 'message': error_msg,
-                'balance': 0.0
-            }
+                'balance': 0.0,
+                'note': 'Balance endpoint may not be available in this API version. This is normal and does not affect SMS sending.'
+                }
                 
         except requests.RequestException as e:
             logger.error(f"Error checking SMS balance: {str(e)}")
@@ -284,8 +287,26 @@ class IBulkSMSService:
                     'message_id': None
                 }
             
-            # Format phone number for Oman (+968)
+            # Format phone number for Oman (+968) - must be exactly 11 digits
             formatted_phone = self._format_phone_number(phone_number)
+            
+            # Validate phone number length (API requires exactly 11 digits)
+            if len(formatted_phone) != 11:
+                logger.error(f"Invalid phone number format: {phone_number} -> {formatted_phone} (length: {len(formatted_phone)})")
+                return {
+                    'success': False,
+                    'message': f'Invalid phone number format. Expected 11 digits (968XXXXXXXXX), got {len(formatted_phone)} digits: {formatted_phone}',
+                    'message_id': None
+                }
+            
+            # Validate phone number starts with 968
+            if not formatted_phone.startswith('968'):
+                logger.error(f"Phone number must start with 968: {formatted_phone}")
+                return {
+                    'success': False,
+                    'message': f'Phone number must start with 968 (Oman country code). Got: {formatted_phone}',
+                    'message_id': None
+                }
             
             # Prepare SMS payload according to API documentation
             # API expects: UserID, Password, Message, Language, MobileNo (array), RecipientType
@@ -299,22 +320,90 @@ class IBulkSMSService:
                 'ScheddateTime': ''  # Empty for immediate send
             }
             
-            # Add sender ID if configured (some APIs might support it)
+            # Add sender ID if configured
+            # Note: Some APIs use different field names. Try both common variations.
+            # IMPORTANT: If SenderID is not approved by the provider, messages may be queued but not delivered
             if self.sender_id:
+                # Try both field name variations
                 payload['SenderID'] = self.sender_id
+                # Some APIs might use 'SenderId' or 'Sender' - but let's stick with SenderID for now
+                logger.info(f"Using SenderID: {self.sender_id} - If messages are not delivered, SenderID may not be approved by provider")
+            else:
+                logger.warning("No SenderID configured - Messages will be sent without custom sender ID")
             
-            # Send SMS using JSON format
-            response = requests.post(
-                self.api_url, 
-                json=payload,  # Use json= instead of data=
-                headers={'Content-Type': 'application/json', 'Cache-Control': 'no-cache'},
-                timeout=30
-            )
+            # Log the payload (without password for security)
+            payload_log = payload.copy()
+            payload_log['Password'] = '***HIDDEN***'
+            logger.info(f"Sending SMS to {formatted_phone} with payload: {json.dumps(payload_log, ensure_ascii=False)}")
+            logger.info(f"Sender ID: {self.sender_id if self.sender_id else 'Not configured'}")
+            
+            # Try JSON format first, then fallback to form-data if SOAP error
+            response = None
+            try:
+                # Send SMS using JSON format
+                response = requests.post(
+                    self.api_url, 
+                    json=payload,  # Use json= instead of data=
+                    headers={'Content-Type': 'application/json', 'Cache-Control': 'no-cache'},
+                    timeout=30
+                )
+                
+                # Check if response is SOAP error (indicates API expects form-data)
+                if response.status_code == 500 and 'soap' in response.text.lower():
+                    logger.warning("API returned SOAP error, retrying with form-data format")
+                    # Retry with form-data
+                    response = requests.post(
+                        self.api_url,
+                        data=payload,  # Use data= for form-data
+                        headers={'Cache-Control': 'no-cache'},
+                        timeout=30
+                    )
+            except requests.RequestException as e:
+                # If JSON fails, try form-data
+                logger.warning(f"JSON request failed, retrying with form-data: {str(e)}")
+                try:
+                    response = requests.post(
+                        self.api_url,
+                        data=payload,  # Use data= for form-data
+                        headers={'Cache-Control': 'no-cache'},
+                        timeout=30
+                    )
+                except requests.RequestException as e2:
+                    raise e2
+            
+            # Log the full response for debugging
+            logger.info(f"SMS API Response - Status: {response.status_code}, Body: {response.text[:500]}")
             
             # API returns 200/201 for successful requests, but checks Code field in response
             if response.status_code in [200, 201]:
                 try:
+                    # Try to parse as JSON first
+                try:
                     result_data = response.json()
+                    except (json.JSONDecodeError, ValueError):
+                        # Response might be XML/SOAP or other format
+                        logger.warning(f"Response is not JSON, checking for success indicators: {response.text[:200]}")
+                        response_text = response.text.lower()
+                        
+                        # Check if response contains success indicators even if not JSON
+                        if 'code' in response_text and ('1' in response_text or 'success' in response_text or 'pushed' in response_text):
+                            # Might be XML with success code
+                            logger.info("Response appears to indicate success despite non-JSON format")
+                            return {
+                                'success': True,
+                                'message': 'SMS sent successfully (non-JSON response)',
+                                'message_id': 'unknown',
+                                'phone': formatted_phone,
+                                'note': 'Message pushed to queue. Delivery may take a few minutes.'
+                            }
+                        
+                        # If we can't parse and no success indicators, return error
+                        logger.error(f"Invalid response format: {response.text[:200]}")
+                        return {
+                            'success': False,
+                            'message': 'Invalid response format from SMS service (expected JSON, got XML/SOAP)',
+                            'message_id': None
+                        }
                     
                     # Check Code field: Code 1 = success (Message Pushed), other codes = error
                     code = result_data.get('Code', -1)
@@ -325,13 +414,53 @@ class IBulkSMSService:
                         message_text = result_data.get('Message', 'SMS sent successfully')
                         
                         logger.info(f"SMS sent successfully to {formatted_phone}, Code: {code}, Message: {message_text}")
+                        logger.info(f"Full API response: {json.dumps(result_data, ensure_ascii=False)}")
                         
-                        return {
-                            'success': True,
+                        # Important: Code 1 means "Message Pushed" to queue, not necessarily delivered
+                        # Delivery can take time and depends on:
+                        # 1. SenderID approval status
+                        # 2. Network conditions
+                        # 3. Recipient's phone status
+                        # 4. Message content compliance
+                        
+                        # Update balance after successful send (if school is configured)
+                        # Note: Balance endpoint may not be available, so this is optional
+                        if self.school:
+                            try:
+                                # Check balance to update it (non-blocking, may fail if endpoint doesn't exist)
+                                balance_result = self.check_balance()
+                                if balance_result.get('success'):
+                                    logger.info(f"Balance updated after SMS send: {balance_result.get('balance', 0)} OMR")
+                                else:
+                                    # Balance check failed (endpoint may not exist) - this is OK
+                                    logger.info(f"Balance check unavailable (endpoint may not exist): {balance_result.get('message', 'Unknown')}")
+                            except Exception as e:
+                                # Balance check failed - this is OK, endpoint may not exist
+                                logger.info(f"Balance check not available: {str(e)}")
+                        
+                        # Build detailed response with troubleshooting info
+                        response_data = {
+                        'success': True,
                             'message': message_text or 'SMS sent successfully',
-                            'message_id': message_id,
-                            'phone': formatted_phone
+                        'message_id': message_id,
+                            'phone': formatted_phone,
+                            'note': 'Message pushed to queue. Delivery may take a few minutes. If not received, check: 1) SenderID approval, 2) Phone number validity, 3) Network status'
                         }
+                        
+                        # Add troubleshooting information
+                        troubleshooting = []
+                        if self.sender_id:
+                            troubleshooting.append(f"SenderID '{self.sender_id}' is configured. If messages are not delivered, verify with your provider that this SenderID is approved and active.")
+                        else:
+                            troubleshooting.append("No SenderID configured. Messages will use default sender ID.")
+                        
+                        troubleshooting.append("Check your iBulk SMS dashboard for delivery reports and status.")
+                        troubleshooting.append("Delivery can take 5-15 minutes. Wait before retrying.")
+                        troubleshooting.append("If still not received after 15 minutes, contact Infocomm/Omantel support: +968 24151020")
+                        
+                        response_data['troubleshooting'] = troubleshooting
+                        
+                        return response_data
                     else:
                         # Error code in response - map to human-readable message
                         error_message = self._get_error_message(code, result_data.get('Message', 'Unknown error'))
@@ -341,7 +470,7 @@ class IBulkSMSService:
                             'success': False,
                             'message': f'SMS service error (Code {code}): {error_message}',
                             'message_id': None
-                        }
+                    }
                 except json.JSONDecodeError:
                     logger.error(f"Invalid JSON response: {response.text[:200]}")
                     return {
@@ -481,7 +610,7 @@ class IBulkSMSService:
             14: 'Credit Expired',
             15: 'Invalid Http request or Parameter fields are wrong',
             16: 'Invalid date time parameter',
-            18: 'Web Service User not registered',
+            18: 'Web Service User not registered - Please contact your SMS provider (Infocomm/Omantel) to enable REST API access for your account. Your account may be valid for web interface but not registered for REST API service.',
             20: 'Client IP Address has been blocked',
             21: 'Client IP is outside Oman, Outside Oman IP is not allowed to access web service',
             22: 'Wrong Flash message parameter, Please pass "y" for flash sms',
@@ -500,21 +629,57 @@ class IBulkSMSService:
     def _format_phone_number(self, phone: str) -> str:
         """
         Format phone number for Oman (+968)
+        API requires exactly 11 digits: 968XXXXXXXXX (968 + 8 digits)
         
         Args:
             phone (str): Phone number to format
             
         Returns:
-            str: Formatted phone number
+            str: Formatted phone number (11 digits)
         """
         # Remove all non-digit characters
         clean_phone = ''.join(filter(str.isdigit, phone))
         
-        # Add Oman country code if not present
-        if not clean_phone.startswith('968') and len(clean_phone) == 8:
+        # If already starts with 968 and is 11 digits, return as is
+        if clean_phone.startswith('968') and len(clean_phone) == 11:
+            return clean_phone
+        
+        # If starts with 968 but not 11 digits, try to fix
+        if clean_phone.startswith('968'):
+            # If it's longer than 11, take first 11
+            if len(clean_phone) > 11:
+                clean_phone = clean_phone[:11]
+            # If it's shorter, pad with zeros (shouldn't happen, but handle it)
+            elif len(clean_phone) < 11:
+                # This is invalid, but we'll try to fix
+                while len(clean_phone) < 11:
+                    clean_phone = clean_phone + '0'
+        
+        # If 8 digits (local number), add 968
+        elif len(clean_phone) == 8:
             clean_phone = '968' + clean_phone
+        
+        # If 9 digits and starts with 9, add 968 and remove first 9
         elif len(clean_phone) == 9 and clean_phone.startswith('9'):
             clean_phone = '968' + clean_phone[1:]
+        
+        # If 10 digits, might be missing country code
+        elif len(clean_phone) == 10:
+            # If starts with 968, it's already 10 digits of 968XXXXXXXXX, add one more
+            # Actually, this shouldn't happen. Let's check if it starts with 968
+            if not clean_phone.startswith('968'):
+                # It's probably 968XXXXXXXX, add one more digit (shouldn't happen)
+                clean_phone = '968' + clean_phone[2:] if clean_phone.startswith('96') else '968' + clean_phone
+        
+        # Ensure exactly 11 digits
+        if len(clean_phone) != 11:
+            logger.warning(f"Phone number {phone} formatted to {clean_phone} but length is {len(clean_phone)}, not 11")
+            # Try to fix: if too long, truncate; if too short, pad
+            if len(clean_phone) > 11:
+                clean_phone = clean_phone[:11]
+            elif len(clean_phone) < 11 and clean_phone.startswith('968'):
+                # Pad with zeros (this shouldn't happen in practice)
+                clean_phone = clean_phone.ljust(11, '0')
         
         return clean_phone
     

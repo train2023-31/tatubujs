@@ -14,7 +14,9 @@ from app.logger import log_action
 from datetime import datetime, timedelta
 from app.config import get_oman_time
 import logging
-from ibulk_sms_service import get_ibulk_sms_service
+import requests
+import json
+from ibulk_sms_service import get_ibulk_sms_service, IBulkSMSService
 
 logger = logging.getLogger(__name__)
 
@@ -1376,12 +1378,35 @@ def test_sms_connection():
         }), 400
 
     try:
-        # Initialize SMS service
-        sms_service = get_ibulk_sms_service(school_id)
+        # Get credentials from request (for testing before saving)
+        test_username = data.get('ibulk_username')
+        test_password = data.get('ibulk_password')
+        test_sender_id = data.get('ibulk_sender_id')
+        test_api_url = data.get('ibulk_api_url')
         
-        # Test connection by checking balance
+        # Validate that credentials are provided
+        if not test_username or not test_password:
+            return jsonify({
+                "message": {
+                    "en": "Username and password are required for testing.",
+                    "ar": "اسم المستخدم وكلمة المرور مطلوبان للاختبار."
+                },
+                "flag": 2
+            }), 400
+        
+        # Initialize SMS service without school_id to use provided credentials
+        sms_service = IBulkSMSService(school_id=None)
+        
+        # Set credentials from request data for testing
+        sms_service.username = test_username
+        sms_service.password = test_password
+        sms_service.sender_id = test_sender_id
+        sms_service.api_url = test_api_url or 'https://ismartsms.net/RestApi/api/SMS/PostSMS'
+        
+        # First, try to check balance (if endpoint exists)
         balance_result = sms_service.check_balance()
         
+        # If balance check succeeds, return success
         if balance_result['success']:
             return jsonify({
                 "message": {
@@ -1397,20 +1422,176 @@ def test_sms_connection():
                 "school_id": school_id,
                 "flag": 3
             }), 200
-        else:
+        
+        # If balance check fails, try to validate credentials by making a test API call
+        # We'll make a minimal request to validate authentication
+        # According to API docs: Code 3 = wrong credentials, Code 1 = success
+        # Try to validate credentials by making a test call with invalid phone number
+        # This will return Code 9 (Invalid Mobile No) if credentials are valid,
+        # or Code 3 (User or Password is wrong) if credentials are invalid
+        test_payload = {
+            'UserID': test_username,
+            'Password': test_password,
+            'Message': 'Test',
+            'Language': '64',  # Arabic
+            'MobileNo': ['96800000000'],  # Invalid test number
+            'RecipientType': '1',
+            'ScheddateTime': ''  # Immediate send
+        }
+        
+        try:
+            test_response = requests.post(
+                sms_service.api_url,
+                json=test_payload,
+                headers={'Content-Type': 'application/json', 'Cache-Control': 'no-cache'},
+                timeout=30
+            )
+            
+            if test_response.status_code in [200, 201]:
+                try:
+                    response_data = test_response.json()
+                    code = response_data.get('Code', -1)
+                    
+                    # Code 3 = wrong credentials (authentication failed)
+                    if code == 3:
+                        return jsonify({
+                            "message": {
+                                "en": "SMS connection test failed: Invalid credentials",
+                                "ar": "فشل اختبار اتصال SMS: بيانات الاعتماد غير صحيحة"
+                            },
+                            "connection_status": {
+                                "success": False,
+                                "error": "Invalid username or password (Code 3)",
+                                "balance": 0.0
+                            },
+                            "school_id": school_id,
+                            "flag": 4
+                        }), 400
+                    
+                    # Code 9 = Invalid Mobile No (but credentials are valid!)
+                    # Code 8 = Mobile No length is empty (but credentials are valid!)
+                    # Code 5 = Message is blank (but credentials are valid!)
+                    # Code 23 = Mobile Number Optout (but credentials are valid! The number just opted out)
+                    # Code 1 = Success (Message Pushed)
+                    # Any code other than 3 means credentials are valid
+                    if code in [8, 9, 5, 23] or code == 1:
+                        # Credentials are valid! 
+                        # Code 23 means the test number opted out, but credentials work
+                        if code == 23:
+                            success_message = "SMS connection test successful: Credentials are valid. Note: Test phone number has opted out (Code 23), but this confirms your credentials are working correctly."
+                            ar_message = "تم اختبار اتصال SMS بنجاح: بيانات الاعتماد صحيحة. ملاحظة: رقم الهاتف التجريبي قام بإلغاء الاشتراك (Code 23)، لكن هذا يؤكد أن بيانات الاعتماد تعمل بشكل صحيح."
+                        else:
+                            success_message = "SMS connection test successful: Credentials are valid"
+                            ar_message = "تم اختبار اتصال SMS بنجاح: بيانات الاعتماد صحيحة"
+                        
+                        return jsonify({
+                            "message": {
+                                "en": success_message,
+                                "ar": ar_message
+                            },
+                            "connection_status": {
+                                "success": True,
+                                "balance": balance_result.get('balance', 0.0),
+                                "currency": "OMR",
+                                "message": "Credentials validated successfully. Balance endpoint may not be available."
+                            },
+                            "school_id": school_id,
+                            "flag": 3
+                        }), 200
+                    
+                    # Code 18 = Web Service User not registered (needs provider activation)
+                    if code == 18:
+                        return jsonify({
+                            "message": {
+                                "en": "SMS connection test failed: Web Service User not registered. Please contact your SMS provider (Infocomm/Omantel) to enable REST API access for your account.",
+                                "ar": "فشل اختبار اتصال SMS: المستخدم غير مسجل لخدمة REST API. يرجى الاتصال بمزود الخدمة (Infocomm/Omantel) لتفعيل الوصول إلى REST API لحسابك."
+                            },
+                            "connection_status": {
+                                "success": False,
+                                "error": "Code 18: Web Service User not registered - Contact SMS provider to enable REST API access",
+                                "balance": 0.0
+                            },
+                            "school_id": school_id,
+                            "flag": 4
+                        }), 400
+                    
+                    # Other error codes - credentials might be valid but something else is wrong
+                    error_msg = sms_service._get_error_message(code, response_data.get('Message', 'Unknown'))
+                    return jsonify({
+                        "message": {
+                            "en": f"SMS connection test: {error_msg}",
+                            "ar": f"اختبار اتصال SMS: {error_msg}"
+                        },
+                        "connection_status": {
+                            "success": False,
+                            "error": f"Code {code}: {error_msg}",
+                            "balance": 0.0
+                        },
+                        "school_id": school_id,
+                        "flag": 4
+                    }), 400
+                    
+                except json.JSONDecodeError:
+                    # Invalid JSON response
+                    return jsonify({
+                        "message": {
+                            "en": "SMS connection test failed: Invalid API response",
+                            "ar": "فشل اختبار اتصال SMS: استجابة API غير صحيحة"
+                        },
+                        "connection_status": {
+                            "success": False,
+                            "error": f"Invalid response: {test_response.text[:200]}",
+                            "balance": 0.0
+                        },
+                        "school_id": school_id,
+                        "flag": 4
+                    }), 400
+            else:
+                # HTTP error
+                return jsonify({
+                    "message": {
+                        "en": f"SMS connection test failed: HTTP {test_response.status_code}",
+                        "ar": f"فشل اختبار اتصال SMS: HTTP {test_response.status_code}"
+                    },
+                    "connection_status": {
+                        "success": False,
+                        "error": f"HTTP {test_response.status_code}: {test_response.text[:200]}",
+                        "balance": 0.0
+                    },
+                    "school_id": school_id,
+                    "flag": 4
+                }), 400
+                
+        except requests.RequestException as e:
+            # Network error
             return jsonify({
                 "message": {
-                    "en": "SMS connection test failed",
-                    "ar": "فشل اختبار اتصال SMS"
+                    "en": f"SMS connection test failed: Network error",
+                    "ar": f"فشل اختبار اتصال SMS: خطأ في الشبكة"
                 },
                 "connection_status": {
                     "success": False,
-                    "error": balance_result['message'],
+                    "error": f"Network error: {str(e)}",
                     "balance": 0.0
                 },
                 "school_id": school_id,
                 "flag": 4
             }), 400
+        
+        # Fallback to balance result if test call also fails
+        return jsonify({
+            "message": {
+                "en": "SMS connection test failed",
+                "ar": "فشل اختبار اتصال SMS"
+            },
+            "connection_status": {
+                "success": False,
+                "error": balance_result.get('message', 'Unknown error'),
+                "balance": 0.0
+            },
+            "school_id": school_id,
+            "flag": 4
+        }), 400
 
     except Exception as e:
         return jsonify({

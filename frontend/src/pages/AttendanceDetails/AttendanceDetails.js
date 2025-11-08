@@ -12,9 +12,12 @@ import {
   AlertCircle,
   User,
   Printer,
-  Edit
+  Edit,
+  MessageCircle,
+  Smartphone,
+  Send
 } from 'lucide-react';
-import { attendanceAPI, usersAPI } from '../../services/api';
+import { attendanceAPI, usersAPI, authAPI } from '../../services/api';
 import { useMutation, useQueryClient } from 'react-query';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDate, getTodayAPI } from '../../utils/helpers';
@@ -43,6 +46,9 @@ const AttendanceDetails = () => {
   });
   const [isBehaviorNoteModalOpen, setIsBehaviorNoteModalOpen] = useState(false);
   const [behaviorNote, setBehaviorNote] = useState('');
+  const [isSendingSms, setIsSendingSms] = useState(false);
+  const [showSmsConfirmModal, setShowSmsConfirmModal] = useState(false);
+  const [pendingSmsData, setPendingSmsData] = useState(null);
 
   // Fetch attendance summary
   const { data: attendanceSummary, isLoading: summaryLoading } = useQuery(
@@ -154,8 +160,32 @@ const AttendanceDetails = () => {
   const updateBehaviorNoteMutation = useMutation(
     (data) => usersAPI.updateStudentBehaviorNote(data.studentId, data.behaviorNote),
     {
-      onSuccess: () => {
+      onSuccess: (response, variables) => {
+        // Invalidate and refetch all students
         queryClient.invalidateQueries('allStudents');
+        
+        // Update the selected student's behavior note immediately
+        if (selectedStudent && selectedStudent.id === variables.studentId) {
+          setSelectedStudent(prev => ({
+            ...prev,
+            behavior_note: variables.behaviorNote
+          }));
+        }
+        
+        // Refetch all students to get updated data
+        queryClient.refetchQueries('allStudents').then(() => {
+          // After refetch, update selectedStudent with the latest data
+          if (selectedStudent) {
+            const updatedStudents = queryClient.getQueryData('allStudents');
+            if (updatedStudents) {
+              const updatedStudent = updatedStudents.find(s => s.id === selectedStudent.id);
+              if (updatedStudent) {
+                setSelectedStudent(updatedStudent);
+              }
+            }
+          }
+        });
+        
         toast.success('تم تحديث ملاحظة السلوك بنجاح');
         setIsBehaviorNoteModalOpen(false);
         setBehaviorNote('');
@@ -166,6 +196,112 @@ const AttendanceDetails = () => {
     }
   );
 
+  // Send SMS mutation for behavior note
+  const sendBehaviorNoteSmsMutation = useMutation(
+    (data) => authAPI.sendTestSms(data),
+    {
+      onSuccess: (response) => {
+        toast.success(response.message?.ar || 'تم إرسال ملاحظة السلوك عبر SMS بنجاح');
+        setIsSendingSms(false);
+        setShowSmsConfirmModal(false);
+        setPendingSmsData(null);
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message?.ar || 'فشل في إرسال ملاحظة السلوك عبر SMS');
+        setIsSendingSms(false);
+      },
+    }
+  );
+
+  // Handle sending behavior note via SMS
+  const handleSendBehaviorNoteSms = () => {
+    if (!selectedStudent) {
+      toast.error('يرجى اختيار طالب أولاً');
+      return;
+    }
+
+    if (!selectedStudent.phone_number) {
+      toast.error('رقم الهاتف غير متوفر لهذا الطالب');
+      return;
+    }
+
+    if (!selectedStudent.behavior_note || selectedStudent.behavior_note.trim() === '') {
+      toast.error('لا توجد ملاحظة سلوك لإرسالها');
+      return;
+    }
+
+    // Format phone number
+    let phoneNumber = selectedStudent.phone_number.replace(/[^0-9]/g, '');
+    if (!phoneNumber.startsWith('968')) {
+      if (phoneNumber.length === 8) {
+        phoneNumber = '968' + phoneNumber;
+      } else if (phoneNumber.length === 9 && phoneNumber.startsWith('9')) {
+        phoneNumber = '968' + phoneNumber.substring(1);
+      }
+    }
+
+    const message = `ملاحظة السلوك - ${selectedStudent.fullName}\n${selectedStudent.behavior_note}`;
+
+    setPendingSmsData({
+      phone: phoneNumber,
+      message: message,
+      student: selectedStudent
+    });
+    setShowSmsConfirmModal(true);
+  };
+
+  // Confirm and send SMS
+  const confirmSendSms = () => {
+    if (!pendingSmsData) return;
+    
+    setIsSendingSms(true);
+    sendBehaviorNoteSmsMutation.mutate({
+      phone_number: pendingSmsData.phone,
+      message: pendingSmsData.message
+    });
+  };
+
+  // Handle sending behavior note via WhatsApp
+  const handleSendBehaviorNoteWhatsApp = () => {
+    if (!selectedStudent) {
+      toast.error('يرجى اختيار طالب أولاً');
+      return;
+    }
+
+    if (!selectedStudent.phone_number) {
+      toast.error('رقم الهاتف غير متوفر لهذا الطالب');
+      return;
+    }
+
+    if (!selectedStudent.behavior_note || selectedStudent.behavior_note.trim() === '') {
+      toast.error('لا توجد ملاحظة سلوك لإرسالها');
+      return;
+    }
+
+    // Format phone number
+    let phoneNumber = selectedStudent.phone_number.replace(/[^0-9]/g, '');
+    if (!phoneNumber.startsWith('968')) {
+      if (phoneNumber.length === 8) {
+        phoneNumber = '968' + phoneNumber;
+      } else if (phoneNumber.length === 9 && phoneNumber.startsWith('9')) {
+        phoneNumber = '968' + phoneNumber.substring(1);
+      }
+    }
+
+    const message = `ملاحظة السلوك - ${selectedStudent.fullName}\n${selectedStudent.behavior_note}`;
+    const encodedMessage = encodeURIComponent(message);
+
+    // Detect if mobile or desktop
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+    
+    // Use wa.me for mobile, web.whatsapp.com for desktop
+    const whatsappUrl = isMobile 
+      ? `https://wa.me/${phoneNumber}?text=${encodedMessage}`
+      : `https://web.whatsapp.com/send?phone=${phoneNumber}&text=${encodedMessage}`;
+
+    window.open(whatsappUrl, '_blank');
+  };
+
   // Redirect non-admin users away from log tab
   useEffect(() => {
     if (selectedTab === 'log' && user?.role !== 'school_admin') {
@@ -175,10 +311,10 @@ const AttendanceDetails = () => {
 
   const tabs = [
     { id: 'summary', name: 'ملخص الحضور', icon: Users },
-    { id: 'details', name: 'تفاصيل الطلاب', icon: Eye },
-    { id: 'excused', name: 'الطلاب المعذورين', icon: AlertCircle },
+    ...(user?.role === 'school_admin' || user?.role === 'data_analyst' ? [{ id: 'details', name: 'تفاصيل الطلاب', icon: Eye }] : []),
+    { id: 'excused', name: 'ملاحظات العذر', icon: AlertCircle },
     // Only show behavior notes log for school admins
-    ...(user?.role === 'school_admin' || user?.role === 'data_analyst' ? [{ id: 'log', name: 'سجل ملاحظات الطالب', icon: Calendar }] : []),
+    // ...(user?.role === 'school_admin' || user?.role === 'data_analyst' ? [{ id: 'log', name: 'سجل ملاحظات الطالب', icon: Calendar }] : []),
   ];
 
   // PDF Export Function
@@ -815,18 +951,40 @@ const AttendanceDetails = () => {
                   {selectedStudent.is_active ? 'نشط' : 'غير نشط'}
                 </span>
               </div>
-              <div className="md:col-span-3">
+              <div className="md:col-span-4">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-gray-500">ملاحظة السلوك</label>
-                  {(user?.role === 'school_admin' || user?.role === 'data_analyst') && (
-                    <button
-                      onClick={handleOpenBehaviorNoteModal}
-                      className="text-primary-600 hover:text-primary-900 flex items-center text-sm"
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      تعديل
-                    </button>
-                  )}
+                  <div className="flex items-center space-x-2">
+                    {selectedStudent.phone_number && selectedStudent.behavior_note && (
+                      <>
+                        <button
+                          onClick={handleSendBehaviorNoteWhatsApp}
+                          className="text-green-600 hover:text-green-900 flex items-center text-sm px-2 py-1 rounded hover:bg-green-50 transition-colors"
+                          title="إرسال عبر WhatsApp"
+                        >
+                          <MessageCircle className="h-4 w-4 mr-1" />
+                          WhatsApp
+                        </button>
+                        <button
+                          onClick={handleSendBehaviorNoteSms}
+                          className="text-blue-600 hover:text-blue-900 flex items-center text-sm px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                          title="إرسال عبر SMS"
+                        >
+                          <Smartphone className="h-4 w-4 mr-1" />
+                          SMS
+                        </button>
+                      </>
+                    )}
+                    {(user?.role === 'school_admin' || user?.role === 'data_analyst') && (
+                      <button
+                        onClick={handleOpenBehaviorNoteModal}
+                        className="text-primary-600 hover:text-primary-900 flex items-center text-sm px-2 py-1 rounded hover:bg-primary-50 transition-colors"
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        تعديل
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <p className="text-sm text-gray-900 mt-1 p-3 bg-gray-50 rounded-lg border">
                   {selectedStudent.behavior_note || 'لا توجد ملاحظات'}
@@ -882,6 +1040,91 @@ const AttendanceDetails = () => {
                 </>
               ) : (
                 'حفظ الملاحظة'
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* SMS Confirmation Modal */}
+      <Modal
+        isOpen={showSmsConfirmModal}
+        onClose={() => {
+          setShowSmsConfirmModal(false);
+          setPendingSmsData(null);
+        }}
+        title="تأكيد إرسال SMS"
+        size="lg"
+      >
+        <div className="space-y-6">
+          {/* Warning/Info */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-2">يرجى مراجعة الرسالة قبل الإرسال:</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Student Info */}
+          {pendingSmsData?.student && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium text-gray-700">الطالب/ة:</span>
+                  <span className="mr-2 text-gray-900">{pendingSmsData.student.fullName}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700">رقم الهاتف:</span>
+                  <span className="mr-2 text-gray-900">{pendingSmsData.phone}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Message Preview */}
+          <div className="bg-white border-2 border-gray-200 rounded-lg p-4">
+            <div className="mb-2">
+              <span className="text-sm font-medium text-gray-700">معاينة الرسالة:</span>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-300">
+              <pre className="whitespace-pre-wrap text-sm text-gray-900 font-medium" dir="rtl">
+                {pendingSmsData?.message || ''}
+              </pre>
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              <p>عدد الأحرف: {(pendingSmsData?.message || '').length}</p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-between space-x-3 pt-4 border-t border-gray-200">
+            <button
+              onClick={() => {
+                setShowSmsConfirmModal(false);
+                setPendingSmsData(null);
+              }}
+              className="btn btn-outline"
+              disabled={isSendingSms}
+            >
+              إلغاء
+            </button>
+            <button
+              onClick={confirmSendSms}
+              disabled={isSendingSms}
+              className="btn btn-primary"
+            >
+              {isSendingSms ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  <span className="mr-2">جاري الإرسال...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="h-5 w-5 mr-2" />
+                  تأكيد وإرسال
+                </>
               )}
             </button>
           </div>

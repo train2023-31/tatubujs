@@ -14,7 +14,7 @@ const Tabs = ({
       case 'pills':
         return `${baseStyles} rounded-full ${
           isActive 
-            ? 'border-primary-500 text-white shadow-md' 
+            ? 'bg-primary-500 text-white shadow-md hover:bg-primary-600' 
             : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
         }`;
       
