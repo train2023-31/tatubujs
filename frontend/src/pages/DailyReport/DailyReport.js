@@ -593,35 +593,31 @@ ${attendanceStatus}
   };
 
   const generateSmsMessage = (record) => {
-    const studentName = record.student_name || 'الطالب';
-    const className = record.class_name || 'الصف';
+    const studentName = record.student_name 
+      ? record.student_name.split(' ')[0]
+      : 'الطالب';
     const date = formatDate(selectedDate, 'dd/MM/yyyy', 'ar');
     
     const haribTimes = record.absent_times || record.absentTimes || record.absent_periods || [];
     const lateTimes = record.late_times || record.lateTimes || record.late_periods || [];
     const ghaibTimes = record.excused_times || record.excusedTimes || record.excused_periods || [];
-    const hasExcuse = record.is_has_exuse || record.is_has_exuse || false;
     
-    // Build compact attendance status
-    const parts = [];
+    // Build message based on attendance issues
+    // Priority: هروب (harib) > متأخر (late) > غياب (ghaib)
+    let message = '';
+    
     if (haribTimes.length > 0) {
-      parts.push(`هارب:${haribTimes.sort((a, b) => a - b).join(',')}`);
+      const sortedPeriods = haribTimes.sort((a, b) => a - b).join(', ');
+      message = `تم تسجيل ابنك ${studentName} هروب\nالحصص: ${sortedPeriods}\nبتاريخ ${date}`;
+    } else if (lateTimes.length > 0) {
+      const sortedPeriods = lateTimes.sort((a, b) => a - b).join(', ');
+      message = `تم تسجيل ابنك ${studentName} متأخر\nالحصص: ${sortedPeriods}\nبتاريخ ${date}`;
+    } else if (ghaibTimes.length > 0) {
+      message = `تم تسجيل ابنك ${studentName} غياب\nبتاريخ ${date}`;
+    } else {
+      // Fallback if no issues (shouldn't happen, but just in case)
+      message = `تم تسجيل ابنك ${studentName} حاضر\nبتاريخ ${date}`;
     }
-    if (lateTimes.length > 0) {
-      parts.push(`متأخر:${lateTimes.sort((a, b) => a - b).join(',')}`);
-    }
-    if (ghaibTimes.length > 0) {
-      parts.push(`غائب:${ghaibTimes.sort((a, b) => a - b).join(',')}`);
-    }
-    
-    const attendanceStatus = parts.length > 0 ? parts.join(' ') : 'حاضر';
-    const excuseStatus = hasExcuse ? 'مع عذر' : 'بدون عذر';
-    
-    // Shorter message format
-    const message = `${studentName} - ${className}
-${date}
-${attendanceStatus}
-${excuseStatus}`;
 
     return message;
   };
