@@ -608,15 +608,15 @@ ${attendanceStatus}
     
     if (haribTimes.length > 0) {
       const sortedPeriods = haribTimes.sort((a, b) => a - b).join(', ');
-      message = `تم تسجيل ابنك ${studentName} هروب\nالحصص: ${sortedPeriods}\nبتاريخ ${date}`;
+      message = `تم تسجيل ابنك/تك ${studentName} هروب\nالحصص: ${sortedPeriods}\nبتاريخ ${date}`;
     } else if (lateTimes.length > 0) {
       const sortedPeriods = lateTimes.sort((a, b) => a - b).join(', ');
-      message = `تم تسجيل ابنك ${studentName} متأخر\nالحصص: ${sortedPeriods}\nبتاريخ ${date}`;
+      message = `تم تسجيل ابنك/تك ${studentName} متأخر\nالحصص: ${sortedPeriods}\nبتاريخ ${date}`;
     } else if (ghaibTimes.length > 0) {
-      message = `تم تسجيل ابنك ${studentName} غياب\nبتاريخ ${date}`;
+      message = `تم تسجيل ابنك/تك ${studentName} غياب\nبتاريخ ${date}`;
     } else {
       // Fallback if no issues (shouldn't happen, but just in case)
-      message = `تم تسجيل ابنك ${studentName} حاضر\nبتاريخ ${date}`;
+      message = `تم تسجيل ابنك/تك ${studentName} حاضر\nبتاريخ ${date}`;
     }
 
     return message;
@@ -2077,134 +2077,175 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName, filters, 
 
   return (
     <div className="report-container max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="report-header text-center mb-8">
-        <div className="flex items-center justify-center mb-4">
-          <div className="w-20 h-20">
+      {/* Smaller, compact header */}
+      <div className="report-header text-center mb-4 flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-blue-200 bg-blue-50 rounded-lg">
+        <div className="flex items-center gap-3">
           <img 
-              src="/logo.png" 
-              alt="تتبع" 
-              className="h-20 w-20 sm:h-20 sm:w-20 object-contain"
-            />
+            src="/logo.png" 
+            alt="تتبع" 
+            className="h-10 w-10 sm:h-12 sm:w-12 object-contain"
+          />
+          <span className="text-xl sm:text-2xl font-semibold text-gray-900">{schoolName}</span>
+        </div>
+        <div className="flex flex-col sm:flex-row items-center sm:gap-4 gap-1 mt-2 sm:mt-0">
+          <span className="text-xs sm:text-sm text-gray-500">
+            {formatDate(selectedDate, 'dd/MM/yyyy', 'ar-OM')}
+          </span>
+          {confirmationStatus && (
+            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+              confirmationStatus.is_confirm 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-yellow-100 text-yellow-800'
+            }`}>
+              {confirmationStatus.is_confirm ? '✅ تم التأكيد' : '⏳ في انتظار التأكيد'}
+            </span>
+          )}
+        </div>
+      </div>
+      
+      {/* Filter Information */}
+      {hasActiveFilters && (
+        <div className="mt-2 mb-2 p-2 bg-gray-100 rounded-lg text-xs">
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="font-semibold text-gray-700">الفلاتر المطبقة:</span>
+            {filters.classFilter && (
+              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">الصف: {filters.classFilter}</span>
+            )}
+            {filters.statusFilter && (
+              <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                الحالة: {filters.statusFilter === 'present' ? 'حاضر' : 
+                        filters.statusFilter === 'absent' ? 'هارب' :
+                        filters.statusFilter === 'late' ? 'متأخر' : 'غائب'}
+              </span>
+            )}
+            {filters.searchTerm && (
+              <span className="bg-green-100 text-green-800 px-2 py-1 rounded">البحث: {filters.searchTerm}</span>
+            )}
+            {filters.excuseFilter && (
+              <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                العذر: {filters.excuseFilter === 'with_excuse' ? 'ذوي أعذار' : 'بدون أعذار'}
+              </span>
+            )}
           </div>
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          {schoolName}
-        </h1>
-      
-        <p className="text-gray-600 text-lg">
-          التاريخ: {new Date().toLocaleString('ar-OM')}  
-        </p>
-        
-        {/* Confirmation Status */}
-        {confirmationStatus && (
-          <div className="mt-4 p-3 bg-gray-100 rounded-lg">
-            <div className="flex items-center justify-center space-x-4">
-              <span className="text-sm font-semibold text-gray-700">حالة تأكيد الغياب:</span>
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                confirmationStatus.is_confirm 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-yellow-100 text-yellow-800'
-              }`}>
-                {confirmationStatus.is_confirm ? '✅ تم التأكيد' : '⏳ في انتظار التأكيد'}
-              </span>
-             
+      )}
+
+
+      {/* Summary  */}
+      { (
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          <div className="card">
+            <div className="card-body text-center">
+              <div className="text-2xl font-bold text-blue-600">
+                {Object.keys(filteredGroupedData).length}
+              </div>
+              <div className="text-sm text-gray-600">عدد الفصول</div>
             </div>
           </div>
-        )}
-        
-        {/* Filter Information */}
-        {hasActiveFilters && (
-          <div className="mt-4 p-3 bg-gray-100 rounded-lg">
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">الفلاتر المطبقة:</h3>
-            <div className="flex flex-wrap gap-2 text-xs">
-              {filters.classFilter && (
-                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">الصف: {filters.classFilter}</span>
-              )}
-              {filters.statusFilter && (
-                <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                  الحالة: {filters.statusFilter === 'present' ? 'حاضر' : 
-                          filters.statusFilter === 'absent' ? 'هارب' :
-                          filters.statusFilter === 'late' ? 'متأخر' : 'غائب'}
-                </span>
-              )}
-              {filters.searchTerm && (
-                <span className="bg-green-100 text-green-800 px-2 py-1 rounded">البحث: {filters.searchTerm}</span>
-              )}
-              {filters.excuseFilter && (
-                <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                  العذر: {filters.excuseFilter === 'with_excuse' ? 'ذوي أعذار' : 'بدون أعذار'}
-                </span>
-              )}
+          <div className="card">
+            <div className="card-body text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {Object.values(filteredGroupedData).reduce((total, students) => total + students.length, 0)}
+              </div>
+              <div className="text-sm text-gray-600">إجمالي الطلاب</div>
             </div>
           </div>
-        )}
-      </div>
+          <div className="card">
+            <div className="card-body text-center">
+              <div className="text-2xl font-bold text-red-600">
+              {Object.values(filteredGroupedData).reduce((total, students) => 
+                  total + students.filter(s => (s.absent_times || s.absentTimes || s.absent_periods || []).length > 0).length, 0)}
+              </div>
+              <div className="text-sm text-gray-600">الطلاب الهاربين</div>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-body text-center">
+              <div className="text-2xl font-bold text-yellow-600">
+              {Object.values(filteredGroupedData).reduce((total, students) => 
+                  total + students.filter(s => (s.late_times || s.lateTimes || s.late_periods || []).length > 0).length, 0)}
+              </div>
+              <div className="text-sm text-gray-600">الطلاب المتأخرين</div>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-body text-center">
+              <div className="text-2xl font-bold text-purple-600">
+              {Object.values(filteredGroupedData).reduce((total, students) => 
+                  total + students.filter(s => s.is_has_exuse || s.is_has_exuse).length, 0)}
+              </div>
+              <div className="text-sm text-gray-600">الطلاب ذوي الأعذار</div>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-body text-center">
+              <div className="text-2xl font-bold text-orange-600">
+              {Object.values(filteredGroupedData).reduce((total, students) => 
+                  total + students.filter(s => (s.excused_times || s.excusedTimes || s.excused_periods || []).length > 0).length, 0)}
+              </div>
+              <div className="text-sm text-gray-600">الطلاب الغائبين</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Report Table */}
       <div className="">
-        <table className="report-table w-full">
-          <thead className="bg-blue-600 text-white sticky top-0 z-10 shadow-md">
+        <table className="report-table w-full border border-gray-200 text-[10px] leading-tight">
+          <thead className="sticky top-0 z-10">
             <tr>
-              <th className="px-6 py-4 text-right font-bold text-lg">الطالب/ة</th>
-              <th className="px-6 py-4 text-center font-bold text-lg">هارب</th>
-              <th className="px-6 py-4 text-center font-bold text-lg">متأخر</th>
-              <th className="px-6 py-4 text-center font-bold text-lg">غائب</th>
+              <th className="px-1 py-1 text-right font-bold text-[9px]">الطالب/ة</th>
+              <th className="px-1 py-1 text-center font-bold text-[9px]">هارب</th>
+              <th className="px-1 py-1 text-center font-bold text-[9px]">متأخر</th>
+              <th className="px-1 py-1 text-center font-bold text-[9px]">غائب</th>
             </tr>
           </thead>
           <tbody>
             {Object.entries(hasActiveFilters ? filteredGroupedData : data).map(([className, students]) => (
               <React.Fragment key={className}>
                 {/* Class Header */}
-                <tr className="class-header">
-                  <td colSpan="4" className="px-6 py-3 font-bold text-gray-800 text-lg">
+                <tr className="class-header bg-gray-100">
+                  <td colSpan="4" className="px-1 py-0.5 font-bold text-gray-700 text-[8px] border-b border-gray-200">
                     {className}
                   </td>
                 </tr>
-                
-                {/* Students */}
                 {students.length > 0 ? (
                   students
                     .sort((a, b) => {
-                      // Sort by Arabic student names alphabetically
                       const nameA = (a.student_name || '').trim();
                       const nameB = (b.student_name || '').trim();
                       return nameA.localeCompare(nameB, 'ar', { sensitivity: 'base' });
                     })
                     .map((record, index) => {
-                    const haribTimes = record.absent_times || record.absentTimes || record.absent_periods || [];
-                    const hasExcuse = record.is_has_exuse || record.is_has_exuse || false;
-                    
-                    // Determine row color based on attendance status for PDF
-                    let rowColorClass = "student-row";
-                    if (haribTimes.length > 0) {
-                      // Red background for students with absent periods
-                      rowColorClass = "student-row bg-red-50 border-l-4 border-red-400 text-red-800";
-                    }  if (hasExcuse) {
-                      // Green background for students with excuses
-                      rowColorClass = "student-row bg-green-50 border-l-4 border-green-400 text-green-800";
-                    }
-                    
-                    return (
-                      <tr key={record.student_id} className={rowColorClass}>
-                        <td className="px-6 py-4 text-right student-name text-base">
-                          {record.student_name}
-                        </td>
-                        <td className="px-6 py-4 text-center harib-days text-base">
-                          {getHaribDays(record)}
-                        </td>
-                        <td className="px-6 py-4 text-center late-days text-base">
-                          {getLateDays(record)}
-                        </td>
-                        <td className="px-6 py-4 text-center ghaib-days text-base">
-                          {getGhaibDays(record)}
-                        </td>
-                      </tr>
-                    );
-                  })
+                      const haribTimes = record.absent_times || record.absentTimes || record.absent_periods || [];
+                      const hasExcuse = record.is_has_exuse || record.is_has_exuse || false;
+                      let rowColorClass = "student-row";
+                      if (haribTimes.length > 0) {
+                        rowColorClass = "student-row bg-red-50 text-red-800";
+                      }
+                      if (hasExcuse) {
+                        rowColorClass = "student-row bg-green-50 text-green-800";
+                      }
+                      return (
+                        <tr key={record.student_id} className={`${rowColorClass} border-b border-gray-100`}>
+                          <td className="px-1 py-0.5 text-right student-name text-[9px]">
+                            {record.student_name}
+                          </td>
+                          <td className="px-1 py-0.5 text-center harib-days text-[9px]">
+                            {getHaribDays(record)}
+                          </td>
+                          <td className="px-1 py-0.5 text-center late-days text-[9px]">
+                            {getLateDays(record)}
+                          </td>
+                          <td className="px-1 py-0.5 text-center ghaib-days text-[9px]">
+                            {getGhaibDays(record)}
+                          </td>
+                        </tr>
+                      );
+                    })
                 ) : (
                   <tr className="bg-gray-50">
-                    <td colSpan="4" className="px-6 py-4 text-center text-yellow-700 text-base italic">
+                    <td colSpan="4" className="px-1 py-2 text-center text-yellow-700 text-[8px] italic">
                       لا توجد سجلات بعد أو لا يوجد غائبين
                     </td>
                   </tr>
@@ -2215,40 +2256,7 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName, filters, 
         </table>
       </div>
 
-      {/* Summary */}
-      {hasActiveFilters && (
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">ملخص النتائج المفلترة</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {Object.values(filteredGroupedData).reduce((total, students) => total + students.length, 0)}
-              </div>
-              <div className="text-gray-600">إجمالي الطلاب</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {Object.keys(filteredGroupedData).length}
-              </div>
-              <div className="text-gray-600">عدد الصفوف</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">
-                {Object.values(filteredGroupedData).reduce((total, students) => 
-                  total + students.filter(s => (s.absent_times || s.absentTimes || s.absent_periods || []).length > 0).length, 0)}
-              </div>
-              <div className="text-gray-600">الطلاب الغائبين</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">
-                {Object.values(filteredGroupedData).reduce((total, students) => 
-                   total + students.filter(s => s.is_has_exuse || s.is_has_exuse).length, 0)}
-              </div>
-              <div className="text-gray-600">الطلاب ذوي الأعذار</div>
-            </div>
-          </div>
-        </div>
-      )}
+      
 
       {/* Footer */}
       <div className="report-footer mt-8 text-center text-sm text-gray-500">

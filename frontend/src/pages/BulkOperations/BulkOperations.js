@@ -616,7 +616,9 @@ const BulkOperations = () => {
             <div>
               <h4 className="text-sm font-medium text-gray-900 mb-2">نصائح:</h4>
               <ul className="text-sm text-gray-600 space-y-1">
-                <li>• استخدم ملف Excel (XLS أو XLSX)</li>
+                
+                <li>• قم بتنزيل قوائم الفصول من نظام البوابة (شاهد الفيديو للتعرف على كيفية التنزيل) وقم برفعها بدون التعديل عليها</li>
+                <li>•  استخدم ملف Excel (XLS أو XLSX) </li>
                 <li>• تأكد من أن الصف الأول يحتوي على أسماء الحقول</li>
                 <li>• لا تترك حقول مطلوبة فارغة</li>
                 <li>• تأكد من عدم تكرار أسماء المستخدمين</li>

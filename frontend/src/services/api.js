@@ -137,9 +137,9 @@ export const authAPI = {
   registerDataAnalyst: (dataAnalystData) => api.post('/auth/register_single_data_analyst', dataAnalystData),
   registerTeachers: (teachersData) => api.post('/auth/register_Teacher', teachersData),
   registerStudents: (studentsData) => api.post('/auth/register_Students', studentsData),
-  registerAndAssignStudents: (data) => api.post('/auth/register_and_assign_students_v2', data),
+  registerAndAssignStudents: (data) => api.post('/auth/register_and_assign_students_v2', data, { timeout: 300000 }), // 5 minutes timeout for bulk operations
   registerSingleAssignStudent: (data) => api.post('/auth/register_single_assign_student', data),
-  updateStudentsPhoneNumbers: (data) => api.post('/auth/update_students_phone_numbers', data),
+  updateStudentsPhoneNumbers: (data) => api.post('/auth/update_students_phone_numbers', data,{ timeout: 300000 }),
   deleteUser: (userId) => api.delete(`/auth/user/${userId}`),
   getUserById: (userId) => api.get(`/auth/getUser/${userId}`).then(res => res.data),
   deleteSchoolData: (options) => api.delete('/auth/delete_school_data', { data: { delete_options: options } }),

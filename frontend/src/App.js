@@ -129,7 +129,7 @@ const initializeCacheManagement = async () => {
   }
 
   // Store current version
-  const currentVersion = process.env.REACT_APP_VERSION || '2.0.0';
+  const currentVersion = process.env.REACT_APP_VERSION || '2.0.1';
   localStorage.setItem('app_version', currentVersion);
 
   // Clear caches periodically on mobile (every 24 hours)

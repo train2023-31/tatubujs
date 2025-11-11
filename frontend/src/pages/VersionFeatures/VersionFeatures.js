@@ -43,7 +43,7 @@ const VersionFeatures = () => {
   const recentVersions = [
     {
       version: '2.0.0',
-      releaseDate: '2025-11-07',
+      releaseDate: '2025-10-10',
       type: 'current',
       categories: [
         {
