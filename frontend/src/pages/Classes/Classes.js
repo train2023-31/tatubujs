@@ -71,6 +71,18 @@ const Classes = () => {
     }
   );
 
+  // Fetch students for assignment (excluding those already in the target class)
+  const { data: assignableStudents, isLoading: assignableStudentsLoading } = useQuery(
+    ['assignableStudents', selectedItem?.id],
+    () => classesAPI.getMySchoolStudents(selectedItem?.id),
+    { 
+      enabled: !!selectedItem?.id && isAssignModalOpen,
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 8000),
+      staleTime: 30000,
+    }
+  );
+
   // Fetch class students when viewing a specific class
   const { data: classStudents, isLoading: classStudentsLoading } = useQuery(
     ['classStudents', selectedItem?.id],
@@ -407,10 +419,11 @@ const Classes = () => {
         {selectedItem && (
           <AssignStudentsForm
             classData={selectedItem}
-            students={unassignedStudents || []}
+            students={assignableStudents || []}
+            loading={assignableStudentsLoading}
             onClose={() => setIsAssignModalOpen(false)}
             onSubmit={assignStudentsMutation.mutate}
-            loading={assignStudentsMutation.isLoading}
+            submitLoading={assignStudentsMutation.isLoading}
           />
         )}
       </Modal>
@@ -897,7 +910,7 @@ const EditForm = ({ item, type, onClose }) => {
 };
 
 // Assign Students Form
-const AssignStudentsForm = ({ classData, students, onClose, onSubmit, loading }) => {
+const AssignStudentsForm = ({ classData, students, loading, onClose, onSubmit, submitLoading }) => {
   const [selectedStudents, setSelectedStudents] = useState([]);
 
   const handleStudentToggle = (studentId) => {
@@ -920,38 +933,65 @@ const AssignStudentsForm = ({ classData, students, onClose, onSubmit, loading })
     });
   };
 
+  if (loading) {
+    return (
+      <div className="flex justify-center py-8">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-2">
           تعيين طلاب لفصل: {classData.name}
         </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          يمكن تعيين الطلاب الذين هم بالفعل في فصول أخرى (مثل الفصول الأساسية) إلى هذا الفصل
+        </p>
         
         {students.length === 0 ? (
           <p className="text-gray-500 text-center py-8">
-            لا توجد طلاب غير معينين
+            جميع الطلاب معينين بالفعل في هذا الفصل
           </p>
         ) : (
           <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-md">
-            {students.map((student) => (
-              <label
-                key={student.id}
-                className="flex items-center p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedStudents.includes(student.id)}
-                  onChange={() => handleStudentToggle(student.id)}
-                  className="mr-3"
-                />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{student.fullName}</p>
-                  {student.phone_number && (
-                    <p className="text-sm text-gray-500">{student.phone_number}</p>
-                  )}
-                </div>
-              </label>
-            ))}
+            {students.map((student) => {
+              const studentClasses = student.class_names || (student.class_name ? [student.class_name] : []);
+              return (
+                <label
+                  key={student.id}
+                  className="flex items-center p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedStudents.includes(student.id)}
+                    onChange={() => handleStudentToggle(student.id)}
+                    className="mr-3"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">{student.fullName}</p>
+                    {student.phone_number && (
+                      <p className="text-sm text-gray-500">{student.phone_number}</p>
+                    )}
+                    {studentClasses.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        <span className="text-xs text-gray-500">الفصول الحالية:</span>
+                        {studentClasses.map((className, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                          >
+                            {className}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </label>
+              );
+            })}
           </div>
         )}
       </div>
@@ -966,10 +1006,10 @@ const AssignStudentsForm = ({ classData, students, onClose, onSubmit, loading })
         </button>
         <button
           type="submit"
-          disabled={loading || selectedStudents.length === 0}
+          disabled={submitLoading || selectedStudents.length === 0}
           className="btn btn-primary"
         >
-          {loading ? (
+          {submitLoading ? (
             <>
               <LoadingSpinner size="sm" />
               <span className="mr-2">جاري التعيين...</span>
@@ -1006,22 +1046,40 @@ const ViewClassStudentsForm = ({ classData, students, loading, onClose }) => {
           </p>
         ) : (
           <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-md">
-            {students.map((student) => (
-              <div
-                key={student.id}
-                className="flex items-center p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
-              >
-                <div className="h-8 w-8 bg-primary-100 rounded-full flex items-center justify-center">
-                  <Users className="h-4 w-4 text-primary-600" />
+            {students.map((student) => {
+              const allClasses = student.class_names || (student.class_name ? [student.class_name] : []);
+              const otherClasses = allClasses.filter(cls => cls !== classData.name);
+              
+              return (
+                <div
+                  key={student.id}
+                  className="flex items-center p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                >
+                  <div className="h-8 w-8 bg-primary-100 rounded-full flex items-center justify-center">
+                    <Users className="h-4 w-4 text-primary-600" />
+                  </div>
+                  <div className="mr-3 flex-1">
+                    <p className="text-sm font-medium text-gray-900">{student.fullName}</p>
+                    {student.phone_number && (
+                      <p className="text-sm text-gray-500">{student.phone_number}</p>
+                    )}
+                    {otherClasses.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        <span className="text-xs text-gray-500">فصول أخرى:</span>
+                        {otherClasses.map((className, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800"
+                          >
+                            {className}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="mr-3">
-                  <p className="text-sm font-medium text-gray-900">{student.fullName}</p>
-                  {student.phone_number && (
-                    <p className="text-sm text-gray-500">{student.phone_number}</p>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

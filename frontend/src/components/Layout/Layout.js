@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import Footer from './Footer';
+import AddToHomeScreen from '../AddToHomeScreen/AddToHomeScreen';
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -27,6 +28,9 @@ const Layout = () => {
         {/* Footer */}
         {/* <Footer /> */}
       </div>
+      
+      {/* Add to Home Screen Prompt */}
+      <AddToHomeScreen />
     </div>
   );
 };

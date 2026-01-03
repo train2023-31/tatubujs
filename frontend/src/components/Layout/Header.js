@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, Bell, User, LogOut, Star, RefreshCw } from 'lucide-react';
+import { Menu, Bell, User, LogOut, Star, RefreshCw, HelpCircle, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { getRoleDisplayName } from '../../utils/helpers';
+import { useAddToHomeScreen } from '../../hooks/useAddToHomeScreen';
 import toast from 'react-hot-toast';
 
 const Header = ({ onMenuClick }) => {
@@ -11,6 +12,7 @@ const Header = ({ onMenuClick }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const { canInstall, isIOS, isStandalone, promptToInstall, showIOSInstallInstructions } = useAddToHomeScreen();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -59,7 +61,35 @@ const Header = ({ onMenuClick }) => {
 
         {/* Left side - User menu */}
         <div className="flex items-center space-x-2 space-x-reverse">
+          {/* Add to Home Screen button (mobile only) */}
+          {canInstall && !isStandalone && (
+            <button
+              onClick={async () => {
+                if (isIOS) {
+                  showIOSInstallInstructions();
+                } else {
+                  const accepted = await promptToInstall();
+                  if (accepted) {
+                    toast.success('تم إضافة التطبيق إلى الشاشة الرئيسية بنجاح!');
+                  }
+                }
+              }}
+              className="p-1.5 lg:p-2 text-gray-400 hover:text-green-500 hover:bg-green-50 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center gap-1.5 transition-colors duration-200"
+              title="إضافة إلى الشاشة الرئيسية"
+            > 
+              <Download className="h-4 w-4 lg:h-5 lg:w-5" />
+              <span className="text-xs lg:text-sm hidden sm:inline">إضافة للتطبيق</span>
+            </button>
+          )}
           {/* Cache clear button (mobile-friendly) */}
+          <button
+            onClick={() => navigate('/app/guide')}
+            className="p-1.5 lg:p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-1.5 transition-colors duration-200"
+            title="دليل الاستخدام"
+          > 
+            <HelpCircle className="h-4 w-4 lg:h-5 lg:w-5" />
+            <span className="text-xs lg:text-sm hidden sm:inline">دليل الاستخدام</span>
+          </button>
           <button
             onClick={async () => {
               try {

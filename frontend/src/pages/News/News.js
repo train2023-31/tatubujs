@@ -58,13 +58,20 @@ const News = () => {
       key: 'title',
       header: 'عنوان الخبر',
       render: (row) => (
-        <div className="flex items-center">
-          <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
             <Newspaper className="h-5 w-5 text-green-600" />
           </div>
-          <div className="mr-3">
-            <p className="text-sm font-medium text-gray-900">{row.title}</p>
-            <p className="text-sm text-gray-500 truncate max-w-xs">{row.description}</p>
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <p className="text-sm sm:text-base font-medium text-gray-900 break-words">{row.title}</p>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1" style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              wordBreak: 'break-word',
+              lineHeight: '1.5'
+            }}>{row.description}</p>
           </div>
         </div>
       ),
@@ -73,12 +80,12 @@ const News = () => {
       key: 'type',
       header: 'النوع',
       render: (row) => (
-        <div className="flex items-center">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className={`badge ${row.type === 'global' ? 'badge-info' : 'badge-warning'}`}>
             {row.type === 'global' ? 'عام' : 'مدرسي'}
           </span>
           {row.type === 'global' && !hasRole(user, ['admin']) && (
-            <Shield className="h-4 w-4 text-gray-400 mr-1" title="يتطلب صلاحيات مدير عام" />
+            <Shield className="h-4 w-4 text-gray-400 flex-shrink-0" title="يتطلب صلاحيات مدير عام" />
           )}
         </div>
       ),
@@ -87,9 +94,9 @@ const News = () => {
       key: 'created_by_name',
       header: 'المنشئ',
       render: (row) => (
-        <div>
-          <p className="text-sm font-medium text-gray-900">{row.created_by_name}</p>
-          <p className="text-sm text-gray-500">{row.created_at}</p>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate">{row.created_by_name || '-'}</p>
+          <p className="text-xs text-gray-500 whitespace-nowrap">{row.created_at || '-'}</p>
         </div>
       ),
     },
@@ -106,9 +113,9 @@ const News = () => {
       key: 'end_at',
       header: 'تاريخ الانتهاء',
       render: (row) => (
-        <div className="flex items-center">
-          <Calendar className="h-4 w-4 text-gray-400 mr-1" />
-          <span className="text-sm text-gray-600">
+        <div className="flex items-center gap-1 min-w-0">
+          <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <span className="text-sm text-gray-600 truncate">
             {row.end_at || 'لا يوجد'}
           </span>
         </div>
@@ -132,14 +139,14 @@ const News = () => {
         }
         
         return (
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             {canEdit && (
               <button
                 onClick={() => {
                   setSelectedNews(row);
                   setIsEditModalOpen(true);
                 }}
-                className="text-primary-600 hover:text-primary-900"
+                className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50 transition-colors"
                 title="تعديل"
               >
                 <Edit className="h-4 w-4" />
@@ -152,7 +159,7 @@ const News = () => {
                     deleteNewsMutation.mutate(row.id);
                   }
                 }}
-                className="text-red-600 hover:text-red-900"
+                className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
                 title="حذف"
                 disabled={deleteNewsMutation.isLoading}
               >
@@ -166,17 +173,17 @@ const News = () => {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-x-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">إدارة الأخبار</h1>
-          <p className="text-gray-600">إدارة الأخبار والإعلانات</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">إدارة الأخبار</h1>
+          <p className="text-sm sm:text-base text-gray-600">إدارة الأخبار والإعلانات</p>
         </div>
         {hasRole(user, ['admin', 'school_admin']) && (
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="btn btn-primary"
+            className="btn btn-primary w-full sm:w-auto"
           >
             <Plus className="h-5 w-5 mr-2" />
             إضافة خبر جديد
@@ -279,9 +286,10 @@ const NewsForm = ({ news, onClose, onSubmit, loading }) => {
             name="title"
             value={formData.title}
             onChange={handleChange}
-            className="input"
+            className="input w-full"
             required
             placeholder="أدخل عنوان الخبر"
+            autoComplete="off"
           />
         </div>
         
@@ -291,10 +299,11 @@ const NewsForm = ({ news, onClose, onSubmit, loading }) => {
             name="description"
             value={formData.description}
             onChange={handleChange}
-            className="input"
+            className="input w-full resize-none"
             rows={4}
             required
             placeholder="أدخل وصف الخبر"
+            style={{ minHeight: '100px' }}
           />
         </div>
 
@@ -324,7 +333,8 @@ const NewsForm = ({ news, onClose, onSubmit, loading }) => {
             name="end_at"
             value={formData.end_at}
             onChange={handleChange}
-            className="input"
+            className="input w-full"
+            style={{ fontSize: '16px' }}
           />
           <p className="text-sm text-gray-500 mt-1">
             إذا لم تحدد تاريخ انتهاء، سيظهر الخبر دائماً
@@ -343,18 +353,18 @@ const NewsForm = ({ news, onClose, onSubmit, loading }) => {
         </div>
       </div>
 
-      <div className="flex items-center justify-end space-x-3 pt-4">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-4">
         <button
           type="button"
           onClick={onClose}
-          className="btn btn-outline"
+          className="btn btn-outline w-full sm:w-auto"
         >
           إلغاء
         </button>
         <button
           type="submit"
           disabled={loading}
-          className="btn btn-primary"
+          className="btn btn-primary w-full sm:w-auto"
         >
           {loading ? (
             <>

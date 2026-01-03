@@ -55,7 +55,7 @@ const BulkOperations = () => {
         setProcessingStage('');
       },
       onError: (error) => {
-        toast.error(error.response?.data?.message || 'فشل في معالجة البيانات');
+        toast.error(error.response?.data?.message?.ar || 'فشل في معالجة البيانات');
         setIsProcessing(false);
         setProcessingStage('');
       },
@@ -77,7 +77,7 @@ const BulkOperations = () => {
       },
       onError: (error) => {
         toast.dismiss('registering-students');
-        toast.error(error.response?.data?.message || 'فشل في معالجة البيانات');
+        toast.error(error.response?.data?.message?.ar || 'فشل في معالجة البيانات');
         setIsProcessing(false);
         setProcessingStage('');
       },
@@ -96,7 +96,7 @@ const BulkOperations = () => {
         setProcessingStage('');
       },
       onError: (error) => {
-        toast.error(error.response?.data?.message || 'فشل في تحديث أرقام الهواتف');
+        toast.error(error.response?.data?.message?.ar || 'فشل في تحديث أرقام الهواتف');
         setIsProcessing(false);
         setProcessingStage('');
       },
@@ -113,7 +113,7 @@ const BulkOperations = () => {
         return response;
       },
       onError: (error) => {
-        toast.error(error.response?.data?.message || 'فشل في إنشاء الفصول');
+        toast.error(error.response?.data?.message?.ar || 'فشل في إنشاء الفصول'); 
         throw error;
       },
     }
@@ -329,9 +329,15 @@ const BulkOperations = () => {
     return Object.keys(uploadedData[0] || {}).filter(key => key !== '_rowIndex');
   };
 
-  const getStatusIcon = (flag) => {
+  const getStatusIcon = (flag, status) => {
+    // Check status first for "skipped" or "rejected" status
+    if (status === 'skipped' || status === 'rejected') {
+      return <AlertCircle className="h-4 w-4 text-yellow-600" />;
+    }
+    
     switch (flag) {
       case 6:
+      case 7:
       case 8:
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 1:
@@ -339,14 +345,21 @@ const BulkOperations = () => {
       case 3:
       case 4:
       case 5:
-      case 7:
         return <AlertCircle className="h-4 w-4 text-red-600" />;
       default:
         return <X className="h-4 w-4 text-gray-400" />;
     }
   };
 
-  const getStatusText = (flag) => {
+  const getStatusText = (flag, status) => {
+    // Check status first for "skipped" or "rejected" status
+    if (status === 'skipped') {
+      return 'تم التخطي (مسجل بالفعل في هذا الفصل)';
+    }
+    if (status === 'rejected') {
+      return 'تم الرفض (مسجل بالفعل في نفس الفصل)';
+    }
+    
     switch (flag) {
       case 1:
         return 'غير مصرح';
@@ -361,9 +374,9 @@ const BulkOperations = () => {
       case 6:
         return 'تم التسجيل بنجاح';
       case 7:
-        return 'المدرسة غير موجودة';
+        return 'نجاح التحديث'; 
       case 8:
-        return 'تم التسجيل بنجاح';
+        return 'نجاح التعيين';
       default:
         return 'غير معروف';
     }
@@ -617,7 +630,7 @@ const BulkOperations = () => {
               <h4 className="text-sm font-medium text-gray-900 mb-2">نصائح:</h4>
               <ul className="text-sm text-gray-600 space-y-1">
                 
-                <li>• قم بتنزيل قوائم الفصول من نظام البوابة (شاهد الفيديو للتعرف على كيفية التنزيل) وقم برفعها بدون التعديل عليها</li>
+                <li className="text-red-500">• قم بتنزيل قوائم الفصول من نظام البوابة (شاهد الفيديو للتعرف على كيفية التنزيل) <strong>وقم برفعها بدون التعديل عليها</strong></li>
                 <li>•  استخدم ملف Excel (XLS أو XLSX) </li>
                 <li>• تأكد من أن الصف الأول يحتوي على أسماء الحقول</li>
                 <li>• لا تترك حقول مطلوبة فارغة</li>
@@ -628,6 +641,8 @@ const BulkOperations = () => {
                   <>
                     <li>• سيتم إنشاء الفصول تلقائياً من (اسم الصف + الشعبة)</li>
                     <li>• ثم سيتم تسجيل وتعيين الطلاب للفصول المناسبة</li>
+                    <li className="text-red-500">• <strong>دعم التسجيل المتعدد:</strong> يمكن للطالب أن يظهر في عدة صفوف بفصول مختلفة (مثل: أحمد في فصل 12، وفي فصل الفيزياء 1، وفي فصل الكيمياء 2)</li>
+                    <li>• إذا كان الطالب مسجلاً مسبقاً، سيتم تعيينه للفصل الجديد فقط (بدون إعادة التسجيل)</li>
                   </>
                 )}
               </ul>
@@ -759,26 +774,36 @@ const BulkOperations = () => {
           </div>
           <div className="card-body">
             <div className="space-y-4">
-              {results.map((result, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    {getStatusIcon(result.flag)}
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {result.username}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {result.message?.ar || result.message?.en || result.message}
-                      </p>
+              {results.map((result, index) => {
+                const status = result.status || (result.flag === 6 || result.flag === 8 ? 'success' : 'failed');
+                const isSuccess = status === 'success' || result.flag === 6 || result.flag === 8;
+                const isSkipped = status === 'skipped';
+                const isRejected = status === 'rejected';
+                const isFailed = status === 'failed' || (!isSuccess && !isSkipped && !isRejected);
+                
+                return (
+                  <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      {getStatusIcon(result.flag, status)}
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {result.username}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {result.message?.ar || result.message?.en || result.message}
+                        </p>
+                      </div>
                     </div>
+                    <span className={`badge ${
+                      isSuccess ? 'badge-success' : 
+                      isSkipped || isRejected ? 'badge-warning' : 
+                      'badge-danger'
+                    }`}>
+                      {getStatusText(result.flag, status)}
+                    </span>
                   </div>
-                  <span className={`badge ${
-                    result.flag === 6 || result.flag === 8 ? 'badge-success' : 'badge-danger'
-                  }`}>
-                    {getStatusText(result.flag)}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

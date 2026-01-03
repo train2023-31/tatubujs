@@ -996,44 +996,44 @@ ${attendanceStatus}
       {/* Date Selector */}
       <div className="card">
         <div className="card-body">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Calendar className="h-5 w-5 text-gray-400 ml-2" />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+              <Calendar className="h-5 w-5 text-gray-400 ml-2 flex-shrink-0" />
               <label className="text-sm font-medium text-gray-700 whitespace-nowrap">تاريخ التقرير:</label>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="input"
+                className="input flex-1 sm:flex-none"
+                style={{ fontSize: '16px' }}
               />
             </div>
             
             {/* Confirmation Status - Only for school_admin */}
             {(user?.role === 'school_admin' || user?.role === 'data_analyst') && (
-              <div className="flex items-center space-x-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
                 {confirmationLoading ? (
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2">
                     <LoadingSpinner size="sm" />
                     <span className="text-sm text-gray-500">جاري تحميل حالة التأكيد...</span>
                   </div>
                 ) : (
                   <>
-                    <div className="flex items-center space-x-2">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    <div className="flex items-center justify-center sm:justify-start">
+                      <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap ${
                         confirmationStatus?.is_confirm 
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
                         {confirmationStatus?.is_confirm ? '✅ تم التأكيد' : '⏳ في انتظار التأكيد'}
                       </span>
-                   
                     </div>
                     
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <button
                         onClick={() => handleConfirmDayAbsents(true)}
                         disabled={isConfirming || confirmationStatus?.is_confirm}
-                        className={`btn btn-sm btn-primary mr-2 ml-2 ${
+                        className={`btn btn-sm btn-primary flex-1 sm:flex-none ${
                           confirmationStatus?.is_confirm 
                             ? 'btn-success opacity-50 cursor-not-allowed' 
                             : 'btn-success'
@@ -1054,7 +1054,7 @@ ${attendanceStatus}
                         <button
                           onClick={() => handleConfirmDayAbsents(false)}
                           disabled={isConfirming}
-                          className="btn btn-sm btn-outline mr-2 btn-danger"
+                          className="btn btn-sm btn-outline btn-danger flex-1 sm:flex-none"
                         >
                           {isConfirming ? (
                             <>

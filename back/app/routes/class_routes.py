@@ -387,10 +387,25 @@ def assign_students():
     if not students:
         return jsonify(message="No valid students found."), 404
 
-    class_obj.students.extend(students)
+    # Get students already in the class to avoid duplicates
+    existing_student_ids = {student.id for student in class_obj.students}
+    new_students = [student for student in students if student.id not in existing_student_ids]
+    
+    if not new_students:
+        return jsonify(message="All selected students are already in this class."), 400
+
+    # Add only new students to the class (supports multi-class enrollment)
+    class_obj.students.extend(new_students)
     db.session.commit()
 
-    return jsonify(message="Students assigned to class"), 200
+    added_count = len(new_students)
+    skipped_count = len(students) - added_count
+    
+    response_message = f"Successfully assigned {added_count} student(s) to class"
+    if skipped_count > 0:
+        response_message += f". {skipped_count} student(s) were already in this class."
+
+    return jsonify(message=response_message), 200
 
 @class_blueprint.route('/students/<int:class_id>', methods=['GET'])
 @jwt_required()
@@ -406,11 +421,15 @@ def get_class_students(class_id):
 
     student_list = []
     for student in active_students:
+        # Get all classes the student is enrolled in
+        all_class_names = [cls.name for cls in student.classes] if student.classes else []
+        
         student_list.append({
             "id": student.id, 
             "fullName": student.fullName, 
             "phone_number": student.phone_number,
-            "class_name": class_obj.name,
+            "class_name": class_obj.name,  # For backward compatibility
+            "class_names": all_class_names,  # All classes student is enrolled in
             "behavior_note": student.behavior_note
         })
 
@@ -426,27 +445,38 @@ def get_students_from_my_school():
     if not teacher:
         return jsonify(message="Only teachers can access this resource."), 403
 
-    # Query students in the teacher's school who are not assigned to any class
-    students = Student.query.filter(
+    # Get optional class_id parameter to exclude students already in that class
+    exclude_class_id = request.args.get('exclude_class_id', type=int)
+
+    # Query all active students in the teacher's school
+    query = Student.query.filter(
         Student.school_id == teacher.school_id,
-        ~Student.classes.any()  # Students with no associated classes
-    ).all()
+        Student.is_active == True
+    )
+
+    # If exclude_class_id is provided, exclude students already in that class
+    if exclude_class_id:
+        # Get student IDs already in the target class
+        target_class = Class.query.get(exclude_class_id)
+        if target_class:
+            excluded_student_ids = {student.id for student in target_class.students}
+            if excluded_student_ids:
+                query = query.filter(~Student.id.in_(excluded_student_ids))
+
+    students = query.all()
 
     # Prepare the student list for the response
     student_list = []
     for student in students:
-        if not student.is_active:
-            continue  # Only include active students
-        # Get the first class name for the student (assuming students are in one class)
-        class_name = None
-        if student.classes:
-            class_name = student.classes[0].name
+        # Get all class names for the student (students can be in multiple classes)
+        class_names = [cls.name for cls in student.classes] if student.classes else []
         
         student_list.append({
             "id": student.id, 
             "fullName": student.fullName, 
             "phone_number": student.phone_number,
-            "class_name": class_name,
+            "class_name": class_names[0] if class_names else None,  # For backward compatibility
+            "class_names": class_names,  # New field showing all classes
             "behavior_note": student.behavior_note
         })
 

@@ -192,7 +192,10 @@ export const classesAPI = {
   getAllSubjects: () => api.get('/classes/AllSubject').then(res => res.data),
   assignStudents: (data) => api.post('/classes/assign-students', data),
   getClassStudents: (classId) => api.get(`/classes/students/${classId}`).then(res => res.data),
-  getMySchoolStudents: () => api.get('/classes/my-school-students').then(res => res.data),
+  getMySchoolStudents: (excludeClassId) => {
+    const params = excludeClassId ? { exclude_class_id: excludeClassId } : {};
+    return api.get('/classes/my-school-students', { params }).then(res => res.data);
+  },
   removeStudents: (data) => api.post('/classes/remove-students', data),
   addNewStudent: (data) => api.post('/auth/register_single_assign_student', data),
 };

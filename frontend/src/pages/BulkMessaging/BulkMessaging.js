@@ -44,18 +44,53 @@ const BulkMessaging = () => {
   const [showDropdown, setShowDropdown] = useState(false);
 
   // Fetch all students
-  const { data: allStudents, isLoading: studentsLoading } = useQuery(
+  const { data: allStudentsRaw, isLoading: studentsLoading } = useQuery(
     'allStudents',
     usersAPI.getMySchoolStudents,
     { enabled: !!user }
   );
+
+  // Deduplicate students by ID and combine class names
+  const allStudents = React.useMemo(() => {
+    if (!allStudentsRaw) return [];
+    
+    const studentsMap = new Map();
+    
+    allStudentsRaw.forEach(student => {
+      const studentId = student.id;
+      
+      if (studentsMap.has(studentId)) {
+        // Student already exists, add class name if not already present
+        const existing = studentsMap.get(studentId);
+        if (student.class_name && !existing.class_names?.includes(student.class_name)) {
+          existing.class_names = existing.class_names || [existing.class_name].filter(Boolean);
+          existing.class_names.push(student.class_name);
+          existing.class_name = existing.class_names.join('، '); // Update display class_name
+        }
+      } else {
+        // New student, add to map
+        studentsMap.set(studentId, {
+          ...student,
+          class_names: student.class_name ? [student.class_name] : []
+        });
+      }
+    });
+    
+    return Array.from(studentsMap.values());
+  }, [allStudentsRaw]);
 
   // Get unique classes for filter
   const uniqueClasses = React.useMemo(() => {
     if (!allStudents) return [];
     const classes = new Set();
     allStudents.forEach(student => {
-      if (student.class_name) {
+      if (student.class_names && student.class_names.length > 0) {
+        student.class_names.forEach(className => {
+          if (className) {
+            classes.add(className);
+          }
+        });
+      } else if (student.class_name) {
         classes.add(student.class_name);
       }
     });
@@ -67,14 +102,20 @@ const BulkMessaging = () => {
     if (!allStudents) return [];
     
     let filtered = allStudents.filter(student => {
-      // Search filter
+      // Search filter - check in all class names
+      const classNamesToSearch = student.class_names && student.class_names.length > 0 
+        ? student.class_names.join(' ') 
+        : (student.class_name || '');
+      
       const matchesSearch = !searchTerm || 
         student.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         student.phone_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.class_name?.toLowerCase().includes(searchTerm.toLowerCase());
+        classNamesToSearch.toLowerCase().includes(searchTerm.toLowerCase());
       
-      // Class filter
-      const matchesClass = !filterClass || student.class_name === filterClass;
+      // Class filter - check if student is in the selected class
+      const matchesClass = !filterClass || 
+        (student.class_names && student.class_names.includes(filterClass)) ||
+        student.class_name === filterClass;
       
       // Selected filter
       let matchesSelected = true;
@@ -231,21 +272,84 @@ const BulkMessaging = () => {
 
     const phoneNumber = formatPhoneNumber(student.phone_number);
     const personalizedMessage = generatePersonalizedMessage(student);
+    
+    // Properly encode the message for URL
     const encodedMessage = encodeURIComponent(personalizedMessage);
+    
+    // Detect mobile device
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
     
+    // Use wa.me for mobile, web.whatsapp.com for desktop
     const whatsappUrl = isMobile 
       ? `https://wa.me/${phoneNumber}?text=${encodedMessage}`
       : `https://web.whatsapp.com/send?phone=${phoneNumber}&text=${encodedMessage}`;
     
-    // Open WhatsApp window - use noopener to avoid popup blocker
-    const newWindow = window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-    
-    // Check if window was blocked
-    if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-      toast.error('تم حظر النوافذ المنبثقة. يرجى السماح للمتصفح بفتح النوافذ المنبثقة');
-    } else {
-      toast.success(`تم فتح WhatsApp للطالب ${student.fullName}`);
+    try {
+      // On mobile devices, use direct navigation (more reliable)
+      if (isMobile) {
+        // Use setTimeout to ensure it's triggered by user action
+        setTimeout(() => {
+          window.location.href = whatsappUrl;
+        }, 100);
+        toast.success(`جاري فتح WhatsApp للطالب ${student.fullName}...`);
+        return;
+      }
+      
+      // On desktop, try to open in new tab
+      const newWindow = window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+      
+      // Check if popup was blocked
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        // Popup blocked - show user-friendly error with copy link option
+        toast.error(
+          (t) => (
+            <div className="flex flex-col gap-2 text-sm">
+              <span>تم حظر النوافذ المنبثقة</span>
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(whatsappUrl);
+                    toast.success('تم نسخ الرابط! يمكنك لصقه في المتصفح');
+                  } catch (err) {
+                    // Fallback for browsers without clipboard API
+                    const textArea = document.createElement('textarea');
+                    textArea.value = whatsappUrl;
+                    textArea.style.position = 'fixed';
+                    textArea.style.opacity = '0';
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                      document.execCommand('copy');
+                      toast.success('تم نسخ الرابط! يمكنك لصقه في المتصفح');
+                    } catch (e) {
+                      toast.error('فشل نسخ الرابط. يرجى نسخه يدوياً');
+                    }
+                    document.body.removeChild(textArea);
+                  }
+                  toast.dismiss(t.id);
+                }}
+                className="text-xs underline text-blue-600 hover:text-blue-800 mt-1"
+              >
+                انقر لنسخ الرابط
+              </button>
+            </div>
+          ),
+          { duration: 6000 }
+        );
+      } else {
+        // Successfully opened
+        toast.success(`تم فتح WhatsApp للطالب ${student.fullName}`);
+      }
+    } catch (error) {
+      // Fallback: try direct navigation
+      console.error('Error opening WhatsApp:', error);
+      try {
+        window.location.href = whatsappUrl;
+        toast.success(`جاري فتح WhatsApp للطالب ${student.fullName}...`);
+      } catch (e) {
+        toast.error('حدث خطأ في فتح WhatsApp. يرجى المحاولة مرة أخرى');
+        console.error('Error navigating to WhatsApp:', e);
+      }
     }
   };
 
@@ -499,7 +603,11 @@ const BulkMessaging = () => {
                           <span className="text-sm font-medium text-gray-900">{student.fullName}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{student.class_name || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {student.class_names && student.class_names.length > 0 
+                          ? student.class_names.join('، ') 
+                          : (student.class_name || '-')}
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-600">{student.phone_number || '-'}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end space-x-2">

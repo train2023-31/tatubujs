@@ -19,7 +19,16 @@ import {
   MessageCircle,
   Settings,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  StickyNote,
+  HelpCircle,
+  UserCheck,
+  ScrollText,
+  GraduationCap,
+  Phone,
+  Database,
+  Calendar,
+  CheckSquare
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasRole } from '../../utils/helpers';
@@ -35,6 +44,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       id: 'main',
       title: 'الرئيسية',
       defaultExpanded: true,
+
       items: [
         {
           name: 'لوحة التحكم',
@@ -45,9 +55,10 @@ const Sidebar = ({ isOpen, onClose }) => {
       ]
     },
     {
-      id: 'management',
-      title: 'الإدارة',
-      defaultExpanded: true,
+      id: 'school',
+      title: 'المدرسة',
+      
+      defaultExpanded: false,
       items: [
         {
           name: 'إدارة المدارس',
@@ -67,89 +78,13 @@ const Sidebar = ({ isOpen, onClose }) => {
           icon: BookOpen,
           roles: ['school_admin'],
         },
-      ]
-    },
-    {
-      id: 'attendance',
-      title: 'الحضور والغياب',
-      defaultExpanded: true,
-      items: [
-        {
-          name: 'تسجيل الحضور',
-          href: '/app/attendance',
-          icon: ClipboardList,
-          roles: ['teacher', 'school_admin', 'data_analyst'],
-        },
-        {
-          name: 'التقرير اليومي',
-          href: '/app/daily-report',
-          icon: FileText,
-          roles: ['school_admin', 'data_analyst'],
-        },
-        {
-          name: 'تفاصيل الحضور',
-          href: '/app/attendance-details',
-          icon: Eye,
-          roles: ['teacher', 'school_admin', 'data_analyst'],
-        },
-        {
-          name: 'سجل ملاحظات الطالب',
-          href: '/app/student-notes-log',
-          icon: ClipboardList,
-          roles: ['school_admin', 'data_analyst'],
-        },
-      ]
-    },
-    {
-      id: 'reports',
-      title: 'التقارير',
-      defaultExpanded: true,
-      items: [
-        {
-          name: 'التقارير والإحصائيات',
-          href: '/app/reports',
-          icon: BarChart3,
-          roles: ['admin', 'school_admin', 'data_analyst'],
-        },
-        
-        {
-          name: 'تقرير المعلمين',
-          href: '/app/teacher-report',
-          icon: Users,
-          roles: ['school_admin', 'data_analyst'],
-        },
-      ]
-    },
-    {
-      id: 'messaging',
-      title: 'الرسائل والاتصالات',
-      defaultExpanded: false,
-      items: [
-        {
-          name: 'إرسال رسائل مخصصة',
-          href: '/app/bulk-messaging',
-          icon: MessageCircle,
-          roles: ['admin', 'school_admin', 'data_analyst'],
-        },
-        {
-          name: 'إعدادات SMS',
-          href: '/app/sms-configuration',
-          icon: Settings,
-          roles: ['school_admin'],
-        },
-      ]
-    },
-    {
-      id: 'services',
-      title: 'الخدمات',
-      defaultExpanded: false,
-      items: [
         {
           name: 'إدارة الأخبار',
           href: '/app/news',
           icon: Newspaper,
           roles: ['admin', 'school_admin', 'data_analyst'],
         },
+        
         {
           name: 'رفع وتحديث البيانات',
           href: '/app/bulk-operations',
@@ -162,6 +97,71 @@ const Sidebar = ({ isOpen, onClose }) => {
           icon: Trash2,
           roles: ['school_admin'],
         },
+        {
+          name: 'إعدادات SMS',
+          href: '/app/sms-configuration',
+          icon: Phone,
+          roles: ['school_admin'],
+        },
+        {
+          name: 'إرسال رسائل مخصصة',
+          href: '/app/bulk-messaging',
+          icon: MessageCircle,
+          roles: ['admin', 'school_admin', 'data_analyst'],
+        },
+      ]
+    },
+    {
+      id: 'students',
+      title: 'الطلاب',
+      defaultExpanded: false,
+      items: [
+        {
+          name: 'تسجيل الحضور',
+          href: '/app/attendance',
+          icon: ClipboardList,
+          roles: ['teacher', 'school_admin', 'data_analyst'],
+        },
+        {
+          name: 'التقرير اليومي',
+          href: '/app/daily-report',
+          icon: Calendar,
+          roles: ['school_admin', 'data_analyst'],
+        },
+        {
+          name: 'تفاصيل الحضور',
+          href: '/app/attendance-details',
+          icon: Eye,
+          roles: ['teacher', 'school_admin', 'data_analyst'],
+        },
+        {
+          name: 'سجل ملاحظات الطالب',
+          href: '/app/student-notes-log',
+          icon: StickyNote,
+          roles: ['school_admin', 'data_analyst'],
+        },
+        
+      ]
+    },
+    {
+      id: 'teachers',
+      title: 'المعلمين',
+      defaultExpanded: false,
+      items: [
+        
+        {
+          name: 'تقرير المعلمين',
+          href: '/app/teacher-report',
+          icon: UserCheck,
+          roles: ['school_admin', 'data_analyst'],
+        },
+        {
+          name: 'التقارير والإحصائيات',
+          href: '/app/reports',
+          icon: BarChart3,
+          roles: ['admin', 'school_admin', 'data_analyst'],
+        },
+       
       ]
     },
     {
@@ -170,18 +170,17 @@ const Sidebar = ({ isOpen, onClose }) => {
       defaultExpanded: false,
       items: [
         {
+          name: 'دليل الاستخدام',
+          href: '/app/guide',
+          icon: HelpCircle,
+          roles: ['school_admin'],
+        },
+        {
           name: 'سجلات النظام',
           href: '/app/view-logs',
-          icon: FileText,
+          icon: ScrollText,
           roles: ['admin', 'school_admin', 'data_analyst'],
         },
-      ]
-    },
-    {
-      id: 'account',
-      title: 'الحساب',
-      defaultExpanded: false,
-      items: [
         {
           name: 'الملف الشخصي',
           href: '/app/profile',
@@ -280,6 +279,37 @@ const Sidebar = ({ isOpen, onClose }) => {
         <nav className="mt-4 sm:mt-6 px-2 sm:px-3 overflow-y-auto h-full pb-20">
           <div className="space-y-2">
             {filteredNavigationGroups.map((group) => {
+              // If category has only one item, render it as a direct menu item
+              if (group.items.length === 1) {
+                const item = group.items[0];
+                const Icon = item.icon;
+                const isActive = location.pathname === item.href;
+                return (
+                  <NavLink
+                    key={group.id}
+                    to={item.href}
+                    onClick={onClose}
+                    className={({ isActive }) =>
+                      `group flex items-center px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md transition-colors duration-200 ${
+                        isActive
+                          ? 'bg-primary-100 text-primary-700 border-r-2 border-primary-600'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      }`
+                    }
+                  >
+                    <Icon
+                      className={`ml-2 sm:ml-3 h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 ${
+                        isActive
+                          ? 'text-primary-500'
+                          : 'text-gray-400 group-hover:text-gray-500'
+                      }`}
+                    />
+                    <span className="truncate">{item.name}</span>
+                  </NavLink>
+                );
+              }
+              
+              // If category has multiple items, render as expandable category
               const isExpanded = expandedCategories.has(group.id);
               const hasActiveItem = group.items.some(item => 
                 location.pathname === item.href && hasRole(user, item.roles)

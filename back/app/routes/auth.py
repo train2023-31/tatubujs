@@ -12,6 +12,7 @@ from io import StringIO
 import pandas as pd
 import re
 from sqlalchemy import and_
+from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta
 from time import time, sleep 
 from app.logger import log_action
@@ -808,6 +809,11 @@ def register_and_assign_students_v2():
     # Fetch all classes in the school for faster lookup
     school_classes = {cls.name: cls for cls in Class.query.filter_by(school_id=Login_user.school_id).all()}
 
+    # Track students created in this batch to handle duplicates within the same batch
+    batch_students = {}  # {username: student_object}
+    # Track class assignments in this batch: {username: set of class_ids}
+    batch_class_assignments = {}
+
     # Prepare response and register students
     response = []
     for student_data in students_data:
@@ -828,11 +834,104 @@ def register_and_assign_students_v2():
             response.append({"username": username, "message": f"Class '{class_name}' not found.", "status": "failed"})
             continue
 
-        # Check for duplicate username
-        if User.query.filter_by(username=username).first():
-            response.append({"username": username, "message": "Username already exists.", "status": "failed"})
-            continue
+        # Check if student was created in this batch first
+        student = batch_students.get(username)
+        
+        # If not in batch, check database and session (includes flushed but uncommitted objects)
+        if not student:
+            # First check for pending/new objects in session (not yet flushed)
+            # This catches objects added in current batch but not yet flushed
+            for obj in db.session.new:
+                if isinstance(obj, User) and hasattr(obj, 'username') and obj.username == username:
+                    if isinstance(obj, Student) and obj.school_id == Login_user.school_id:
+                        student = obj
+                        batch_students[username] = student
+                        break
+                    elif not isinstance(obj, Student):
+                        # Username exists as non-student user in pending objects
+                        response.append({
+                            "username": username,
+                            "message": {
+                                "en": "Username already exists as non-student user.",
+                                "ar": "اسم المستخدم موجود بالفعل كمستخدم غير طالب."
+                            },
+                            "status": "failed"
+                        })
+                        continue
+            
+            # Query database - this will see both committed AND flushed objects in current session
+            if not student:
+                existing_user = db.session.query(User).filter_by(username=username).first()
+                
+                if existing_user:
+                    # If it's a student in the same school, use it (don't create, just enroll)
+                    if isinstance(existing_user, Student) and existing_user.school_id == Login_user.school_id:
+                        student = existing_user
+                        batch_students[username] = student
+                    else:
+                        # Username exists but not as a student in this school
+                        response.append({
+                            "username": username,
+                            "message": {
+                                "en": "Username already exists as non-student user.",
+                                "ar": "اسم المستخدم موجود بالفعل كمستخدم غير طالب."
+                            },
+                            "status": "failed"
+                        })
+                        continue
 
+        # If student exists (either in DB or in current batch), just enroll to classes
+        if student:
+            # Check if already in this class - check batch assignments first (faster)
+            batch_class_ids = batch_class_assignments.get(username, set())
+            
+            if class_obj.id in batch_class_ids:
+                # Student already enrolled in this class in current batch
+                response.append({
+                    "username": username,
+                    "message": {
+                        "en": "Student already enrolled in class '{class_name}'.",
+                        "ar": "الطالب مسجل بالفعل في الفصل '{class_name}'."
+                    },
+                    "status": "skipped"
+                })
+                continue
+            
+            # Check database directly via student_classes table (more efficient than loading relationships)
+            existing_enrollment = db.session.query(student_classes).filter(
+                student_classes.c.student_id == student.id,
+                student_classes.c.class_id == class_obj.id
+            ).first()
+            
+            if existing_enrollment:
+                # Student already in this class in database
+                response.append({
+                    "username": username,
+                    "message": {
+                        "en": "Student already enrolled in class '{class_name}'.",
+                        "ar": "الطالب مسجل بالفعل في الفصل '{class_name}'."
+                    },
+                    "status": "skipped"
+                })
+                continue
+            else:
+                # Student exists but not in this class - enroll them to the class
+                class_obj.students.append(student)
+                # Track this assignment in batch
+                if username not in batch_class_assignments:
+                    batch_class_assignments[username] = set()
+                batch_class_assignments[username].add(class_obj.id)
+                response.append({
+                    "username": username,
+                    "message": {
+                        "en": "Student enrolled in class '{class_name}'.",
+                        "ar": "تم تسجيل الطالب في الفصل '{class_name}'."
+                    },
+                    "status": "success"
+                })
+                continue
+
+        # Student doesn't exist - create new student and enroll to class
         # Hash the default password
         hashed_password = generate_password_hash('12345678')
 
@@ -848,15 +947,110 @@ def register_and_assign_students_v2():
         )
 
         db.session.add(new_student)
-        db.session.flush()  # Flush to get the student ID for assignment
+        
+        try:
+            db.session.flush()  # Flush to get the student ID for assignment
+        except IntegrityError as e:
+            # If unique constraint violation, student already exists in DB
+            # This should rarely happen since we check first, but handle it gracefully
+            db.session.expunge(new_student)
+            # Re-query to get the existing student
+            existing_user = db.session.query(User).filter_by(username=username).first()
+            
+            if existing_user and isinstance(existing_user, Student) and existing_user.school_id == Login_user.school_id:
+                # Use existing student and enroll to class
+                student = existing_user
+                batch_students[username] = student
+                
+                # Check if already in this class - check batch assignments first
+                batch_class_ids = batch_class_assignments.get(username, set())
+                
+                if class_obj.id in batch_class_ids:
+                    response.append({
+                        "username": username,
+                        "message": {
+                            "en": "Student already enrolled in class '{class_name}'.",
+                            "ar": "الطالب مسجل بالفعل في الفصل '{class_name}'."
+                        },
+                        "status": "skipped"
+                    })
+                    continue
+                
+                # Check database directly via student_classes table
+                existing_enrollment = db.session.query(student_classes).filter(
+                    student_classes.c.student_id == student.id,
+                    student_classes.c.class_id == class_obj.id
+                ).first()
+                
+                if not existing_enrollment:
+                    # Enroll to class
+                    class_obj.students.append(student)
+                    if username not in batch_class_assignments:
+                        batch_class_assignments[username] = set()
+                    batch_class_assignments[username].add(class_obj.id)
+                    response.append({
+                        "username": username,
+                        "message": {
+                            "en": "Student enrolled in class '{class_name}'.",
+                            "ar": "تم تسجيل الطالب في الفصل '{class_name}'."
+                        },
+                        "status": "success"
+                    })
+                else:
+                    response.append({
+                        "username": username,
+                        "message": {
+                            "en": "Student already enrolled in class '{class_name}'.",
+                            "ar": "الطالب مسجل بالفعل في الفصل '{class_name}'."
+                        },
+                        "status": "skipped"
+                    })
+                continue
+            else:
+                # Unexpected error
+                response.append({
+                    "username": username,
+                    "message": {
+                        "en": "Username already exists.",
+                        "ar": "اسم المستخدم موجود بالفعل."
+                    },
+                    "status": "failed"
+                })
+                continue
+        
+        # Track this student in the batch dictionary
+        batch_students[username] = new_student
 
-        # Assign student to the class
+        # Enroll student to the class
         class_obj.students.append(new_student)
-        response.append({"username": username, "message": f"Student registered and assigned to {class_name}.", "status": "success"})
+        
+        # Track this class assignment in batch
+        if username not in batch_class_assignments:
+            batch_class_assignments[username] = set()
+        batch_class_assignments[username].add(class_obj.id)
+        
+        response.append({"username": username, "message": {
+            "en": "Student created and enrolled in class '{class_name}'.",
+            "ar": "تم إنشاء الطالب وتسجيله في الفصل '{class_name}'."
+        }, "status": "success"})
 
     # Commit all changes
     try:
         db.session.commit()
+    except IntegrityError as e:
+        # Handle unique constraint violations during commit
+        db.session.rollback()
+        error_msg = str(e)
+        # Return partial results with error info
+        return jsonify({
+            "message": {
+                "en": "Some students could not be processed due to database constraints.",
+                "ar": "لم يتم معالجة بعض الطلاب بسبب حدوث خطأ في قاعدة البيانات."
+            },
+            "error": "integrity_error",
+            "details": error_msg,
+            "partial_results": response
+        }), 400
     except Exception as e:
         db.session.rollback()
         return jsonify(message=f"Database error: {str(e)}"), 500

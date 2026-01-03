@@ -411,12 +411,12 @@ const SmsConfiguration = () => {
                       <div className="flex-1">
                         <h5 className="font-semibold text-gray-900 mb-1">التسجيل في خدمة iBulk SMS</h5>
                         <p className="text-sm text-gray-700 mb-2">
-                          قم بزيارة موقع <a href="https://ismartsms.net" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">ismartsms.net</a> والتسجيل في خدمة iBulk SMS من Omantel
+                          قم بزيارة موقع <a href="https://www.omantel.om/business/enterprise-government/mobile/messaging-services/bulk-sms" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">Omantel bulk-sms</a> والتسجيل في خدمة iBulk SMS من Omantel
                         </p>
                         <ul className="text-xs text-gray-600 space-y-1 mr-5">
                           <li>• ستحتاج إلى حساب مع Omantel/Infocomm</li>
                           <li>• تأكد من تفعيل خدمة REST API لحسابك</li>
-                          <li>• إذا لم يكن لديك حساب، اتصل بـ Omantel على: <span className="font-medium">+968 24151020</span></li>
+                          <li>• إذا لم يكن لديك حساب، اتصل بـ Omantel على: <span className="font-medium">24151020</span></li>
                         </ul>
                       </div>
                     </div>
@@ -436,7 +436,7 @@ const SmsConfiguration = () => {
                         <ul className="text-xs text-gray-600 space-y-1 mr-5">
                           <li>• <span className="font-medium">اسم المستخدم (UserID)</span> - من مزود الخدمة</li>
                           <li>• <span className="font-medium">كلمة المرور (Password)</span> - من مزود الخدمة</li>
-                          <li>• <span className="font-medium">معرف المرسل (SenderID)</span> - يجب أن يكون معتمداً من Omantel</li>
+                          <li>• <span className="font-medium">معرف المرسل (SenderID)</span> - يجب أن يكون معتمداً من Omantel مثل (اسم مدرستك) (HazimSchool)</li>
                         </ul>
                       </div>
                     </div>

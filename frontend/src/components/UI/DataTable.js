@@ -38,7 +38,7 @@ const DataTable = ({
   return (
     <div className={`card ${className}`} dir="rtl">
       {/* Desktop Table View */}
-      <div className="hidden md:block overflow-x-auto">
+      <div className="hidden md:block overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
         <table className="table">
           <thead className="table-header sticky top-0 z-10 bg-white shadow-md">
             <tr>
@@ -64,24 +64,35 @@ const DataTable = ({
       </div>
 
       {/* Mobile Card View */}
-      <div className="md:hidden">
-        <div className="space-y-4 p-4">
+      <div className="md:hidden -mx-2 sm:-mx-4">
+        <div className="space-y-3 px-2 sm:px-4">
           {data.map((row, rowIndex) => (
-            <div key={rowIndex} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-              <div className="space-y-3">
+            <div key={rowIndex} className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 shadow-sm">
+              <div className="space-y-2.5 sm:space-y-3">
                 {columns.map((column, colIndex) => {
                   // Skip action columns on mobile - they will be shown at the bottom
                   if (column.key === 'actions') {
                     return null;
                   }
                   
+                  // Special handling for title column (first column usually)
+                  if (column.key === 'title') {
+                    return (
+                      <div key={colIndex} className="mb-3 pb-3 border-b border-gray-100">
+                        <div className="text-sm text-gray-900 min-w-0 overflow-hidden">
+                          {column.render ? column.render(row) : row[column.key]}
+                        </div>
+                      </div>
+                    );
+                  }
+                  
                   return (
-                    <div key={colIndex} className="flex justify-between items-start">
-                      <span className="text-sm font-medium text-gray-500 min-w-0 flex-shrink-0">
+                    <div key={colIndex} className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-gray-500 flex-shrink-0">
                         {column.header}:
                       </span>
-                      <div className="text-sm text-gray-900 text-right flex-1 mr-2">
-                        {column.render ? column.render(row) : row[column.key]}
+                      <div className="text-sm text-gray-900 min-w-0 overflow-hidden break-words">
+                        {column.render ? column.render(row) : (row[column.key] || '-')}
                       </div>
                     </div>
                   );
@@ -89,12 +100,12 @@ const DataTable = ({
                 
                 {/* Show actions at the bottom for mobile */}
                 {columns.some(col => col.key === 'actions') && (
-                  <div className="pt-3 border-t border-gray-100">
+                  <div className="pt-3 mt-3 border-t border-gray-200">
                     <div className="flex flex-wrap justify-end gap-2">
                       {columns
                         .filter(col => col.key === 'actions')
                         .map((column, colIndex) => (
-                          <div key={colIndex}>
+                          <div key={colIndex} className="flex items-center">
                             {column.render ? column.render(row) : row[column.key]}
                           </div>
                         ))}

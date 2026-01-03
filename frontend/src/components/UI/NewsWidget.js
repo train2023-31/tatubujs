@@ -128,14 +128,14 @@ const NewsWidget = ({ limit = 3, showHeader = true, onViewAll }) => {
           {filteredNews.map((newsItem, index) => (
             <div
               key={newsItem.id}
-              className={`p-4 rounded-lg border ${
+              className={`p-3 sm:p-4 rounded-lg border ${
                 index === 0 
                   ? 'bg-blue-50 border-blue-200' 
                   : 'bg-gray-50 border-gray-200'
               }`}
             >
-              <div className="flex items-start space-x-3">
-                <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+              <div className="flex items-start gap-3">
+                <div className={`flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center ${
                   index === 0 
                     ? 'bg-blue-100' 
                     : 'bg-gray-100'
@@ -146,7 +146,7 @@ const NewsWidget = ({ limit = 3, showHeader = true, onViewAll }) => {
                       : 'text-gray-600'
                   }`} />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 overflow-hidden">
                   <div className="flex items-center space-x-2 mb-1">
                     <h4 className={`text-sm font-medium ${
                       index === 0 
@@ -167,35 +167,29 @@ const NewsWidget = ({ limit = 3, showHeader = true, onViewAll }) => {
                     index === 0 
                       ? 'text-blue-700' 
                       : 'text-gray-600'
-                  } md:block hidden`} style={{
+                  }`} style={{
                     display: '-webkit-box',
-                    WebkitLineClamp: 2,
+                    WebkitLineClamp: 3,
                     WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    wordBreak: 'break-word'
                   }}>
                     {newsItem.description}
                   </p>
-                  {/* Mobile version - show full description */}
-                  <p className={`text-sm ${
-                    index === 0 
-                      ? 'text-blue-700' 
-                      : 'text-gray-600'
-                  } block md:hidden`}>
-                    {newsItem.description}
-                  </p>
-                  <div className="flex items-center space-x-4 mt-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2">
                     <div className="flex items-center text-xs text-gray-500">
-                      <User className="h-3 w-3 mr-1" />
-                      {newsItem.created_by_name}
+                      <User className="h-3 w-3 mr-1 flex-shrink-0" />
+                      <span className="truncate">{newsItem.created_by_name}</span>
                     </div>
-                    <div className="flex items-center text-xs text-gray-500 ">
-                      <Calendar className="h-3 w-3 mr-4" />
-                      <span className="text-xs">{newsItem.created_at}</span>
+                    <div className="flex items-center text-xs text-gray-500">
+                      <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
+                      <span className="text-xs whitespace-nowrap">{formatDate(new Date(newsItem.created_at), 'dd/MM/yyyy', 'ar')}</span>
                     </div>
                     {newsItem.end_at && (
                       <div className="flex items-center text-xs text-orange-600">
-                        <Calendar className="h-3 w-3 mr-1" />
-                        <span className="text-xs">ينتهي: {newsItem.end_at}</span>
+                        <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
+                        <span className="text-xs whitespace-nowrap">ينتهي: {formatDate(new Date(newsItem.end_at), 'dd/MM/yyyy', 'ar')}</span>
                       </div>
                     )}
                   </div>

@@ -27,6 +27,7 @@ import WhatsAppMessaging from './pages/WhatsAppMessaging/WhatsAppMessaging';
 import SmsConfiguration from './pages/SmsConfiguration/SmsConfiguration';
 import BulkMessaging from './pages/BulkMessaging/BulkMessaging';
 import StudentNotesLog from './pages/StudentNotesLog/StudentNotesLog';
+import Guide from './pages/Guide/Guide';
 import LoadingSpinner from './components/UI/LoadingSpinner';
 import cacheManager from './utils/cacheManager';
 
@@ -404,6 +405,16 @@ function App() {
                 
                 {/* Version Features - All roles */}
                 <Route path="version-features" element={<VersionFeatures />} />
+                
+                {/* Guide - School Admin */}
+                <Route 
+                  path="guide" 
+                  element={
+                    <ProtectedRoute allowedRoles={['school_admin']}>
+                      <Guide />
+                    </ProtectedRoute>
+                  } 
+                />
                 
                 {/* Profile - All roles */}
                 <Route path="profile" element={<Profile />} />
