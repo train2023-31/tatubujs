@@ -39,11 +39,13 @@ class Student(User):
     
     # Student-specific fields
     behavior_note = db.Column(db.Text, nullable=True)  # General note for student behavior
+    location = db.Column(db.String(255), nullable=True)  # المنطقة السكنية (Residential Area)
 
     # Relationships
     school = db.relationship('School', back_populates='students')
     classes = db.relationship('Class', secondary='student_classes', back_populates='students')
     attendances = db.relationship('Attendance', back_populates='student')
+    buses = db.relationship('Bus', secondary='bus_students', back_populates='students')
 
     __mapper_args__ = {
         'polymorphic_identity': 'student',
@@ -51,7 +53,9 @@ class Student(User):
     def to_dict(self):
         """Serialize Student object to dictionary."""
         data = super().to_dict()
-        # Add more student-specific fields if necessary
+        data.update({
+            "location": self.location  # المنطقة السكنية
+        })
         return data
 
 class Teacher(User):
@@ -78,6 +82,34 @@ class Teacher(User):
             "salary": self.salary,
             "week_Classes_Number": self.week_Classes_Number,
             "job_name": self.job_name  # Include job_name in serialization
+        })
+        return data
+
+
+class Driver(User):
+    __tablename__ = 'drivers'
+    id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
+    
+    # Driver-specific fields
+    license_number = db.Column(db.String(100), nullable=True)
+    license_expiry = db.Column(db.Date, nullable=True)
+    
+    # Relationships
+    school = db.relationship('School', backref='drivers')
+    bus = db.relationship('Bus', back_populates='driver', uselist=False)  # One driver, one bus
+    
+    __mapper_args__ = {
+        'polymorphic_identity': 'driver',
+    }
+    
+    def to_dict(self):
+        """Serialize Driver object to dictionary."""
+        data = super().to_dict()
+        data.update({
+            "license_number": self.license_number,
+            "license_expiry": self.license_expiry.isoformat() if self.license_expiry else None,
+            "bus_id": self.bus.id if self.bus else None,
+            "bus_number": self.bus.bus_number if self.bus else None,
         })
         return data
 
@@ -297,3 +329,82 @@ class ActionLog(db.Model):
     description = db.Column(db.Text, nullable=True)
     timestamp = db.Column(db.DateTime, default=get_oman_time().utcnow)
     status_code = db.Column(db.Integer)
+
+
+# Association table for students and buses
+bus_students = db.Table('bus_students',
+    db.Column('student_id', db.Integer, db.ForeignKey('students.id'), primary_key=True),
+    db.Column('bus_id', db.Integer, db.ForeignKey('buses.id'), primary_key=True),
+    db.Column('assigned_at', db.DateTime, default=get_oman_time().utcnow)
+)
+
+
+# Bus Model
+class Bus(db.Model):
+    __tablename__ = 'buses'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    bus_number = db.Column(db.String(50), nullable=False)
+    bus_name = db.Column(db.String(100), nullable=False)
+    school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=False)
+    driver_id = db.Column(db.Integer, db.ForeignKey('drivers.id'), nullable=True, unique=True)  # Changed to drivers.id and added unique
+    capacity = db.Column(db.Integer, nullable=False, default=50)
+    plate_number = db.Column(db.String(50), nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
+    
+    # Relationships
+    school = db.relationship('School', backref='buses')
+    driver = db.relationship('Driver', back_populates='bus')  # Changed relationship
+    students = db.relationship('Student', secondary='bus_students', back_populates='buses')
+    scans = db.relationship('BusScan', back_populates='bus', cascade='all, delete-orphan')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'bus_number': self.bus_number,
+            'bus_name': self.bus_name,
+            'school_id': self.school_id,
+            'driver_id': self.driver_id,
+            'driver_name': self.driver.fullName if self.driver else None,
+            'capacity': self.capacity,
+            'plate_number': self.plate_number,
+            'is_active': self.is_active,
+            'student_count': len(self.students),
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+
+# Bus Scan/Tracking Model
+class BusScan(db.Model):
+    __tablename__ = 'bus_scans'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('students.id'), nullable=False)
+    bus_id = db.Column(db.Integer, db.ForeignKey('buses.id'), nullable=False)
+    scan_type = db.Column(db.String(20), nullable=False)  # 'board' or 'exit'
+    scan_time = db.Column(db.DateTime, nullable=False, default=get_oman_time().utcnow)
+    location = db.Column(db.String(255), nullable=True)
+    scanned_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    
+    # Relationships
+    student = db.relationship('Student', foreign_keys=[student_id], backref='bus_scans')
+    bus = db.relationship('Bus', back_populates='scans')
+    scanner = db.relationship('User', backref='scans_performed', foreign_keys=[scanned_by])
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'student_id': self.student_id,
+            'student_name': self.student.fullName if self.student else None,
+            'student_username': self.student.username if self.student else None,
+            'bus_id': self.bus_id,
+            'bus_number': self.bus.bus_number if self.bus else None,
+            'scan_type': self.scan_type,
+            'scan_time': self.scan_time.isoformat() if self.scan_time else None,
+            'location': self.location,
+            'scanned_by': self.scanned_by,
+            'scanner_name': self.scanner.fullName if self.scanner else None,
+            'notes': self.notes
+        }

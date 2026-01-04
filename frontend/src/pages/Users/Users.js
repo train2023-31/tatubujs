@@ -144,6 +144,8 @@ const Users = () => {
         return allUsers.filter(user => user.role === 'teacher');
       case 'students':
         return allUsers.filter(user => user.role === 'student');
+      case 'drivers':
+        return allUsers.filter(user => user.role === 'driver');
       default:
         return allUsers;
     }
@@ -298,6 +300,7 @@ const Users = () => {
     { id: 'all', name: 'جميع المستخدمين', count: allUsers?.length || 0 },
     { id: 'teachers', name: 'المعلمين', count: allUsers?.filter(user => user.role === 'teacher').length || 0 },
     { id: 'students', name: 'الطلاب', count: allUsers?.filter(user => user.role === 'student').length || 0 },
+    { id: 'drivers', name: 'السائقين', count: allUsers?.filter(user => user.role === 'driver').length || 0 },
   ];
 
   return (
@@ -381,6 +384,11 @@ const Users = () => {
                   <>
                     <option value="">جميع الطلاب</option>
                     <option value="student">طالب</option>
+                  </>
+                ) : selectedTab === 'drivers' ? (
+                  <>
+                    <option value="">جميع السائقين</option>
+                    <option value="driver">سائق</option>
                   </>
                 ) : null}
               </select>
@@ -699,7 +707,7 @@ const AddUserForm = ({ onClose, onSuccess }) => {
 
   const addUserMutation = useMutation(
     (userData) => {
-      // If current user is school_admin, they can add teachers, students, and data_analyst
+      // If current user is school_admin, they can add teachers, students, data_analyst, and drivers
       if (user?.role === 'school_admin') {
         switch (userData.role) {
           case 'teacher':
@@ -708,8 +716,10 @@ const AddUserForm = ({ onClose, onSuccess }) => {
             return authAPI.registerStudents([userData]);
           case 'data_analyst':
             return authAPI.registerDataAnalyst(userData);
+          case 'driver':
+            return authAPI.registerDriver(userData); // Use general register for drivers
           default:
-            throw new Error('School admin can only add teachers, students, and data analysts');
+            throw new Error('School admin can only add teachers, students, data analysts, and drivers');
         }
       }
       
@@ -723,6 +733,8 @@ const AddUserForm = ({ onClose, onSuccess }) => {
           case 'school_admin':
             return authAPI.registerUser(userData);
           case 'data_analyst':
+            return authAPI.registerUser(userData);
+          case 'driver':
             return authAPI.registerUser(userData);
           default:
             return authAPI.registerUser(userData);
@@ -850,12 +862,14 @@ const AddUserForm = ({ onClose, onSuccess }) => {
                 <option value="teacher">معلم</option>
                 <option value="school_admin">مدير مدرسة</option>
                 <option value="data_analyst">محلل بيانات</option>
+                <option value="driver">سائق</option>
               </>
             ) : (
               <>
                 <option value="student">طالب</option>
                 <option value="teacher">معلم</option>
                 <option value="data_analyst">محلل بيانات</option>
+                <option value="driver">سائق</option>
               </>
             )}
           </select>
@@ -890,6 +904,11 @@ const AddUserForm = ({ onClose, onSuccess }) => {
                 {formData.role === 'teacher' && (
                   <div>
                     <strong className="text-green-600">معلم:</strong> يمكن للمعلم تسجيل حضور الطلاب في فصوله، وعرض التقارير المتعلقة بفصوله، وإدارة ملفه الشخصي.
+                  </div>
+                )}
+                {formData.role === 'driver' && (
+                  <div>
+                    <strong className="text-purple-600">سائق:</strong> يمكن للسائق تسجيل الدخول لمسح رموز QR للطلاب عند صعودهم ونزولهم من الحافلة. السائق يمكنه الوصول فقط إلى الحافلة المخصصة له.
                   </div>
                 )}
                 {formData.role === 'school_admin' && (
@@ -1152,6 +1171,7 @@ const EditUserForm = ({ user, onClose, onSuccess }) => {
             <option value="teacher">معلم</option>
             <option value="student">طالب</option>
             <option value="data_analyst">محلل بيانات</option>
+            <option value="driver">سائق</option>
           </select>
           
           {/* Role Description */}

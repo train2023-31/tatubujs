@@ -318,6 +318,7 @@ const Guide = () => {
                 <ul className="list-disc list-inside mr-6 mt-2 space-y-1 text-sm">
                   <li><strong>الرقم المدرسي:</strong> رقم الطالب المدرسي</li>
                   <li><strong>الهاتف النقال:</strong> رقم هاتف الطالب</li>
+                  <li><strong>المنطقة السكنية:</strong> المنطقة السكنية للطالب (اختياري)</li>
                 </ul>
               </li>
               <li>احفظ الملف وارفعه</li>

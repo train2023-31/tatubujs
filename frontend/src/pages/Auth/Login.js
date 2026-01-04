@@ -26,8 +26,16 @@ const Login = () => {
       const result = await login(data);
       
       if (result && result.success) {
-        // Login successful - navigate to dashboard
-        navigate('/app/dashboard');
+        // Login successful - navigate based on role
+        const userRole = result.user?.role;
+        
+        if (userRole === 'driver') {
+          // Redirect drivers directly to scanner
+          navigate('/app/bus-scanner');
+        } else {
+          // Other roles go to dashboard
+          navigate('/app/dashboard');
+        }
       } else {
         // Login failed - show error message
         setLoginError(result?.error || 'اسم المستخدم أو كلمة المرور غير صحيحة');

@@ -3,7 +3,7 @@
 from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from app.models import User, Student, Teacher, School ,Class , Subject , student_classes ,Attendance ,News ,ActionLog
+from app.models import User, Student, Teacher, School ,Class , Subject , student_classes ,Attendance ,News ,ActionLog, Driver
 from app import db ,limiter
 import csv
 from flask import send_file, Response
@@ -186,6 +186,16 @@ def register():
         )
     elif role == 'data_analyst':
         new_user = Teacher(
+            username=username,
+            password=hashed_password,
+            email=email,
+            phone_number=phone_number,
+            user_role=role,
+            fullName=fullName,
+            school_id=school_id
+        )
+    elif role == 'driver':
+        new_user = Driver(
             username=username,
             password=hashed_password,
             email=email,
@@ -428,6 +438,72 @@ def register_single_data_analyst():
     return jsonify(message="Data analyst registered successfully , تم إضافة محلل البيانات بنجاح"), 201
 
 
+@auth_blueprint.route('/register_single_driver', methods=['POST'])
+@jwt_required()
+@log_action("إضافة", description="إضافة سائق جديد " ,content='')
+def register_single_driver():
+    user_id = get_jwt_identity()
+    Login_user = User.query.get(user_id)
+
+    if Login_user.user_role != 'school_admin':  # Ensure only school_admin can register drivers
+        return jsonify(message={"en": "Unauthorized to make this action.", "ar": "غير مصرح لك بتنفيذ هذا الإجراء."}, flag=1), 400
+    
+    data = request.get_json()
+    username = data.get('username')
+    email = data.get('email')
+    fullName = data.get('fullName')
+    phone_number = data.get('phone_number')
+    license_number = data.get('license_number')
+    license_expiry = data.get('license_expiry')
+
+    # Validate required fields
+    if not all([username, email, fullName]):
+        return jsonify(message="Missing required fields."), 400
+
+    # Check if username or email already exists
+    existing_user = User.query.filter(
+        (User.username == username) | (User.email == email)
+    ).first()
+    if existing_user:
+        return jsonify(message="Username or email already exists."), 409
+    
+    # Ensure school exists
+    school = School.query.get(Login_user.school_id)
+
+    # Hash the password
+    hashed_password = generate_password_hash(school.password)
+
+    # Ensure school exists
+    school = School.query.get(Login_user.school_id)
+    if not school:
+        return jsonify(message="School not found."), 404
+
+    # Parse license_expiry if provided (expecting ISO format string: YYYY-MM-DD)
+    license_expiry_date = None
+    if license_expiry:
+        try:
+            license_expiry_date = datetime.strptime(license_expiry, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify(message="Invalid license_expiry format. Expected YYYY-MM-DD."), 400
+
+    new_user = Driver(
+        password=hashed_password,
+        email=email,
+        phone_number=phone_number,
+        user_role='driver',
+        fullName=fullName,
+        license_number=license_number,
+        license_expiry=license_expiry_date,
+        school_id=Login_user.school_id,
+        username=username,
+    )
+       
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify(message="Driver registered successfully , تم إضافة السائق بنجاح"), 201
+
+
 @auth_blueprint.route('/register_single_assign_student', methods=['POST'])
 @jwt_required()
 @log_action("إضافة", description="إضافة طالب جديد ")
@@ -650,6 +726,7 @@ def update_students_phone_numbers():
     for student_data in students_data:
         username = student_data.get('username')
         phone_number = student_data.get('phone_number')
+        location = student_data.get('location')  # المنطقة السكنية
 
         # Validate required fields
         if not username or not phone_number:
@@ -679,11 +756,15 @@ def update_students_phone_numbers():
 
         # Update the phone number
         student.phone_number = phone_number
+        # Update location if provided
+        if location is not None:
+            student.location = location
+        
         response.append({
             "username": username,
             "message": {
-                "en": "Phone number updated successfully.",
-                "ar": "تم تحديث رقم الهاتف بنجاح."
+                "en": "Phone number and location updated successfully.",
+                "ar": "تم تحديث رقم الهاتف والمنطقة السكنية بنجاح."
             },
             "flag": 7
         })

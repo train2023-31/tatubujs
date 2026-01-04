@@ -1609,6 +1609,7 @@ def get_my_profile():
     return jsonify({
         "student_id": user_id,
         "username": user.username,
+        "location": user.location,
         "fullName": user.fullName,
         "email": user.email,
         "phone_number": user.phone_number,

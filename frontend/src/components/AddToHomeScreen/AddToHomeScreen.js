@@ -55,7 +55,7 @@ const AddToHomeScreen = () => {
                 alt="تتبع" 
                 className="w-12 h-12 rounded-lg object-contain"
               />
-              <h3 className="text-lg font-bold text-gray-900">إضافة إلى الشاشة الرئيسية</h3>
+              <h3 className="text-lg font-bold text-gray-900">إضافة إلى الهاتف كتطبيق</h3>
             </div>
             <button
               onClick={() => setShowIOSInstructions(false)}

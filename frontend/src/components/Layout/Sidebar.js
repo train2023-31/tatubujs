@@ -28,7 +28,9 @@ import {
   Phone,
   Database,
   Calendar,
-  CheckSquare
+  CheckSquare,
+  Bus,
+  QrCode
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasRole } from '../../utils/helpers';
@@ -50,7 +52,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'لوحة التحكم',
           href: '/app/dashboard',
           icon: Home,
-          roles: ['admin', 'school_admin', 'teacher', 'data_analyst','student'],
+          roles: ['admin', 'school_admin', 'teacher', 'data_analyst','student' , 'driver'],
         },
       ]
     },
@@ -162,6 +164,31 @@ const Sidebar = ({ isOpen, onClose }) => {
           roles: ['admin', 'school_admin', 'data_analyst'],
         },
        
+      ]
+    },
+    {
+      id: 'bus',
+      title: 'الحافلات',
+      defaultExpanded: false,
+      items: [
+        {
+          name: 'إدارة الحافلات',
+          href: '/app/buses',
+          icon: Bus,
+          roles: ['school_admin', 'admin'],
+        },
+        {
+          name: 'ماسح الحافلة',
+          href: '/app/bus-scanner',
+          icon: QrCode,
+          roles: ['school_admin', 'admin', 'driver'],
+        },
+        {
+          name: 'رموز QR للطلاب',
+          href: '/app/student-qrcodes',
+          icon: QrCode,
+          roles: ['school_admin', 'admin'],
+        },
       ]
     },
     {

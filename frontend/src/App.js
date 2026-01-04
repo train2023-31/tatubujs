@@ -28,6 +28,9 @@ import SmsConfiguration from './pages/SmsConfiguration/SmsConfiguration';
 import BulkMessaging from './pages/BulkMessaging/BulkMessaging';
 import StudentNotesLog from './pages/StudentNotesLog/StudentNotesLog';
 import Guide from './pages/Guide/Guide';
+import BusManagement from './pages/BusManagement/BusManagement';
+import BusScanner from './pages/BusScanner/BusScanner';
+import StudentQRCodes from './pages/StudentQRCodes/StudentQRCodes';
 import LoadingSpinner from './components/UI/LoadingSpinner';
 import cacheManager from './utils/cacheManager';
 
@@ -412,6 +415,36 @@ function App() {
                   element={
                     <ProtectedRoute allowedRoles={['school_admin']}>
                       <Guide />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Bus Management - School Admin and Admin */}
+                <Route 
+                  path="buses" 
+                  element={
+                    <ProtectedRoute allowedRoles={['school_admin', 'admin']}>
+                      <BusManagement />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Bus Scanner - School Admin, Admin, and Driver */}
+                <Route 
+                  path="bus-scanner" 
+                  element={
+                    <ProtectedRoute allowedRoles={['school_admin', 'admin', 'driver']}>
+                      <BusScanner />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Student QR Codes - School Admin and Admin */}
+                <Route 
+                  path="student-qrcodes" 
+                  element={
+                    <ProtectedRoute allowedRoles={['school_admin', 'admin']}>
+                      <StudentQRCodes />
                     </ProtectedRoute>
                   } 
                 />

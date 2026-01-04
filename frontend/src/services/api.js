@@ -134,6 +134,7 @@ export const authAPI = {
   changePassword: (passwordData) => api.put('/auth/change_password', passwordData),
   registerUser: (userData) => api.post('/auth/register', userData),
   registerTeacher: (teacherData) => api.post('/auth/register_single_teacher', teacherData),
+  registerDriver: (driverData) => api.post('/auth/register_single_driver', driverData), 
   registerDataAnalyst: (dataAnalystData) => api.post('/auth/register_single_data_analyst', dataAnalystData),
   registerTeachers: (teachersData) => api.post('/auth/register_Teacher', teachersData),
   registerStudents: (studentsData) => api.post('/auth/register_Students', studentsData),
@@ -236,6 +237,33 @@ export const reportsAPI = {
   getSchoolAbsenceStatistics: (params) => api.get('/static/school_absence_statistics', { params }).then(res => res.data),
   getSchoolsStatistics: (params) => api.get('/static/schools-statistics', { params }).then(res => res.data),
   getBulkOperationsStatus: (params) => api.get('/static/bulk-operations-status', { params }).then(res => res.data),
+};
+
+// Bus API
+export const busAPI = {
+  // Bus Management
+  getBuses: () => api.get('/bus/buses').then(res => res.data),
+  getBus: (busId) => api.get(`/bus/buses/${busId}`).then(res => res.data),
+  createBus: (busData) => api.post('/bus/buses', busData),
+  updateBus: (busId, busData) => api.put(`/bus/buses/${busId}`, busData),
+  deleteBus: (busId) => api.delete(`/bus/buses/${busId}`),
+  
+  // Driver
+  getDriverBus: () => api.get('/bus/driver/my-bus').then(res => res.data),
+  
+  // Student Assignment
+  getBusStudents: (busId) => api.get(`/bus/buses/${busId}/students`).then(res => res.data),
+  assignStudents: (busId, studentIds) => api.post(`/bus/buses/${busId}/assign-students`, { student_ids: studentIds }),
+  removeStudents: (busId, studentIds) => api.post(`/bus/buses/${busId}/remove-students`, { student_ids: studentIds }),
+  
+  // Scanning
+  scanStudent: (scanData) => api.post('/bus/scan', scanData),
+  getScans: (params) => api.get('/bus/scans', { params }).then(res => res.data),
+  getStudentBusStatus: (studentId) => api.get(`/bus/students/${studentId}/bus-status`).then(res => res.data),
+  getCurrentStudentsOnBus: (busId) => api.get(`/bus/buses/${busId}/current-students`).then(res => res.data),
+  
+  // Reports
+  getDailyBusReport: (params) => api.get('/bus/reports/daily', { params }).then(res => res.data),
 };
 
 export default api;

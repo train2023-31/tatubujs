@@ -25,14 +25,19 @@ import {
   Star,
   Building,
   Newspaper,
-  Sparkles
+  Sparkles,
+  Bus,
+  User,
+  History,
+  QrCode
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { reportsAPI, attendanceAPI, authAPI } from '../../services/api';
+import { reportsAPI, attendanceAPI, authAPI, busAPI } from '../../services/api';
 import { formatDate, getTodayAPI, getRoleDisplayName } from '../../utils/helpers';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import Modal from '../../components/UI/Modal';
 import NewsWidget from '../../components/UI/NewsWidget';
+import { QRCodeCanvas } from 'qrcode.react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import toast from 'react-hot-toast';
@@ -292,6 +297,10 @@ const Dashboard = () => {
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
           />
+        );
+      case 'driver':
+        return (
+          <DriverDashboard />
         );
       default:
         return <div>دور غير معروف</div>;
@@ -1588,6 +1597,324 @@ const StatCard = ({ title, value, icon: Icon, color, showEyeIcon = false, onEyeC
   );
 };
 
+// Driver Dashboard Component
+const DriverDashboard = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Fetch driver's bus
+  const { data: driverBusData, isLoading: busLoading } = useQuery(
+    ['driverBus', user?.user_id],
+    () => busAPI.getDriverBus(),
+    {
+      enabled: !!user?.user_id,
+      refetchInterval: 30000,
+      onSuccess: (data) => {
+        console.log('DriverDashboard - Bus data loaded:', data);
+      },
+      onError: (error) => {
+        console.error('DriverDashboard - Bus error:', error);
+      }
+    }
+  );
+
+  const bus = driverBusData?.bus;
+  const busId = bus?.id;
+
+  // Fetch current students on bus
+  const { data: currentStudentsData, isLoading: currentStudentsLoading } = useQuery(
+    ['currentStudentsOnBus', busId],
+    () => busAPI.getCurrentStudentsOnBus(busId),
+    {
+      enabled: !!busId,
+      refetchInterval: 10000, // Refresh every 10 seconds
+      onSuccess: (data) => {
+        console.log('DriverDashboard - Current students data loaded:', data);
+      },
+      onError: (error) => {
+        console.error('DriverDashboard - Current students error:', error);
+      }
+    }
+  );
+
+  // Fetch today's scan logs
+  const today = new Date().toISOString().split('T')[0];
+  const { data: todayScans, isLoading: scansLoading } = useQuery(
+    ['todayScans', busId, today],
+    () => busAPI.getScans({ bus_id: busId, date: today, limit: 50 }),
+    {
+      enabled: !!busId,
+      refetchInterval: 15000, // Refresh every 15 seconds
+      onSuccess: (data) => {
+        console.log('DriverDashboard - Today scans data loaded:', data);
+      },
+      onError: (error) => {
+        console.error('DriverDashboard - Today scans error:', error);
+      }
+    }
+  );
+
+  // Fetch all assigned students
+  const { data: assignedStudents, isLoading: assignedStudentsLoading } = useQuery(
+    ['busStudents', busId],
+    () => busAPI.getBusStudents(busId),
+    {
+      enabled: !!busId,
+      refetchInterval: 60000, // Refresh every minute
+      onSuccess: (data) => {
+        console.log('DriverDashboard - Assigned students data loaded:', data);
+      },
+      onError: (error) => {
+        console.error('DriverDashboard - Assigned students error:', error);
+      }
+    }
+  );
+
+  if (busLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <LoadingSpinner />
+        <span className="mr-3 text-gray-500">جاري تحميل البيانات...</span>
+      </div>
+    );
+  }
+
+  if (!driverBusData?.has_bus || !bus) {
+    return (
+      <div className="card">
+        <div className="card-body text-center py-12">
+          <Bus className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">لا توجد حافلة مسجلة</h3>
+          <p className="text-gray-500">لم يتم تعيين حافلة لك. يرجى التواصل مع الإدارة.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const currentStudents = currentStudentsData?.students || [];
+  const totalAssigned = assignedStudents?.length || 0;
+  const onBusCount = currentStudents.length;
+  const notOnBusCount = totalAssigned - onBusCount;
+  const scansToday = Array.isArray(todayScans) ? todayScans : [];
+
+  // Group scans by type
+  const boardScans = scansToday.filter(s => s.scan_type === 'board').length;
+  const exitScans = scansToday.filter(s => s.scan_type === 'exit').length;
+
+  return (
+    <div className="space-y-6">
+      {/* Quick Access */}
+      <div className="card">
+        <div className="card-header">
+          <h3 className="text-lg font-medium text-gray-900">الوصول السريع</h3>
+        </div>
+        <div className="card-body">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <QuickAccessCard
+              title="مسح رموز QR"
+              description="مسح رموز QR للطلاب للصعود والنزول"
+              icon={QrCode}
+              color="blue"
+              onClick={() => navigate('/app/bus-scanner')}
+            />
+           
+          </div>
+        </div>
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
+        <StatCard
+          title="إجمالي الطلاب"
+          value={totalAssigned}
+          icon={Users}
+          color="blue"
+        />
+        <StatCard
+          title="على الحافلة"
+          value={onBusCount}
+          icon={UserCheck}
+          color="green"
+        />
+        <StatCard
+          title="غير موجودين"
+          value={notOnBusCount}
+          icon={AlertCircle}
+          color="orange"
+        />
+        <StatCard
+          title="صعود اليوم"
+          value={boardScans}
+          icon={ArrowRight}
+          color="green"
+        />
+        <StatCard
+          title="نزول اليوم"
+          value={exitScans}
+          icon={ArrowLeft}
+          color="red"
+        />
+      </div>
+
+      {/* Bus Information */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Bus Details */}
+        <div className="card">
+          <div className="card-header">
+            <div className="flex items-center gap-2">
+              <Bus className="h-5 w-5 text-green-600" />
+              <h3 className="card-title">معلومات الحافلة</h3>
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">رقم الحافلة</label>
+                  <p className="text-gray-900 font-semibold text-lg">{bus.bus_number}</p>
+                </div>
+                <div>
+                  <label className="label">اسم الحافلة</label>
+                  <p className="text-gray-900 font-semibold text-lg">{bus.bus_name}</p>
+                </div>
+                <div>
+                  <label className="label">رقم اللوحة</label>
+                  <p className="text-gray-900">{bus.plate_number || 'غير محدد'}</p>
+                </div>
+                <div>
+                  <label className="label">السعة</label>
+                  <p className="text-gray-900">{bus.capacity} طالب</p>
+                </div>
+              </div>
+              <div className="pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">معدل الإشغال</span>
+                  <span className="text-lg font-semibold text-gray-900">
+                    {totalAssigned > 0 ? Math.round((onBusCount / totalAssigned) * 100) : 0}%
+                  </span>
+                </div>
+                <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-green-600 h-2 rounded-full transition-all duration-300" 
+                    style={{ width: `${totalAssigned > 0 ? (onBusCount / totalAssigned) * 100 : 0}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Current Students on Bus */}
+        <div className="card">
+          <div className="card-header">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-blue-600" />
+                <h3 className="card-title">الطلاب على الحافلة</h3>
+              </div>
+              <span className="badge badge-success">{onBusCount}</span>
+            </div>
+          </div>
+          <div className="card-body">
+            {currentStudentsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <LoadingSpinner />
+              </div>
+            ) : currentStudents.length > 0 ? (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {currentStudents.map((student, index) => (
+                  <div key={student.id || index} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                        <User className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900">{student.fullName || student.username}</p>
+                        {student.class_name && (
+                          <p className="text-xs text-gray-600">الفصل: {student.class_name}</p>
+                        )}
+                        {student.board_time && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            صعد: {formatDate(student.board_time, 'HH:mm', 'ar')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <UserCheck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">لا يوجد طلاب على الحافلة حالياً</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Today's Scan Logs */}
+      <div className="card">
+        <div className="card-header">
+          <div className="flex items-center gap-2">
+            <History className="h-5 w-5 text-orange-600" />
+            <h3 className="card-title">سجل المسح اليوم</h3>
+          </div>
+        </div>
+        <div className="card-body">
+          {scansLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <LoadingSpinner />
+            </div>
+          ) : scansToday.length > 0 ? (
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {scansToday.map((scan, index) => (
+                <div key={scan.id || index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                      scan.scan_type === 'board' ? 'bg-green-100' : 'bg-red-100'
+                    }`}>
+                      {scan.scan_type === 'board' ? (
+                        <ArrowRight className="h-6 w-6 text-green-600" />
+                      ) : (
+                        <ArrowLeft className="h-6 w-6 text-red-600" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">
+                        {scan.student_name || scan.student_username || 'طالب غير معروف'}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {formatDate(scan.scan_time, 'dd MMMM yyyy - HH:mm', 'ar')}
+                      </p>
+                      {scan.location && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          الموقع: {scan.location}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className={`badge ${
+                    scan.scan_type === 'board' ? 'badge-success' : 'badge-danger'
+                  }`}>
+                    {scan.scan_type === 'board' ? 'صعود' : 'نزول'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">لا توجد سجلات مسح اليوم</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Student Dashboard Component
 const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
   const { user } = useAuth();
@@ -1655,7 +1982,65 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
     }
   );
 
-  if (attendanceLoading || profileLoading || statsLoading) {
+  // Fetch student bus status and details
+  const { data: busStatus, isLoading: busLoading } = useQuery(
+    ['studentBusStatus', user?.user_id],
+    () => {
+      console.log('StudentDashboard - Query function called for bus status');
+      return busAPI.getStudentBusStatus(user?.user_id);
+    },
+    {
+      enabled: !!user?.user_id,
+      refetchInterval: 30000,
+      onSuccess: (data) => {
+        console.log('StudentDashboard - Bus status data loaded:', data);
+      },
+      onError: (error) => {
+        console.error('StudentDashboard - Bus status error:', error);
+      }
+    }
+  );
+
+  // Fetch student bus scan logs
+  const { data: scanLogs, isLoading: logsLoading } = useQuery(
+    ['studentScanLogs', user?.user_id],
+    () => {
+      console.log('StudentDashboard - Query function called for scan logs');
+      return busAPI.getScans({ student_id: user?.user_id, limit: 20 });
+    },
+    {
+      enabled: !!user?.user_id,
+      refetchInterval: 30000,
+      onSuccess: (data) => {
+        console.log('StudentDashboard - Scan logs data loaded:', data);
+      },
+      onError: (error) => {
+        console.error('StudentDashboard - Scan logs error:', error);
+      }
+    }
+  );
+
+  // Fetch all students on the same bus for route tracking
+  const busId = busStatus?.current_bus?.id;
+  const { data: busStudents, isLoading: busStudentsLoading } = useQuery(
+    ['busStudents', busId],
+    () => {
+      console.log('StudentDashboard - Query function called for bus students, busId:', busId);
+      return busAPI.getBusStudents(busId);
+    },
+    {
+      enabled: !!busId,
+      refetchInterval: 60000, // Refresh every minute
+      onSuccess: (data) => {
+        console.log('StudentDashboard - Bus students data loaded:', data);
+      },
+      onError: (error) => {
+        console.error('StudentDashboard - Bus students error:', error);
+      }
+    }
+  );
+
+  if (attendanceLoading || profileLoading || statsLoading || busLoading || logsLoading || busStudentsLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <LoadingSpinner />
@@ -1778,6 +2163,10 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
               <p className="text-gray-900">{studentProfile?.phone_number || 'غير محدد'}</p>
             </div>
             <div>
+              <label className="label">المنطقة السكنية</label>
+              <p className="text-gray-900">{studentProfile?.location || 'غير محدد'}</p>
+            </div>
+            <div>
               <label className="label">عدد الفصول</label>
               <p className="text-gray-900">{studentProfile?.total_classes || 0}</p>
             </div>
@@ -1792,6 +2181,385 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* QR Code and Bus Information Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* QR Code Card */}
+        <div className="card">
+          <div className="card-header">
+            <div className="flex items-center gap-2">
+              <QrCode className="h-5 w-5 text-blue-600" />
+              <h3 className="card-title">رمز QR الخاص بي</h3>
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-white rounded-lg border-2 border-gray-200 shadow-sm mb-4">
+                <QRCodeCanvas
+                  id={`student-qr-${user?.user_id}`}
+                  value={user?.username || ''}
+                  size={200}
+                  level="H"
+                  includeMargin={true}
+                />
+              </div>
+              <p className="text-xs text-gray-500 text-center mb-4">
+                استخدم هذا الرمز للصعود والنزول من الحافلة
+              </p>
+              <button
+                onClick={() => {
+                  const canvas = document.getElementById(`student-qr-${user?.user_id}`);
+                  if (canvas) {
+                    // Create a new canvas for the complete image with student name
+                    const cardCanvas = document.createElement('canvas');
+                    cardCanvas.width = 400;
+                    cardCanvas.height = 500;
+                    const ctx = cardCanvas.getContext('2d');
+                    
+                    // White background
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, 400, 500);
+                    
+                    // Border
+                    ctx.strokeStyle = '#E5E7EB';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(10, 10, 380, 480);
+                    
+                    // School name at top (if available)
+                    if (user?.school_name) {
+                      ctx.fillStyle = '#1F2937';
+                      ctx.font = 'bold 20px Amiri';
+                      ctx.textAlign = 'center';
+                      ctx.fillText(user.school_name, 200, 40);
+                    }
+                    
+                    // Student name
+                    const studentName = studentProfile?.fullName || user?.username || 'الطالب';
+                    ctx.fillStyle = '#111827';
+                    ctx.font = 'bold 24px Amiri';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(studentName, 200, 80);
+                    
+                    // QR Code (centered)
+                    const qrImg = new Image();
+                    qrImg.onload = () => {
+                      const qrSize = 250;
+                      const qrX = (400 - qrSize) / 2;
+                      const qrY = 110;
+                      ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+                      
+                      // Note about QR code usage
+                      ctx.fillStyle = '#6B7280';
+                      ctx.font = '14px Amiri';
+                      ctx.textAlign = 'center';
+                      ctx.fillText('هذا الرمز للصعود والنزول من الحافلة QR', 200, 390);
+                      
+                 
+                      
+                      // Convert to PNG and download
+                      cardCanvas.toBlob((blob) => {
+                        if (blob) {
+                          const url = URL.createObjectURL(blob);
+                          const downloadLink = document.createElement('a');
+                          downloadLink.href = url;
+                          downloadLink.download = `${studentName.replace(/[<>:"/\\|?*]/g, '_')}_QR.png`;
+                          document.body.appendChild(downloadLink);
+                          downloadLink.click();
+                          document.body.removeChild(downloadLink);
+                          URL.revokeObjectURL(url);
+                          toast.success('تم تحميل رمز QR بنجاح');
+                        }
+                      }, 'image/png');
+                    };
+                    qrImg.onerror = () => {
+                      toast.error('حدث خطأ أثناء تحميل الصورة');
+                    };
+                    qrImg.src = canvas.toDataURL('image/png');
+                  }
+                }}
+                className="btn btn-primary flex items-center gap-2 w-full"
+              >
+                <Download className="h-4 w-4" />
+                تحميل PNG مع الاسم
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Bus Details Card */}
+        <div className="card">
+          <div className="card-header">
+            <div className="flex items-center gap-2">
+              <Bus className="h-5 w-5 text-green-600" />
+              <h3 className="card-title">معلومات الحافلة</h3>
+            </div>
+          </div>
+          <div className="card-body">
+            {busStatus?.current_bus ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">رقم الحافلة</label>
+                    <p className="text-gray-900 font-semibold">{busStatus.current_bus.bus_number}</p>
+                  </div>
+                  <div>
+                    <label className="label">اسم الحافلة</label>
+                    <p className="text-gray-900 font-semibold">{busStatus.current_bus.bus_name}</p>
+                  </div>
+                  <div>
+                    <label className="label">رقم اللوحة</label>
+                    <p className="text-gray-900">{busStatus.current_bus.plate_number || 'غير محدد'}</p>
+                  </div>
+                  <div>
+                    <label className="label">السعة</label>
+                    <p className="text-gray-900">{busStatus.current_bus.capacity} طالب</p>
+                  </div>
+                </div>
+                <div className="pt-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full ${busStatus.on_bus ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                    <span className={`text-sm font-medium ${busStatus.on_bus ? 'text-green-700' : 'text-gray-600'}`}>
+                      {busStatus.on_bus ? 'على الحافلة' : 'غير موجود على الحافلة'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Bus className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">لا توجد حافلة مسجلة</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Driver Information */}
+      {busStatus?.current_bus?.driver_name && (
+        <div className="card">
+          <div className="card-header">
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5 text-purple-600" />
+              <h3 className="card-title">معلومات السائق</h3>
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center">
+                <User className="h-8 w-8 text-purple-600" />
+              </div>
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900">{busStatus.current_bus.driver_name}</h4>
+                <p className="text-sm text-gray-600">سائق الحافلة</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bus Route Tracking */}
+      {busStatus?.current_bus && (
+        <div className="card">
+          <div className="card-header">
+            <div className="flex items-center gap-2">
+              <Bus className="h-5 w-5 text-blue-600" />
+              <h3 className="card-title">مسار الحافلة</h3>
+            </div>
+          </div>
+          <div className="card-body">
+            {busStudentsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <LoadingSpinner />
+                <span className="mr-3 text-gray-500">جاري تحميل مسار الحافلة...</span>
+              </div>
+            ) : busStudents && Array.isArray(busStudents) && busStudents.length > 0 ? (
+              <div className="space-y-4">
+                {/* Route Visualization */}
+                {busStudents.filter(student => student.location && student.location.trim()).length > 0 ? (
+                  <div className="relative">
+                    {/* Route Line */}
+                    <div className="absolute right-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-500 via-blue-400 to-green-500 transform translate-x-1/2"></div>
+                    
+                    {/* Route Points */}
+                    <div className="relative space-y-6">
+                      {/* Start Point */}
+                      <div className="flex items-center gap-4 relative z-10">
+                        <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center shadow-lg border-4 border-white">
+                          <span className="text-white font-bold text-sm">بدء</span>
+                        </div>
+                        <div className="flex-1 bg-blue-50 rounded-lg p-3 border border-blue-200">
+                          <p className="text-sm font-semibold text-blue-900">نقطة البداية</p>
+                          <p className="text-xs text-blue-700">بدء رحلة الحافلة</p>
+                        </div>
+                      </div>
+
+                      {/* Student Locations */}
+                      {busStudents
+                        .filter(student => student.location && student.location.trim())
+                        .map((student, index) => (
+                          <div key={student.id || index} className="flex items-center gap-4 relative z-10">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-4 border-white ${
+                              student.id === user?.user_id 
+                                ? 'bg-green-500' 
+                                : 'bg-blue-400'
+                            }`}>
+                              <span className="text-white font-bold text-sm">{index + 1}</span>
+                            </div>
+                            <div className={`flex-1 rounded-lg p-3 border ${
+                              student.id === user?.user_id 
+                                ? 'bg-green-50 border-green-200' 
+                                : 'bg-blue-50 border-blue-200'
+                            }`}>
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className={`text-sm font-semibold ${
+                                    student.id === user?.user_id 
+                                      ? 'text-green-900' 
+                                      : 'text-blue-900'
+                                  }`}>
+                                    {student.location}
+                                    {student.id === user?.user_id && (
+                                      <span className="mr-2 text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full">موقعك</span>
+                                    )}
+                                  </p>
+                                  {student.fullName && (
+                                    <p className="text-xs text-gray-600 mt-1">
+                                      {student.fullName}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                      {/* School Destination */}
+                      <div className="flex items-center gap-4 relative z-10">
+                        <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center shadow-lg border-4 border-white">
+                          <School className="h-6 w-6 text-white" />
+                        </div>
+                        <div className="flex-1 bg-green-50 rounded-lg p-3 border border-green-200">
+                          <p className="text-sm font-semibold text-green-900">المدرسة</p>
+                          <p className="text-xs text-green-700">{user?.school_name || 'المدرسة'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Bus className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500 mb-2">لا توجد مواقع مسجلة للطلاب</p>
+                    <p className="text-xs text-gray-400">يرجى تحديث المناطق السكنية للطلاب لعرض مسار الحافلة</p>
+                  </div>
+                )}
+
+                {/* Route Summary */}
+                <div className="mt-6 pt-4 border-t border-gray-200">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-blue-600">
+                        {busStudents.filter(s => s.location && s.location.trim()).length}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1">نقاط التوقف</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-green-600">{busStudents.length}</p>
+                      <p className="text-xs text-gray-600 mt-1">إجمالي الطلاب</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-purple-600">
+                        {busStudents.filter(s => s.location && s.location.trim()).length > 0 
+                          ? Math.round((busStudents.filter(s => s.location && s.location.trim()).length / busStudents.length) * 100)
+                          : 0}%
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1">طلاب بمواقع</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-orange-600">{busStatus.current_bus.bus_number}</p>
+                      <p className="text-xs text-gray-600 mt-1">رقم الحافلة</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Note for students without location */}
+                {busStudents.filter(s => !s.location || !s.location.trim()).length > 0 && (
+                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-xs text-yellow-800">
+                      <AlertCircle className="h-4 w-4 inline ml-1" />
+                      {busStudents.filter(s => !s.location || !s.location.trim()).length} طالب بدون منطقة سكنية مسجلة
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Bus className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500 mb-2">لا توجد بيانات عن الطلاب</p>
+                <p className="text-xs text-gray-400">لم يتم تعيين طلاب على هذه الحافلة بعد</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Bus Scan Logs */}
+      <div className="card">
+        <div className="card-header">
+          <div className="flex items-center gap-2">
+            <History className="h-5 w-5 text-orange-600" />
+            <h3 className="card-title">سجل الصعود والنزول</h3>
+          </div>
+        </div>
+        <div className="card-body">
+          {scanLogs && Array.isArray(scanLogs) && scanLogs.length > 0 ? (
+            <div className="space-y-3">
+              {scanLogs.map((log, index) => (
+                <div key={log.id || index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                      log.scan_type === 'board' ? 'bg-green-100' : 'bg-red-100'
+                    }`}>
+                      {log.scan_type === 'board' ? (
+                        <ArrowRight className="h-6 w-6 text-green-600" />
+                      ) : (
+                        <ArrowLeft className="h-6 w-6 text-red-600" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">
+                        {log.scan_type === 'board' ? 'صعود' : 'نزول'}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {formatDate(log.scan_time, 'dd MMMM yyyy - HH:mm', 'ar')}
+                      </p>
+                      {log.bus_number && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          الحافلة: {log.bus_number}
+                        </p>
+                      )}
+                      {log.location && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          الموقع: {log.location}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className={`badge ${
+                    log.scan_type === 'board' ? 'badge-success' : 'badge-danger'
+                  }`}>
+                    {log.scan_type === 'board' ? 'صعود' : 'نزول'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">لا توجد سجلات صعود أو نزول</p>
+            </div>
+          )}
         </div>
       </div>
 

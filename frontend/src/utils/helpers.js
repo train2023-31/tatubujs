@@ -260,6 +260,7 @@ export const getRoleDisplayName = (role) => {
     teacher: 'معلم',
     student: 'طالب',
     data_analyst: 'محلل بيانات',
+    driver: 'سائق',
   };
   
   return roleNames[role] || role || 'غير محدد';
@@ -277,6 +278,7 @@ export const getRoleColor = (role) => {
     teacher: 'badge-info',
     student: 'badge-success',
     data_analyst: 'badge-primary',
+    driver: 'badge-primary',
   };
   
   return roleColors[role] || 'badge-info';

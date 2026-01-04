@@ -199,7 +199,8 @@ const BulkOperations = () => {
     } else if (selectedTab === 'phones') {
       processedData = uploadedData.map(row => ({
         username: row['الرقم المدرسي'] || '',
-        phone_number: row['الهاتف النقال'] || ''
+        phone_number: row['الهاتف النقال'] || '',
+        location: row['المنطقة السكنية'] || row['المنطقه السكنيه'] || ''  // Support both spellings
       }));
     }
 
@@ -303,7 +304,8 @@ const BulkOperations = () => {
       case 'phones':
         return {
           'الرقم المدرسي': 'username',
-          'الهاتف النقال': 'phone_number'
+          'الهاتف النقال': 'phone_number',
+          'المنطقة السكنية': 'location'
         };
       default:
         return {};
@@ -317,7 +319,7 @@ const BulkOperations = () => {
       case 'assign':
         return ['الرقم المدرسي', 'الاســـــــــــم', 'الشعبة', 'اسم الصف'];
       case 'phones':
-        return ['الرقم المدرسي', 'الهاتف النقال'];
+        return ['الرقم المدرسي', 'الهاتف النقال', 'المنطقة السكنية'];
       default:
         return [];
     }
