@@ -31,7 +31,7 @@ import {
   CheckSquare,
   Bus,
   QrCode,
-  
+  CalendarDays,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasRole } from '../../utils/helpers';
@@ -111,6 +111,12 @@ const Sidebar = ({ isOpen, onClose }) => {
           href: '/app/bulk-messaging',
           icon: MessageCircle,
           roles: ['admin', 'school_admin', 'data_analyst'],
+        },
+        {
+          name: 'جدول الحصص',
+          href: '/app/school-timetable',
+          icon: CalendarDays,
+          roles: ['admin', 'school_admin', 'teacher', 'data_analyst', 'student'],
         },
       ]
     },

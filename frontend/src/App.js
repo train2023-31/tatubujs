@@ -32,6 +32,7 @@ import BusManagement from './pages/BusManagement/BusManagement';
 import BusScanner from './pages/BusScanner/BusScanner';
 import BusReports from './pages/BusReports/BusReports';
 import StudentQRCodes from './pages/StudentQRCodes/StudentQRCodes';
+import SchoolTimetable from './pages/SchoolTimetable/SchoolTimetable';
 import LoadingSpinner from './components/UI/LoadingSpinner';
 import cacheManager from './utils/cacheManager';
 
@@ -459,6 +460,9 @@ function App() {
                     </ProtectedRoute>
                   } 
                 />
+                
+                {/* School Timetable - All roles */}
+                <Route path="school-timetable" element={<SchoolTimetable />} />
                 
                 {/* Profile - All roles */}
                 <Route path="profile" element={<Profile />} />
