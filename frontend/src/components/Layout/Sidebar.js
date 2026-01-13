@@ -30,7 +30,8 @@ import {
   Calendar,
   CheckSquare,
   Bus,
-  QrCode
+  QrCode,
+  
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasRole } from '../../utils/helpers';
@@ -182,6 +183,12 @@ const Sidebar = ({ isOpen, onClose }) => {
           href: '/app/bus-scanner',
           icon: QrCode,
           roles: ['school_admin', 'admin', 'driver'],
+        },
+        {
+          name: 'تقارير الحافلات',
+          href: '/app/bus-reports',
+          icon: FileText,
+          roles: ['school_admin', 'admin', 'data_analyst'],
         },
         {
           name: 'رموز QR للطلاب',

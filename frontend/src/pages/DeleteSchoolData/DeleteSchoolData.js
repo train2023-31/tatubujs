@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation } from 'react-query';
-import { Trash2, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { Trash2, AlertTriangle, CheckCircle, XCircle, Bus, User, ScanLine } from 'lucide-react';
 import { authAPI } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
@@ -11,6 +11,9 @@ const DeleteSchoolData = () => {
   const [deleteOptions, setDeleteOptions] = useState({
     students: false,
     teachers: false,
+    drivers: false,
+    buses: false,
+    scans: false,
     classes: false,
     subjects: false,
     attendance: false,
@@ -29,6 +32,9 @@ const DeleteSchoolData = () => {
         setDeleteOptions({
           students: false,
           teachers: false,
+          drivers: false,
+          buses: false,
+          scans: false,
           classes: false,
           subjects: false,
           attendance: false,
@@ -50,6 +56,9 @@ const DeleteSchoolData = () => {
       setDeleteOptions({
         students: newValue,
         teachers: newValue,
+        drivers: newValue,
+        buses: newValue,
+        scans: newValue,
         classes: newValue,
         subjects: newValue,
         attendance: newValue,
@@ -119,7 +128,10 @@ const DeleteSchoolData = () => {
 
     // Sort options according to deletion order
     const deletionOrder = [
+      'scans',
       'attendance',
+      'buses',
+      'drivers',
       'classes',
       'subjects', 
       'logs',
@@ -184,7 +196,9 @@ const DeleteSchoolData = () => {
               <div className="bg-blue-100 rounded-lg p-4">
                 <h4 className="font-semibold text-blue-800 mb-2">الترتيب المطلوب:</h4>
                 <ol className="text-blue-700 space-y-1 list-decimal list-inside">
-                  <li><strong>سجلات الحضور والغياب</strong> - يجب حذفها أولاً</li>
+                  <li><strong>سجلات مسح الحافلات</strong> - يجب حذفها أولاً</li>
+                  <li><strong>سجلات الحضور والغياب</strong> - يجب حذفها بعد سجلات المسح</li>
+                  <li><strong>الحافلات والسائقين</strong> - يمكن حذفها بعد سجلات المسح</li>
                   <li><strong>الفصول والمواد الدراسية</strong> - يمكن حذفها بعد سجلات الحضور</li>
                   <li><strong>التقارير والأخبار</strong> - يمكن حذفها في أي وقت</li>
                   <li><strong>الطلاب</strong> - يجب حذفهم بعد حذف الفصول والمواد</li>
@@ -222,7 +236,25 @@ const DeleteSchoolData = () => {
 
             {/* Individual Options */}
             <div className="space-y-3">
-              {/* Priority 1: Attendance */}
+              {/* Priority 1: Scans */}
+              <div className="border-l-4 border-purple-500 bg-purple-50 rounded-lg p-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={deleteOptions.scans}
+                    onChange={() => handleOptionChange('scans')}
+                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                  />
+                  <div className="flex items-center gap-2">
+                    <ScanLine className="w-4 h-4 text-purple-600" />
+                    <span className="bg-purple-600 text-white text-xs px-2 py-1 rounded-full">1</span>
+                    <span className="text-gray-700 font-medium">سجلات مسح الحافلات</span>
+                    <span className="text-purple-600 text-xs">(أولاً)</span>
+                  </div>
+                </label>
+              </div>
+
+              {/* Priority 2: Attendance */}
               <div className="border-l-4 border-green-500 bg-green-50 rounded-lg p-3">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
@@ -232,14 +264,48 @@ const DeleteSchoolData = () => {
                     className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                   />
                   <div className="flex items-center gap-2">
-                    <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">1</span>
+                    <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">2</span>
                     <span className="text-gray-700 font-medium">سجلات الحضور والغياب</span>
-                    <span className="text-green-600 text-xs">(أولاً)</span>
                   </div>
                 </label>
               </div>
 
-              {/* Priority 2: Classes and Subjects */}
+              {/* Priority 3: Buses and Drivers */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="border-l-4 border-indigo-500 bg-indigo-50 rounded-lg p-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={deleteOptions.buses}
+                      onChange={() => handleOptionChange('buses')}
+                      className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Bus className="w-4 h-4 text-indigo-600" />
+                      <span className="bg-indigo-600 text-white text-xs px-2 py-1 rounded-full">3</span>
+                      <span className="text-gray-700">الحافلات</span>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="border-l-4 border-indigo-500 bg-indigo-50 rounded-lg p-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={deleteOptions.drivers}
+                      onChange={() => handleOptionChange('drivers')}
+                      className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                    />
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-indigo-600" />
+                      <span className="bg-indigo-600 text-white text-xs px-2 py-1 rounded-full">3</span>
+                      <span className="text-gray-700">السائقين</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Priority 4: Classes and Subjects */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="border-l-4 border-blue-500 bg-blue-50 rounded-lg p-3">
                   <label className="flex items-center gap-3 cursor-pointer">
@@ -250,7 +316,7 @@ const DeleteSchoolData = () => {
                       className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                     />
                     <div className="flex items-center gap-2">
-                      <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">2</span>
+                      <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">4</span>
                       <span className="text-gray-700">الفصول</span>
                     </div>
                   </label>
@@ -265,14 +331,14 @@ const DeleteSchoolData = () => {
                       className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                     />
                     <div className="flex items-center gap-2">
-                      <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">2</span>
+                      <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">4</span>
                       <span className="text-gray-700">المواد الدراسية</span>
                     </div>
                   </label>
                 </div>
               </div>
 
-              {/* Priority 3: Reports and News */}
+              {/* Priority 5: Reports and News */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="border-l-4 border-yellow-500 bg-yellow-50 rounded-lg p-3">
                   <label className="flex items-center gap-3 cursor-pointer">
@@ -305,7 +371,7 @@ const DeleteSchoolData = () => {
                 </div>
               </div>
 
-              {/* Priority 4: Students */}
+              {/* Priority 6: Students */}
               <div className="border-l-4 border-orange-500 bg-orange-50 rounded-lg p-3">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
@@ -315,14 +381,14 @@ const DeleteSchoolData = () => {
                     className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                   />
                   <div className="flex items-center gap-2">
-                    <span className="bg-orange-600 text-white text-xs px-2 py-1 rounded-full">4</span>
+                    <span className="bg-orange-600 text-white text-xs px-2 py-1 rounded-full">6</span>
                     <span className="text-gray-700 font-medium">الطلاب</span>
                     <span className="text-orange-600 text-xs">(قبل المعلمين)</span>
                   </div>
                 </label>
               </div>
 
-              {/* Priority 5: Teachers */}
+              {/* Priority 7: Teachers */}
               <div className="border-l-4 border-red-500 bg-red-50 rounded-lg p-3">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
@@ -332,7 +398,7 @@ const DeleteSchoolData = () => {
                     className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                   />
                   <div className="flex items-center gap-2">
-                    <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">5</span>
+                    <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">7</span>
                     <span className="text-gray-700 font-medium">المعلمين</span>
                     <span className="text-red-600 text-xs">(أخيراً)</span>
                   </div>
@@ -376,11 +442,14 @@ const DeleteSchoolData = () => {
                 أنت على وشك حذف البيانات التالية نهائياً:
               </p>
               <ul className="list-disc list-inside text-gray-700 space-y-1 mb-4">
+                {deleteOptions.scans && <li>جميع سجلات مسح الحافلات</li>}
+                {deleteOptions.attendance && <li>جميع سجلات الحضور والغياب</li>}
+                {deleteOptions.buses && <li>جميع الحافلات</li>}
+                {deleteOptions.drivers && <li>جميع السائقين</li>}
                 {deleteOptions.students && <li>جميع الطلاب</li>}
                 {deleteOptions.teachers && <li>جميع المعلمين</li>}
                 {deleteOptions.classes && <li>جميع الفصول</li>}
                 {deleteOptions.subjects && <li>جميع المواد الدراسية</li>}
-                {deleteOptions.attendance && <li>جميع سجلات الحضور والغياب</li>}
                 {deleteOptions.logs && <li>جميع التقارير</li>}
                 {deleteOptions.news && <li>جميع الأخبار</li>}
               </ul>

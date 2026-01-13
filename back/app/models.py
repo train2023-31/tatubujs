@@ -1,5 +1,5 @@
 from app import db
-from datetime import datetime
+from datetime import datetime, timezone
 from app.config import get_oman_time
 
 # Base User model
@@ -350,6 +350,7 @@ class Bus(db.Model):
     driver_id = db.Column(db.Integer, db.ForeignKey('drivers.id'), nullable=True, unique=True)  # Changed to drivers.id and added unique
     capacity = db.Column(db.Integer, nullable=False, default=50)
     plate_number = db.Column(db.String(50), nullable=True)
+    location = db.Column(db.String(255), nullable=True)  # موقع الحافلة (Bus Location)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
     
@@ -369,6 +370,7 @@ class Bus(db.Model):
             'driver_name': self.driver.fullName if self.driver else None,
             'capacity': self.capacity,
             'plate_number': self.plate_number,
+            'location': self.location,
             'is_active': self.is_active,
             'student_count': len(self.students),
             'created_at': self.created_at.isoformat() if self.created_at else None
@@ -383,7 +385,7 @@ class BusScan(db.Model):
     student_id = db.Column(db.Integer, db.ForeignKey('students.id'), nullable=False)
     bus_id = db.Column(db.Integer, db.ForeignKey('buses.id'), nullable=False)
     scan_type = db.Column(db.String(20), nullable=False)  # 'board' or 'exit'
-    scan_time = db.Column(db.DateTime, nullable=False, default=get_oman_time().utcnow)
+    scan_time = db.Column(db.DateTime, nullable=False, default=lambda: get_oman_time())
     location = db.Column(db.String(255), nullable=True)
     scanned_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     notes = db.Column(db.Text, nullable=True)

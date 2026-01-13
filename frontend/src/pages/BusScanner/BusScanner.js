@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from 'react-query';
-import { QrCode, CheckCircle, XCircle, Bus as BusIcon, LogIn, LogOut, AlertCircle } from 'lucide-react';
+import { QrCode, CheckCircle, XCircle, Bus as BusIcon, LogIn, LogOut, AlertCircle, Lock } from 'lucide-react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { busAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
@@ -13,7 +13,9 @@ const BusScanner = () => {
   const [scanType, setScanType] = useState('board'); // 'board' or 'exit'
   const [lastScan, setLastScan] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [scanTypeLocked, setScanTypeLocked] = useState(false); // Lock scan type when scanning
   const scannerRef = useRef(null);
+  const scanTypeRef = useRef('board'); // Ref to track scan type for scanning
   
   // Check if user is a driver
   const isDriver = user?.role === 'driver';
@@ -80,6 +82,9 @@ const BusScanner = () => {
       return;
     }
     
+    // Use the locked scan type from ref to ensure consistency
+    const currentScanType = scanTypeRef.current;
+    
     // Stop scanner temporarily to prevent multiple scans
     if (scannerRef.current) {
       try {
@@ -93,7 +98,7 @@ const BusScanner = () => {
       const response = await busAPI.scanStudent({
         username: decodedText, // QR code contains the username
         bus_id: parseInt(selectedBusId),
-        scan_type: scanType,
+        scan_type: currentScanType, // Use locked scan type from ref
       });
       
       setLastScan({
@@ -102,9 +107,9 @@ const BusScanner = () => {
         success: true,
       });
       
-      // Show success toast
+      // Show success toast with scan type
       toast.success(
-        `✅ ${response.data.student.fullName}\n${scanType === 'board' ? 'صعد إلى' : 'نزل من'} الحافلة`,
+        `✅ ${response.data.student.fullName}\n${currentScanType === 'board' ? 'صعد إلى' : 'نزل من'} الحافلة`,
         { duration: 3000 }
       );
       
@@ -155,7 +160,18 @@ const BusScanner = () => {
       toast.error('يرجى اختيار الحافلة أولاً');
       return;
     }
+    // Lock the scan type when starting to scan
+    scanTypeRef.current = scanType;
+    setScanTypeLocked(true);
     setIsScanning(true);
+    // Show confirmation toast with scan type
+    toast.success(
+      `تم تفعيل المسح - ${scanType === 'board' ? 'صعود' : 'نزول'}`,
+      { 
+        duration: 2000,
+        icon: scanType === 'board' ? '✅' : '🚪'
+      }
+    );
   };
   
   const stopScanning = () => {
@@ -163,6 +179,7 @@ const BusScanner = () => {
       scannerRef.current.clear().catch(() => {});
     }
     setIsScanning(false);
+    setScanTypeLocked(false); // Unlock scan type when stopping
   };
   
   return (
@@ -241,25 +258,75 @@ const BusScanner = () => {
           {/* Scan Type Selection */}
           <div>
             <label className="label">نوع المسح</label>
+            {scanTypeLocked && (
+              <div className="mb-2 p-2 bg-yellow-50 border border-yellow-300 rounded-lg flex items-center gap-2">
+                <Lock className="h-4 w-4 text-yellow-600" />
+                <span className="text-xs text-yellow-800 font-medium">
+                  نوع المسح مقفل: {scanType === 'board' ? 'صعود' : 'نزول'} - أوقف المسح لتغيير النوع
+                </span>
+              </div>
+            )}
             <div className="flex gap-2">
               <button
-                onClick={() => setScanType('board')}
+                onClick={() => {
+                  if (!scanTypeLocked) {
+                    setScanType('board');
+                    toast.success('تم اختيار: صعود', { duration: 1500 });
+                  } else {
+                    toast.error('يجب إيقاف المسح أولاً لتغيير نوع المسح', { duration: 2000 });
+                  }
+                }}
+                disabled={scanTypeLocked}
                 className={`flex-1 btn ${
-                  scanType === 'board' ? 'btn-primary' : 'btn-outline'
+                  scanType === 'board' 
+                    ? 'btn bg-green-700 text-white' 
+                    : scanTypeLocked 
+                      ? 'btn-outline opacity-50 cursor-not-allowed' 
+                      : 'btn-outline'
                 }`}
               >
-                <LogIn className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                <LogIn className="h-4 w-4 sm:h-5 sm:w-5 mr-2 ml-2" />
                 صعود
+                {scanType === 'board' && scanTypeLocked && (
+                  <Lock className="h-3 w-3 mr-1" />
+                )}
               </button>
               <button
-                onClick={() => setScanType('exit')}
+                onClick={() => {
+                  if (!scanTypeLocked) {
+                    setScanType('exit');
+                    toast.success('تم اختيار: نزول', { duration: 1500 });
+                  } else {
+                    toast.error('يجب إيقاف المسح أولاً لتغيير نوع المسح', { duration: 2000 });
+                  }
+                }}
+                disabled={scanTypeLocked}
                 className={`flex-1 btn ${
-                  scanType === 'exit' ? 'btn-danger' : 'btn-outline'
+                  scanType === 'exit' 
+                    ? 'btn-danger' 
+                    : scanTypeLocked 
+                      ? 'btn-outline opacity-50 cursor-not-allowed' 
+                      : 'btn-outline'
                 }`}
               >
-                <LogOut className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                <LogOut className="h-4 w-4 sm:h-5 sm:w-5 mr-2 ml-2" />
                 نزول
+                {scanType === 'exit' && scanTypeLocked && (
+                  <Lock className="h-3 w-3 mr-1" />
+                )}
               </button>
+            </div>
+            {/* Current Scan Type Indicator */}
+            <div className={`mt-2 p-2 rounded-lg text-center text-sm font-medium ${
+              scanType === 'board' 
+                ? 'bg-green-100 text-green-800 border border-green-300' 
+                : 'bg-red-100 text-red-800 border border-red-300'
+            }`}>
+              {scanType === 'board' ? (
+                <span>📥 وضع المسح الحالي: <strong>صعود</strong></span>
+              ) : (
+                <span>📤 وضع المسح الحالي: <strong>نزول</strong></span>
+              )}
             </div>
           </div>
           
@@ -271,7 +338,7 @@ const BusScanner = () => {
                 disabled={!selectedBusId}
                 className="flex-1 btn btn-primary"
               >
-                <QrCode className="h-5 w-5 mr-2" />
+                <QrCode className="h-5 w-5 mr-2 ml-2" />
                 بدء المسح
               </button>
             ) : (

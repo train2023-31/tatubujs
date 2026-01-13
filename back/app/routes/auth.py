@@ -3,7 +3,7 @@
 from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from app.models import User, Student, Teacher, School ,Class , Subject , student_classes ,Attendance ,News ,ActionLog, Driver
+from app.models import User, Student, Teacher, School ,Class , Subject , student_classes ,Attendance ,News ,ActionLog, Driver, Bus, BusScan, bus_students
 from app import db ,limiter
 import csv
 from flask import send_file, Response
@@ -502,6 +502,129 @@ def register_single_driver():
     db.session.commit()
 
     return jsonify(message="Driver registered successfully , تم إضافة السائق بنجاح"), 201
+
+
+@auth_blueprint.route('/register_Driver', methods=['POST']) 
+@jwt_required()
+@log_action("إضافة", description="إضافة قائمة سائقين جدد ")
+def register_Drivers():
+    user_id = get_jwt_identity()
+    Login_user = User.query.get(user_id)
+
+    data = request.get_json()
+    
+    if Login_user.user_role != 'school_admin' and Login_user.user_role != 'data_analyst':  # Ensure only school_admin or data_analyst can register drivers
+        return jsonify(message={"en": "Unauthorized to make this action.", "ar": "غير مصرح لك بتنفيذ هذا الإجراء."}, flag=1), 400
+    
+    if not isinstance(data, list):  # Ensure data is a list of users
+        return jsonify(message={"en": "Invalid data format. Expecting a list of users.", "ar": "تنسيق بيانات غير صالح. يجب أن تكون قائمة من المستخدمين."}, flag=2), 400
+    
+    # Limit number of drivers
+    MAX_DRIVERS = 10000
+    if len(data) > MAX_DRIVERS:
+        return jsonify(message={
+            "en": f"Maximum allowed drivers is {MAX_DRIVERS}.",
+            "ar": f"الحد الأقصى المسموح به لإرسال السائقين هو {MAX_DRIVERS}."
+        }, flag=5), 400
+    
+    response = []  # To collect responses for each user
+    for user_data in data:
+        username = user_data.get('username')
+        email = user_data.get('email')
+        fullName = user_data.get('fullName')
+        phone_number = user_data.get('phone_number')
+        license_number = user_data.get('license_number')
+        license_expiry = user_data.get('license_expiry')
+        
+        # Validate required fields
+        if not all([username, fullName, email]):
+            response.append({
+                "username": username, 
+                "message": {
+                    "en": "Missing required fields.", 
+                    "ar": "هناك حقول مفقودة."
+                },
+                "flag": 3
+            })
+            continue
+        
+        # Check if username or email already exists
+        existing_user = User.query.filter(
+            (User.username == username) | (User.email == email)
+        ).first()
+        if existing_user:
+            response.append({
+                "username": username, 
+                "message": {
+                    "en": "Username or email already exists.", 
+                    "ar": "اسم المستخدم أو البريد الإلكتروني موجود بالفعل."
+                },
+                "flag": 4
+            })
+            continue
+        
+        # Ensure school exists
+        school = School.query.get(Login_user.school_id)
+
+        # Hash the password (Default password or generate one)
+        hashed_password = generate_password_hash(school.password)  # Default password for new drivers
+        
+        if not school:
+            response.append({
+                "username": username, 
+                "message": {
+                    "en": "School not found.", 
+                    "ar": "لم يتم العثور على المدرسة."
+                },
+                "flag": 5
+            })
+            continue
+        
+        # Parse license_expiry if provided (expecting ISO format string: YYYY-MM-DD)
+        license_expiry_date = None
+        if license_expiry:
+            try:
+                license_expiry_date = datetime.strptime(license_expiry, '%Y-%m-%d').date()
+            except ValueError:
+                response.append({
+                    "username": username, 
+                    "message": {
+                        "en": "Invalid license_expiry format. Expected YYYY-MM-DD.", 
+                        "ar": "تنسيق تاريخ انتهاء الرخصة غير صالح. المتوقع YYYY-MM-DD."
+                    },
+                    "flag": 2
+                })
+                continue
+        
+        new_user = Driver(
+            username=username,
+            password=hashed_password,
+            email=email,
+            phone_number=phone_number,
+            user_role='driver',
+            fullName=fullName,
+            license_number=license_number,
+            license_expiry=license_expiry_date,
+            school_id=Login_user.school_id,
+        )
+        
+        db.session.add(new_user)
+        response.append({
+            "username": username, 
+            "message": {
+                "en": "User registered successfully.", 
+                "ar": "تم تسجيل المستخدم بنجاح."
+            },
+            "flag": 6
+        })
+    
+    # Commit all users at once
+    try:
+        db.session.commit()
+    except Exception as e:
+        return jsonify(message={"en": f"Database error: {str(e)}", "ar": f"خطأ في قاعدة البيانات: {str(e)}"}, flag=7), 500
+
+    return jsonify(response), 201
 
 
 @auth_blueprint.route('/register_single_assign_student', methods=['POST'])
@@ -1230,6 +1353,13 @@ def update_user(user_id):
     week_Classes_Number = data.get('week_Classes_Number')
     salary = data.get('salary')
 
+    # Driver-specific fields
+    license_number = data.get('license_number')
+    license_expiry = data.get('license_expiry')
+
+    # Student-specific fields
+    location = data.get('location')
+
     # Validate uniqueness
     if username and User.query.filter(User.username == username, User.id != user_id).first():
         return jsonify(message="Username already exists."), 409
@@ -1268,6 +1398,26 @@ def update_user(user_id):
         if salary is not None:
             user.salary = salary
 
+    # Update driver-specific fields if the user is a Driver
+    if isinstance(user, Driver):
+        if license_number is not None:
+            user.license_number = license_number
+        if license_expiry is not None:
+            try:
+                # Parse license_expiry if it's a string (ISO format: YYYY-MM-DD)
+                if isinstance(license_expiry, str):
+                    license_expiry_date = datetime.strptime(license_expiry, '%Y-%m-%d').date()
+                else:
+                    license_expiry_date = license_expiry
+                user.license_expiry = license_expiry_date
+            except (ValueError, TypeError) as e:
+                return jsonify(message=f"Invalid license_expiry format: {str(e)}"), 400
+
+    # Update student-specific fields if the user is a Student
+    if isinstance(user, Student):
+        if location is not None:
+            user.location = location
+
     try:
         db.session.commit()
     except Exception as e:
@@ -1290,6 +1440,17 @@ def update_user(user_id):
             "job_name": user.job_name,
             "week_Classes_Number": user.week_Classes_Number,
             "salary": user.salary,
+        })
+
+    if isinstance(user, Driver):
+        user_data.update({
+            "license_number": user.license_number,
+            "license_expiry": user.license_expiry.isoformat() if user.license_expiry else None,
+        })
+
+    if isinstance(user, Student):
+        user_data.update({
+            "location": user.location,
         })
 
     return jsonify(message="User updated successfully.", user=user_data), 200
@@ -1666,7 +1827,17 @@ def delete_school_data():
         }), 404
 
     try:
-        ### **1️⃣ Delete Attendance Records (if selected)**
+        # Get all user IDs in this school first (for action logs deletion)
+        all_user_ids_in_school = [u.id for u in User.query.filter_by(school_id=school_id).all()]
+        
+        ### **1️⃣ Delete Bus Scans (if selected)**
+        if "scans" in delete_options:
+            # Get all bus IDs for this school
+            bus_ids = [b.id for b in Bus.query.filter_by(school_id=school_id).all()]
+            if bus_ids:
+                db.session.query(BusScan).filter(BusScan.bus_id.in_(bus_ids)).delete(synchronize_session=False)
+
+        ### **2️⃣ Delete Attendance Records (if selected)**
         if "attendance" in delete_options:
             db.session.query(Attendance).filter(
                 Attendance.class_id.in_(
@@ -1674,7 +1845,36 @@ def delete_school_data():
                 )
             ).delete(synchronize_session=False)
 
-        ### **2️⃣ Delete Student-Class Relationships (if students or classes are selected)**
+        ### **3️⃣ Delete Action Logs (if logs selected OR if deleting users)**
+        # Delete logs before deleting users to avoid foreign key constraint errors
+        if "logs" in delete_options or "drivers" in delete_options or "students" in delete_options or "teachers" in delete_options:
+            if all_user_ids_in_school:
+                db.session.query(ActionLog).filter(ActionLog.user_id.in_(all_user_ids_in_school)).delete(synchronize_session=False)
+
+        ### **4️⃣ Delete Buses (if selected)**
+        if "buses" in delete_options:
+            # Get all bus IDs for this school
+            bus_ids = [b.id for b in Bus.query.filter_by(school_id=school_id).all()]
+            if bus_ids:
+                # Delete bus-student relationships (many-to-many table)
+                db.session.execute(
+                    db.text("DELETE FROM bus_students WHERE bus_id IN :bus_ids"),
+                    {"bus_ids": tuple(bus_ids) if len(bus_ids) > 1 else (bus_ids[0],)}
+                )
+                # Delete buses (cascade will handle bus_scans deletion)
+                db.session.query(Bus).filter(Bus.id.in_(bus_ids)).delete(synchronize_session=False)
+
+        ### **5️⃣ Delete Drivers (if selected)**
+        if "drivers" in delete_options:
+            # Get driver IDs for this school
+            driver_ids = [
+                d.id for d in Driver.query.filter_by(school_id=school_id).all()
+            ]
+            if driver_ids:
+                db.session.query(Driver).filter(Driver.id.in_(driver_ids)).delete(synchronize_session=False)
+                db.session.query(User).filter(User.id.in_(driver_ids)).delete(synchronize_session=False)
+
+        ### **6️⃣ Delete Student-Class Relationships (if students or classes are selected)**
         if "students" in delete_options or "classes" in delete_options:
             db.session.query(student_classes).filter(
                 student_classes.c.class_id.in_(
@@ -1682,14 +1882,22 @@ def delete_school_data():
                 )
             ).delete(synchronize_session=False)
 
-        ### **3️⃣ Delete Students (if selected)**
+        ### **7️⃣ Delete Students (if selected)**
         if "students" in delete_options:
             student_ids = [s.id for s in Student.query.filter_by(school_id=school_id).all()]
             if student_ids:
+                # Delete bus-student relationships first
+                db.session.execute(
+                    db.text("DELETE FROM bus_students WHERE student_id IN :student_ids"),
+                    {"student_ids": tuple(student_ids) if len(student_ids) > 1 else (student_ids[0],)}
+                )
+                # Delete bus scans for these students
+                db.session.query(BusScan).filter(BusScan.student_id.in_(student_ids)).delete(synchronize_session=False)
+                # Delete students
                 db.session.query(Student).filter(Student.id.in_(student_ids)).delete(synchronize_session=False)
                 db.session.query(User).filter(User.id.in_(student_ids)).delete(synchronize_session=False)
 
-        ### **4️⃣ Delete Teachers (if selected)**
+        ### **8️⃣ Delete Teachers (if selected)**
         if "teachers" in delete_options:
             # Get teacher IDs excluding school_admins
             teacher_ids = [
@@ -1703,30 +1911,25 @@ def delete_school_data():
                 db.session.query(User).filter(User.id.in_(teacher_ids)).delete(synchronize_session=False)
 
 
-        ### **5️⃣ Delete Subjects (if selected)**
+        ### **9️⃣ Delete Subjects (if selected)**
         if "subjects" in delete_options:
             db.session.query(Subject).filter_by(school_id=school_id).delete(synchronize_session=False)
 
-        ### **6️⃣ Delete Classes (if selected)**
+        ### **🔟 Delete Classes (if selected)**
         if "classes" in delete_options:
             db.session.query(Class).filter_by(school_id=school_id).delete(synchronize_session=False)
 
-            ### **8️⃣ Delete News (if selected)**
+        ### **1️⃣1️⃣ Delete News (if selected)**
         if "news" in delete_options:
             db.session.query(News).filter_by(school_id=school_id).delete(synchronize_session=False)
 
-        ### **7️⃣ Delete School (if selected)**
+        ### **1️⃣2️⃣ Delete School (if selected)**
         if "school" in delete_options:
             # Ensure the school admin is NOT deleted
             db.session.query(User).filter(
                 and_(User.school_id == school_id, User.user_role != "school_admin")
             ).delete(synchronize_session=False)
             db.session.delete(school)
-
-        ### **🧾 Delete Logs for users in this school**
-        if "logs" in delete_options:
-            user_ids_in_school = [u.id for u in User.query.filter_by(school_id=school_id).all()]
-            db.session.query(ActionLog).filter(ActionLog.user_id.in_(user_ids_in_school)).delete(synchronize_session=False)
 
         # Commit changes
         db.session.commit()

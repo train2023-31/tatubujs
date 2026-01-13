@@ -29,7 +29,9 @@ import {
   Bus,
   User,
   History,
-  QrCode
+  QrCode,
+  MapPin,
+  Globe
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { reportsAPI, attendanceAPI, authAPI, busAPI } from '../../services/api';
@@ -41,6 +43,36 @@ import { QRCodeCanvas } from 'qrcode.react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import toast from 'react-hot-toast';
+
+// Helper function to format time in Oman MCT timezone
+const formatOmanTime = (dateString) => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    
+    // Format time in 24-hour format
+    const timeStr = date.toLocaleString('ar-OM', {
+      timeZone: 'Asia/Muscat',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    
+    // Format date
+    const dateStr = date.toLocaleString('ar-OM', {
+      timeZone: 'Asia/Muscat',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'short'
+    });
+    
+    return { time: timeStr, date: dateStr, full: `${dateStr} - ${timeStr}` };
+  } catch (error) {
+    return { time: '', date: '', full: '' };
+  }
+};
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -469,6 +501,8 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
   const [isStudentListModalOpen, setIsStudentListModalOpen] = useState(false);
   const [selectedStudentList, setSelectedStudentList] = useState(null);
   const [selectedListType, setSelectedListType] = useState('');
+  const [isBusStudentsModalOpen, setIsBusStudentsModalOpen] = useState(false);
+  const [busStudentsType, setBusStudentsType] = useState(''); // 'board' or 'exit'
 
 
   // Local function to safely call needsSetup
@@ -488,6 +522,37 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
       refetchInterval: 30000,
     }
   );
+
+  // Fetch bus report for today
+  const { data: busReport, isLoading: busReportLoading } = useQuery(
+    ['busReport', selectedDate],
+    () => busAPI.getDailyBusReport({ date: selectedDate }),
+    {
+      enabled: !!selectedDate,
+      refetchInterval: 30000,
+    }
+  );
+
+  // Calculate bus statistics
+  const busStats = React.useMemo(() => {
+    if (!busReport || !Array.isArray(busReport)) {
+      return { totalOnBus: 0, totalExited: 0, totalBuses: 0 };
+    }
+    
+    let totalOnBus = 0;
+    let totalExited = 0;
+    
+    busReport.forEach(busData => {
+      totalOnBus += busData.currently_on_bus || 0;
+      totalExited += busData.exited_count || 0;
+    });
+    
+    return {
+      totalOnBus,
+      totalExited,
+      totalBuses: busReport.length
+    };
+  }, [busReport]);
 
 
   // Handle viewing absent students for a specific class
@@ -544,8 +609,46 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
     setSelectedListType('');
   };
 
+  // Handle viewing bus students
+  const handleViewBusStudents = (type) => {
+    setBusStudentsType(type);
+    setIsBusStudentsModalOpen(true);
+  };
 
-  if (loading || summaryLoading || bulkOpsLoading) {
+  // Close bus students modal
+  const handleCloseBusStudentsModal = () => {
+    setIsBusStudentsModalOpen(false);
+    setBusStudentsType('');
+  };
+
+  // Get bus students list for modal
+  const getBusStudentsList = () => {
+    if (!busReport || !Array.isArray(busReport)) return [];
+    
+    const studentsList = [];
+    
+    busReport.forEach(busData => {
+      if (!busData.scans || !Array.isArray(busData.scans)) return;
+      
+      busData.scans.forEach(scan => {
+        if (scan.scan_type === busStudentsType) {
+          studentsList.push({
+            student_name: scan.student_name || scan.student_username || 'غير محدد',
+            student_id: scan.student_id,
+            bus_number: busData.bus?.bus_number || scan.bus_number || 'غير محدد',
+            bus_name: busData.bus?.bus_name || 'غير محدد',
+            scan_time: scan.scan_time,
+            location: scan.location || '-'
+          });
+        }
+      });
+    });
+    
+    return studentsList;
+  };
+
+
+  if (loading || summaryLoading || bulkOpsLoading || busReportLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <LoadingSpinner />
@@ -920,6 +1023,28 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
           onEyeClick={() => handleViewStudentList('excuse')}
         />
       </div>
+
+      {/* Bus Statistics Cards */}
+      {busStats.totalBuses > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <StatCard
+            title="الطلاب على الحافلات"
+            value={busStats.totalOnBus || 0}
+            icon={Bus}
+            color="indigo"
+            showEyeIcon={true}
+            onEyeClick={() => handleViewBusStudents('board')}
+          />
+          <StatCard
+            title="الطلاب الذين نزلوا"
+            value={busStats.totalExited || 0}
+            icon={Bus}
+            color="purple"
+            showEyeIcon={true}
+            onEyeClick={() => handleViewBusStudents('exit')}
+          />
+        </div>
+      )}
 
       {/* Class Statistics */}
       {(schoolStats?.classes && schoolStats.classes.length > 0) || (attendanceSummary?.attendance_summary && attendanceSummary.attendance_summary.length > 0) ? (
@@ -1413,6 +1538,101 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
         </div>
       </Modal>
 
+      {/* Bus Students Modal */}
+      <Modal
+        isOpen={isBusStudentsModalOpen}
+        onClose={handleCloseBusStudentsModal}
+        title={`قائمة الطلاب ${busStudentsType === 'board' ? 'على الحافلات' : 'الذين نزلوا من الحافلات'}`}
+        size="xl"
+      >
+        <div className="space-y-4">
+          {busReportLoading ? (
+            <div className="flex items-center justify-center py-9">
+              <LoadingSpinner />
+              <span className="mr-3 text-gray-500">جاري تحميل بيانات الطلاب...</span>
+            </div>
+          ) : (() => {
+            const studentsList = getBusStudentsList();
+            return studentsList.length > 0 ? (
+              <div className="space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-shrink-0">
+                      <Bus className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-blue-900">
+                        إجمالي الطلاب: {studentsList.length}
+                      </h4>
+                      <p className="text-sm text-blue-700">
+                        {busStudentsType === 'board' 
+                          ? 'الطلاب الذين صعدوا على الحافلات' 
+                          : 'الطلاب الذين نزلوا من الحافلات'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="max-h-96 overflow-y-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b sticky top-0">
+                      <tr>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          اسم الطالب
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          رقم الحافلة
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          اسم الحافلة
+                        </th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          الوقت
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          الموقع
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {studentsList.map((student, index) => {
+                        const timeInfo = formatOmanTime(student.scan_time);
+                        return (
+                          <tr key={`${student.student_id}-${index}`} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {student.student_name}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                              {student.bus_number}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                              {student.bus_name}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-center text-sm text-gray-900">
+                              {timeInfo.time || '-'}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                              {student.location}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="text-gray-500 text-lg">🚌</div>
+                <p className="text-gray-500 mt-2">
+                  لا يوجد طلاب {busStudentsType === 'board' ? 'على الحافلات' : 'نزلوا من الحافلات'} اليوم
+                </p>
+              </div>
+            );
+          })()}
+        </div>
+      </Modal>
+
     </div>
   );
 };
@@ -1567,6 +1787,7 @@ const StatCard = ({ title, value, icon: Icon, color, showEyeIcon = false, onEyeC
     yellow: 'bg-yellow-500 text-white',
     purple: 'bg-purple-500 text-white',
     orange: 'bg-orange-500 text-white',
+    indigo: 'bg-indigo-500 text-white',
   };
 
   return (
@@ -1785,6 +2006,15 @@ const DriverDashboard = () => {
                   <label className="label">السعة</label>
                   <p className="text-gray-900">{bus.capacity} طالب</p>
                 </div>
+                {bus.location && (
+                  <div className="col-span-2">
+                    <label className="label">موقع الحافلة</label>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-gray-500" />
+                      <p className="text-gray-900">{bus.location}</p>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="pt-4 border-t">
                 <div className="flex items-center justify-between">
@@ -2040,7 +2270,18 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
     }
   );
 
-  if (attendanceLoading || profileLoading || statsLoading || busLoading || logsLoading || busStudentsLoading) {
+  // Fetch today's scans for the bus to determine which locations have been scanned
+  const today = new Date().toISOString().split('T')[0];
+  const { data: todayBusScans, isLoading: todayScansLoading } = useQuery(
+    ['todayBusScans', busId, today],
+    () => busAPI.getScans({ bus_id: busId, date: today, limit: 1000 }),
+    {
+      enabled: !!busId,
+      refetchInterval: 30000, // Refresh every 30 seconds
+    }
+  );
+
+  if (attendanceLoading || profileLoading || statsLoading || busLoading || logsLoading || busStudentsLoading || todayScansLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <LoadingSpinner />
@@ -2316,6 +2557,15 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
                     <label className="label">السعة</label>
                     <p className="text-gray-900">{busStatus.current_bus.capacity} طالب</p>
                   </div>
+                  {busStatus.current_bus.location && (
+                    <div className="col-span-2">
+                      <label className="label">موقع الحافلة</label>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-gray-500" />
+                        <p className="text-gray-900">{busStatus.current_bus.location}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="pt-4 border-t">
                   <div className="flex items-center gap-2">
@@ -2360,7 +2610,7 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
       )}
 
       {/* Bus Route Tracking */}
-      {busStatus?.current_bus && (
+      {busStatus && (
         <div className="card">
           <div className="card-header">
             <div className="flex items-center gap-2">
@@ -2369,135 +2619,282 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
             </div>
           </div>
           <div className="card-body">
-            {busStudentsLoading ? (
+            {busStudentsLoading || todayScansLoading ? (
               <div className="flex items-center justify-center py-8">
                 <LoadingSpinner />
                 <span className="mr-3 text-gray-500">جاري تحميل مسار الحافلة...</span>
               </div>
-            ) : busStudents && Array.isArray(busStudents) && busStudents.length > 0 ? (
+            ) : (
               <div className="space-y-4">
-                {/* Route Visualization */}
-                {busStudents.filter(student => student.location && student.location.trim()).length > 0 ? (
-                  <div className="relative">
-                    {/* Route Line */}
-                    <div className="absolute right-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-500 via-blue-400 to-green-500 transform translate-x-1/2"></div>
-                    
-                    {/* Route Points */}
-                    <div className="relative space-y-6">
-                      {/* Start Point */}
-                      <div className="flex items-center gap-4 relative z-10">
-                        <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center shadow-lg border-4 border-white">
-                          <span className="text-white font-bold text-sm">بدء</span>
-                        </div>
-                        <div className="flex-1 bg-blue-50 rounded-lg p-3 border border-blue-200">
-                          <p className="text-sm font-semibold text-blue-900">نقطة البداية</p>
-                          <p className="text-xs text-blue-700">بدء رحلة الحافلة</p>
-                        </div>
-                      </div>
-
-                      {/* Student Locations */}
-                      {busStudents
-                        .filter(student => student.location && student.location.trim())
-                        .map((student, index) => (
-                          <div key={student.id || index} className="flex items-center gap-4 relative z-10">
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-4 border-white ${
-                              student.id === user?.user_id 
-                                ? 'bg-green-500' 
-                                : 'bg-blue-400'
-                            }`}>
-                              <span className="text-white font-bold text-sm">{index + 1}</span>
+                {/* Route Visualization - Always show route */}
+                {(() => {
+                  // Always show route, even if no students
+                  if (!busStudents || !Array.isArray(busStudents) || busStudents.length === 0) {
+                    return (
+                      <div className="relative w-full py-8 sm:py-12">
+                        <div className="relative w-full" style={{ height: '120px' }}>
+                          <svg 
+                            className="absolute top-1/2 left-0 w-full transform -translate-y-1/2"
+                            style={{ height: '2px' }}
+                            preserveAspectRatio="none"
+                          >
+                            <line
+                              x1="0"
+                              y1="1"
+                              x2="100%"
+                              y2="1"
+                              stroke="#000000"
+                              strokeWidth="2"
+                              strokeDasharray="8, 8"
+                              className="opacity-60"
+                            />
+                          </svg>
+                          <div className="relative w-full flex items-center justify-between px-2 sm:px-4" style={{ height: '120px' }}>
+                            <div className="flex flex-col items-center relative z-10" style={{ flex: '0 0 auto' }}>
+                              <div className="relative mb-2">
+                                <MapPin className="h-8 w-8 sm:h-10 sm:w-10 text-black" />
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-2 h-2 bg-black rounded-full"></div>
+                              </div>
+                              <div className="text-center mt-2 max-w-[80px] sm:max-w-[120px]">
+                                <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">بدء</p>
+                                <p className="text-xs text-gray-600 truncate">الرحلة</p>
+                              </div>
                             </div>
-                            <div className={`flex-1 rounded-lg p-3 border ${
-                              student.id === user?.user_id 
-                                ? 'bg-green-50 border-green-200' 
-                                : 'bg-blue-50 border-blue-200'
-                            }`}>
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className={`text-sm font-semibold ${
-                                    student.id === user?.user_id 
-                                      ? 'text-green-900' 
-                                      : 'text-blue-900'
-                                  }`}>
-                                    {student.location}
-                                    {student.id === user?.user_id && (
-                                      <span className="mr-2 text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full">موقعك</span>
-                                    )}
-                                  </p>
-                                  {student.fullName && (
-                                    <p className="text-xs text-gray-600 mt-1">
-                                      {student.fullName}
-                                    </p>
-                                  )}
-                                </div>
+                            <div className="flex flex-col items-center relative z-10" style={{ flex: '0 0 auto' }}>
+                              <div className="relative mb-2">
+                                <Bus className="h-10 w-10 sm:h-12 sm:w-12 text-black" />
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-2 h-2 bg-black rounded-full"></div>
+                              </div>
+                              <div className="text-center mt-2 max-w-[80px] sm:max-w-[120px]">
+                                <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">المدرسة</p>
+                                <p className="text-xs text-gray-600 truncate">{user?.school_name || 'الوصول'}</p>
                               </div>
                             </div>
                           </div>
-                        ))}
+                        </div>
+                        <div className="text-center py-8">
+                          <p className="text-gray-500 mb-2 font-medium">لا توجد بيانات عن الطلاب</p>
+                          <p className="text-xs text-gray-400">لم يتم تعيين طلاب على هذه الحافلة بعد</p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  // Get today's scans to determine which locations have been scanned
+                  const scans = todayBusScans || [];
+                  const scannedStudentIds = new Set(
+                    scans
+                      .filter(scan => scan.scan_type === 'board')
+                      .map(scan => scan.student_id)
+                  );
+                  
+                  // Separate students into scanned and unscanned
+                  const studentsWithLocation = busStudents.filter(s => s.location && s.location.trim());
+                  const scannedLocations = studentsWithLocation.filter(s => scannedStudentIds.has(s.id));
+                  const unscannedLocations = studentsWithLocation.filter(s => !scannedStudentIds.has(s.id));
+                  
+                  return (
+                    <>
+                      {/* Route Line - Always visible */}
+                      <div className="relative w-full py-8 sm:py-12">
+                        {/* Horizontal Dashed Path */}
+                        <div className="relative w-full" style={{ height: '120px' }}>
+                          {/* SVG Horizontal Dashed Line */}
+                          <svg 
+                            className="absolute top-1/2 left-0 w-full transform -translate-y-1/2"
+                            style={{ height: '2px' }}
+                            preserveAspectRatio="none"
+                          >
+                            <line
+                              x1="0"
+                              y1="1"
+                              x2="100%"
+                              y2="1"
+                              stroke="#000000"
+                              strokeWidth="2"
+                              strokeDasharray="8, 8"
+                              className="opacity-60"
+                            />
+                          </svg>
 
-                      {/* School Destination */}
-                      <div className="flex items-center gap-4 relative z-10">
-                        <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center shadow-lg border-4 border-white">
-                          <School className="h-6 w-6 text-white" />
+                          {/* Route Points - Only Scanned Locations on Line */}
+                          <div className="relative w-full flex items-center justify-between px-2 sm:px-4" style={{ height: '120px' }}>
+                            {/* Start Point */}
+                            <div className="flex flex-col items-center relative z-10" style={{ flex: '0 0 auto' }}>
+                              <div className="relative mb-2">
+                                <MapPin className="h-8 w-8 sm:h-10 sm:w-10 text-black" />
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-2 h-2 bg-black rounded-full"></div>
+                              </div>
+                              <div className="text-center mt-2 max-w-[80px] sm:max-w-[120px]">
+                                <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">بدء</p>
+                                <p className="text-xs text-gray-600 truncate">الرحلة</p>
+                              </div>
+                            </div>
+
+                            {/* Scanned Locations on Route Line */}
+                            {scannedLocations.map((student, index) => {
+                              const isCurrentUser = student.id === user?.user_id;
+                              const totalScanned = scannedLocations.length;
+                              const position = totalScanned > 0 ? ((index + 1) / (totalScanned + 1)) * 100 : 50;
+                              
+                              // Get scan info for this student
+                              const studentScans = scans.filter(s => s.student_id === student.id && s.scan_type === 'board');
+                              const lastScan = studentScans.length > 0 ? studentScans[studentScans.length - 1] : null;
+                              
+                              return (
+                                <div 
+                                  key={student.id || index} 
+                                  className="flex flex-col items-center absolute z-10"
+                                  style={{ 
+                                    left: `${position}%`,
+                                    transform: 'translateX(-50%)',
+                                    flex: '0 0 auto'
+                                  }}
+                                >
+                                  <div className="relative mb-2">
+                                    <MapPin 
+                                      className={`h-8 w-8 sm:h-10 sm:w-10 ${isCurrentUser ? 'text-green-600' : 'text-blue-600'}`}
+                                    />
+                                    <div className={`absolute top-full left-1/2 transform -translate-x-1/2 w-2 h-2 rounded-full ${isCurrentUser ? 'bg-green-600' : 'bg-blue-600'}`}></div>
+                                    {/* Checkmark for scanned */}
+                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                                      <CheckCircle className="h-3 w-3 text-white" />
+                                    </div>
+                                  </div>
+                                  <div className="text-center mt-2 max-w-[80px] sm:max-w-[120px]">
+                                    <p className={`text-xs sm:text-sm font-semibold truncate ${isCurrentUser ? 'text-green-700' : 'text-blue-900'}`}>
+                                      {student.location}
+                                    </p>
+                                    {student.fullName && (
+                                      <p className="text-xs text-gray-600 truncate">{student.fullName}</p>
+                                    )}
+                                    {lastScan && (
+                                      <p className="text-xs text-gray-500 mt-1">
+                                        {formatOmanTime(lastScan.scan_time).time}
+                                      </p>
+                                    )}
+                                    {isCurrentUser && (
+                                      <span className="inline-block mt-1 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                                        موقعك
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                            {/* School Destination */}
+                            <div className="flex flex-col items-center relative z-10" style={{ flex: '0 0 auto' }}>
+                              <div className="relative mb-2">
+                                <Bus className="h-10 w-10 sm:h-12 sm:w-12 text-black" />
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-2 h-2 bg-black rounded-full"></div>
+                              </div>
+                              <div className="text-center mt-2 max-w-[80px] sm:max-w-[120px]">
+                                <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">المدرسة</p>
+                                <p className="text-xs text-gray-600 truncate">{user?.school_name || 'الوصول'}</p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1 bg-green-50 rounded-lg p-3 border border-green-200">
-                          <p className="text-sm font-semibold text-green-900">المدرسة</p>
-                          <p className="text-xs text-green-700">{user?.school_name || 'المدرسة'}</p>
+                      </div>
+
+                      {/* On The Way List - Unscanned Locations */}
+                      {unscannedLocations.length > 0 && (
+                        <div className="mt-6 pt-4 border-t border-gray-200">
+                          <div className="flex items-center gap-2 mb-4">
+                            <AlertCircle className="h-5 w-5 text-orange-600" />
+                            <h4 className="text-lg font-semibold text-gray-900">في الطريق ({unscannedLocations.length})</h4>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {unscannedLocations.map((student, index) => {
+                              const isCurrentUser = student.id === user?.user_id;
+                              return (
+                                <div
+                                  key={student.id || index}
+                                  className={`p-3 rounded-lg border-2 ${
+                                    isCurrentUser 
+                                      ? 'bg-yellow-50 border-yellow-300' 
+                                      : 'bg-gray-50 border-gray-200'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <MapPin className={`h-5 w-5 flex-shrink-0 ${isCurrentUser ? 'text-yellow-600' : 'text-gray-400'}`} />
+                                    <div className="flex-1 min-w-0">
+                                      <p className={`text-sm font-semibold truncate ${isCurrentUser ? 'text-yellow-900' : 'text-gray-700'}`}>
+                                        {student.location}
+                                      </p>
+                                      {student.fullName && (
+                                        <p className="text-xs text-gray-600 truncate">{student.fullName}</p>
+                                      )}
+                                    </div>
+                                    {isCurrentUser && (
+                                      <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full">
+                                        موقعك
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
+                      )}
+                    </>
+                  );
+                })()}
+
+                {/* Route Summary Cards */}
+                {busStudents && Array.isArray(busStudents) && busStudents.length > 0 && (
+                  <div className="mt-6 pt-4 border-t border-gray-200">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 text-center border-2 border-blue-200 shadow-sm">
+                        <div className="flex items-center justify-center mb-2">
+                          <MapPin className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <p className="text-2xl sm:text-3xl font-bold text-blue-600">
+                          {busStudents.filter(s => s.location && s.location.trim()).length}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-600 mt-1 font-medium">نقاط التوقف</p>
+                      </div>
+                      <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 text-center border-2 border-green-200 shadow-sm">
+                        <div className="flex items-center justify-center mb-2">
+                          <Users className="h-5 w-5 text-green-600" />
+                        </div>
+                        <p className="text-2xl sm:text-3xl font-bold text-green-600">{busStudents.length}</p>
+                        <p className="text-xs sm:text-sm text-gray-600 mt-1 font-medium">إجمالي الطلاب</p>
+                      </div>
+                      <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 text-center border-2 border-purple-200 shadow-sm">
+                        <div className="flex items-center justify-center mb-2">
+                          <BarChart3 className="h-5 w-5 text-purple-600" />
+                        </div>
+                        <p className="text-2xl sm:text-3xl font-bold text-purple-600">
+                          {busStudents.filter(s => s.location && s.location.trim()).length > 0 
+                            ? Math.round((busStudents.filter(s => s.location && s.location.trim()).length / busStudents.length) * 100)
+                            : 0}%
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-600 mt-1 font-medium">طلاب بمواقع</p>
+                      </div>
+                      <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 text-center border-2 border-orange-200 shadow-sm">
+                        <div className="flex items-center justify-center mb-2">
+                          <Bus className="h-5 w-5 text-orange-600" />
+                        </div>
+                        <p className="text-2xl sm:text-3xl font-bold text-orange-600">{busStatus.current_bus.bus_number}</p>
+                        <p className="text-xs sm:text-sm text-gray-600 mt-1 font-medium">رقم الحافلة</p>
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Bus className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500 mb-2">لا توجد مواقع مسجلة للطلاب</p>
-                    <p className="text-xs text-gray-400">يرجى تحديث المناطق السكنية للطلاب لعرض مسار الحافلة</p>
-                  </div>
                 )}
-
-                {/* Route Summary */}
-                <div className="mt-6 pt-4 border-t border-gray-200">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-blue-600">
-                        {busStudents.filter(s => s.location && s.location.trim()).length}
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1">نقاط التوقف</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-green-600">{busStudents.length}</p>
-                      <p className="text-xs text-gray-600 mt-1">إجمالي الطلاب</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-purple-600">
-                        {busStudents.filter(s => s.location && s.location.trim()).length > 0 
-                          ? Math.round((busStudents.filter(s => s.location && s.location.trim()).length / busStudents.length) * 100)
-                          : 0}%
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1">طلاب بمواقع</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-orange-600">{busStatus.current_bus.bus_number}</p>
-                      <p className="text-xs text-gray-600 mt-1">رقم الحافلة</p>
-                    </div>
-                  </div>
-                </div>
 
                 {/* Note for students without location */}
-                {busStudents.filter(s => !s.location || !s.location.trim()).length > 0 && (
-                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-xs text-yellow-800">
-                      <AlertCircle className="h-4 w-4 inline ml-1" />
+                {busStudents && Array.isArray(busStudents) && busStudents.filter(s => !s.location || !s.location.trim()).length > 0 && (
+                  <div className="mt-4 p-3 sm:p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 border-2 border-yellow-300 rounded-xl shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+                      <p className="text-xs sm:text-sm text-yellow-800 font-medium">
                       {busStudents.filter(s => !s.location || !s.location.trim()).length} طالب بدون منطقة سكنية مسجلة
                     </p>
+                    </div>
                   </div>
                 )}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Bus className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 mb-2">لا توجد بيانات عن الطلاب</p>
-                <p className="text-xs text-gray-400">لم يتم تعيين طلاب على هذه الحافلة بعد</p>
               </div>
             )}
           </div>
@@ -2510,49 +2907,87 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
           <div className="flex items-center gap-2">
             <History className="h-5 w-5 text-orange-600" />
             <h3 className="card-title">سجل الصعود والنزول</h3>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">توقيت مسقط (MCT)</span>
           </div>
         </div>
         <div className="card-body">
           {scanLogs && Array.isArray(scanLogs) && scanLogs.length > 0 ? (
             <div className="space-y-3">
-              {scanLogs.map((log, index) => (
-                <div key={log.id || index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                      log.scan_type === 'board' ? 'bg-green-100' : 'bg-red-100'
-                    }`}>
-                      {log.scan_type === 'board' ? (
-                        <ArrowRight className="h-6 w-6 text-green-600" />
-                      ) : (
-                        <ArrowLeft className="h-6 w-6 text-red-600" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">
-                        {log.scan_type === 'board' ? 'صعود' : 'نزول'}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {formatDate(log.scan_time, 'dd MMMM yyyy - HH:mm', 'ar')}
-                      </p>
-                      {log.bus_number && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          الحافلة: {log.bus_number}
-                        </p>
-                      )}
-                      {log.location && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          الموقع: {log.location}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className={`badge ${
-                    log.scan_type === 'board' ? 'badge-success' : 'badge-danger'
+              {scanLogs.map((log, index) => {
+                const omanTime = formatOmanTime(log.scan_time);
+                
+                return (
+                  <div key={log.id || index} className={`p-4 rounded-lg border-2 ${
+                    log.scan_type === 'board' 
+                      ? 'bg-green-50 border-green-200' 
+                      : 'bg-red-50 border-red-200'
                   }`}>
-                    {log.scan_type === 'board' ? 'صعود' : 'نزول'}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          log.scan_type === 'board' ? 'bg-green-500' : 'bg-red-500'
+                        }`}>
+                          {log.scan_type === 'board' ? (
+                            <ArrowRight className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                          ) : (
+                            <ArrowLeft className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <p className={`font-bold text-base sm:text-lg ${
+                              log.scan_type === 'board' ? 'text-green-900' : 'text-red-900'
+                            }`}>
+                              {log.scan_type === 'board' ? 'صعود إلى الحافلة' : 'نزول من الحافلة'}
+                            </p>
+                            <span className={`badge text-xs ${
+                              log.scan_type === 'board' ? 'badge-success' : 'badge-danger'
+                            }`}>
+                              {log.scan_type === 'board' ? 'صعود' : 'نزول'}
+                            </span>
+                          </div>
+                          
+                          {/* Time Display - Prominent */}
+                          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg mb-2 ${
+                            log.scan_type === 'board' 
+                              ? 'bg-green-100 text-green-900' 
+                              : 'bg-red-100 text-red-900'
+                          }`}>
+                            <Clock className={`h-4 w-4 ${
+                              log.scan_type === 'board' ? 'text-green-700' : 'text-red-700'
+                            }`} />
+                            <span className="font-bold text-sm sm:text-base">
+                              {omanTime.time || formatDate(log.scan_time, 'HH:mm', 'ar')}
+                            </span>
+                            <span className="text-xs font-medium bg-white px-2 py-0.5 rounded">MCT</span>
+                          </div>
+                          
+                          {/* Date */}
+                          <p className="text-xs sm:text-sm text-gray-600 mb-1">
+                            {omanTime.date || formatDate(log.scan_time, 'EEEE, dd MMMM yyyy', 'ar')}
+                          </p>
+                          
+                          {/* Additional Info */}
+                          <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-600">
+                            {log.bus_number && (
+                              <div className="flex items-center gap-1">
+                                <Bus className="h-3 w-3" />
+                                <span>الحافلة: {log.bus_number}</span>
+                              </div>
+                            )}
+                            {log.location && (
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                <span>{log.location}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-8">

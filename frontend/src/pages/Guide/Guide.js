@@ -11,7 +11,10 @@ import {
   GraduationCap,
   Info,
   PlayCircle,
-  Video
+  Video,
+  Bus,
+  User,
+  ScanLine
 } from 'lucide-react';
 import Tabs from '../../components/UI/Tabs';
 
@@ -135,12 +138,10 @@ const Guide = () => {
               <li>انتقل إلى صفحة <Link to="/app/bulk-operations?tab=teachers" className="text-primary-600 hover:underline font-medium" onClick={(e) => { e.preventDefault(); window.location.href = '/app/bulk-operations?tab=teachers'; }}>رفع وتحديث البيانات</Link></li>
               <li>اختر تبويب <strong>"تسجيل المعلمين"</strong></li>
               <li>قم بتحميل النموذج من الزر <strong>"تحميل نموذج المعلمين"</strong></li>
-              <li>املأ النموذج بالبيانات التالية:
+              <li>املأ النموذج بالبيانات التالية (الحقول المطلوبة فقط):
                 <ul className="list-disc list-inside mr-6 mt-2 space-y-1 text-sm">
-                  <li><strong>اسم المستخدم:</strong> رقم هاتف المعلم (مثل: 9999##99)</li>
                   <li><strong>الاسم الكامل:</strong> الاسم الكامل للمعلم</li>
-                  <li><strong>البريد الإلكتروني:</strong> رقم هاتف المعلم (نفس اسم المستخدم)</li>
-                  <li><strong>رقم الهاتف:</strong> رقم هاتف المعلم</li>
+                  <li><strong>رقم الهاتف:</strong> رقم هاتف المعلم (سيتم استخدامه تلقائياً كاسم مستخدم وبريد إلكتروني)</li>
                   <li><strong>المسمى الوظيفي:</strong> مثل: حاسب آلي، رياضيات، إلخ</li>
                   <li><strong>عدد الحصص الأسبوعية:</strong> عدد الحصص (مثل: 20)</li>
                 </ul>
@@ -157,12 +158,10 @@ const Guide = () => {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h4 className="font-semibold text-blue-900 mb-2">مثال على البيانات:</h4>
             <div className="overflow-x-auto -mx-4 px-4" style={{ WebkitOverflowScrolling: 'touch' }}>
-              <table className="min-w-full text-sm border border-blue-300" style={{ minWidth: '600px' }}>
+              <table className="min-w-full text-sm border border-blue-300" style={{ minWidth: '500px' }}>
                 <thead className="bg-blue-100">
                   <tr>
-                    <th className="px-3 py-2 border border-blue-300 text-right">اسم المستخدم</th>
                     <th className="px-3 py-2 border border-blue-300 text-right">الاسم الكامل</th>
-                    <th className="px-3 py-2 border border-blue-300 text-right">البريد الإلكتروني</th>
                     <th className="px-3 py-2 border border-blue-300 text-right">رقم الهاتف</th>
                     <th className="px-3 py-2 border border-blue-300 text-right">المسمى الوظيفي</th>
                     <th className="px-3 py-2 border border-blue-300 text-right">عدد الحصص</th>
@@ -170,9 +169,7 @@ const Guide = () => {
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="px-3 py-2 border border-blue-300">9999123456</td>
                     <td className="px-3 py-2 border border-blue-300">أحمد محمد علي</td>
-                    <td className="px-3 py-2 border border-blue-300">9999123456</td>
                     <td className="px-3 py-2 border border-blue-300">9999123456</td>
                     <td className="px-3 py-2 border border-blue-300">حاسب آلي</td>
                     <td className="px-3 py-2 border border-blue-300">20</td>
@@ -180,6 +177,9 @@ const Guide = () => {
                 </tbody>
               </table>
             </div>
+            <p className="text-sm text-blue-800 mt-3">
+              💡 <strong>ملاحظة:</strong> سيتم استخدام رقم الهاتف تلقائياً كاسم مستخدم وبريد إلكتروني.
+            </p>
           </div>
         </div>
       </StepCard>
@@ -273,6 +273,64 @@ const Guide = () => {
         </div>
       </StepCard>
 
+      {/* Step 2.5: Register Drivers */}
+      <StepCard
+        number="2.5"
+        title="تسجيل السائقين (اختياري)"
+        description="قم بتسجيل سائقين الحافلات في المدرسة"
+        tip="💡 نصيحة: استخدم رقم هاتف السائق كاسم مستخدم وبريد إلكتروني لسهولة تذكر تسجيل الدخول."
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Bus className="w-5 h-5 text-primary-600" />
+              خطوات تسجيل السائقين:
+            </h4>
+            <ol className="list-decimal list-inside space-y-2 text-gray-700">
+              <li>انتقل إلى صفحة <Link to="/app/bulk-operations?tab=drivers" className="text-primary-600 hover:underline font-medium" onClick={(e) => { e.preventDefault(); window.location.href = '/app/bulk-operations?tab=drivers'; }}>رفع وتحديث البيانات</Link></li>
+              <li>اختر تبويب <strong>"تسجيل السائقين"</strong></li>
+              <li>قم بتحميل النموذج من الزر <strong>"تحميل نموذج السائقين"</strong></li>
+              <li>املأ النموذج بالبيانات التالية (الحقول المطلوبة فقط):
+                <ul className="list-disc list-inside mr-6 mt-2 space-y-1 text-sm">
+                  <li><strong>الاسم الكامل:</strong> الاسم الكامل للسائق</li>
+                  <li><strong>رقم الهاتف:</strong> رقم هاتف السائق (سيتم استخدامه تلقائياً كاسم مستخدم وبريد إلكتروني)</li>
+                  <li><strong>رقم الرخصة:</strong> رقم رخصة القيادة (اختياري)</li>
+                </ul>
+              </li>
+              <li>احفظ الملف بصيغة Excel (XLS أو XLSX)</li>
+              <li>ارفع الملف من خلال زر <strong>"اختر ملف Excel"</strong></li>
+              <li>راجع البيانات المعروضة في معاينة البيانات</li>
+              <li>اضغط على <strong>"معالجة البيانات"</strong> لإتمام التسجيل</li>
+            </ol>
+          </div>
+          
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">مثال على البيانات:</h4>
+            <div className="overflow-x-auto -mx-4 px-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <table className="min-w-full text-sm border border-blue-300" style={{ minWidth: '400px' }}>
+                <thead className="bg-blue-100">
+                  <tr>
+                    <th className="px-3 py-2 border border-blue-300 text-right">الاسم الكامل</th>
+                    <th className="px-3 py-2 border border-blue-300 text-right">رقم الهاتف</th>
+                    <th className="px-3 py-2 border border-blue-300 text-right">رقم الرخصة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="px-3 py-2 border border-blue-300">محمد أحمد سالم</td>
+                    <td className="px-3 py-2 border border-blue-300">9999123456</td>
+                    <td className="px-3 py-2 border border-blue-300">123456789</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="text-sm text-blue-800 mt-3">
+              💡 <strong>ملاحظة:</strong> سيتم استخدام رقم الهاتف تلقائياً كاسم مستخدم وبريد إلكتروني.
+            </p>
+          </div>
+        </div>
+      </StepCard>
+
         {/* Step 4: Create Classes */}
       <StepCard
         number="4"
@@ -297,10 +355,43 @@ const Guide = () => {
           </div>
         </div>
       </StepCard>
-      {/* Step 5: Update Phone Numbers */}
+      {/* Step 5: Bus Management */}
       <StepCard
         number="5"
-        title="تحديث أرقام الهواتف (اختياري)"
+        title="إدارة الحافلات (اختياري)"
+        description="قم بإضافة الحافلات وتعيين السائقين والطلاب"
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Bus className="w-5 h-5 text-primary-600" />
+              خطوات إدارة الحافلات:
+            </h4>
+            <ol className="list-decimal list-inside space-y-2 text-gray-700">
+              <li>انتقل إلى صفحة <Link to="/app/buses" className="text-primary-600 hover:underline font-medium" onClick={(e) => { e.preventDefault(); window.location.href = '/app/buses'; }}>إدارة الحافلات</Link></li>
+              <li>اضغط على <strong>"إضافة حافلة جديدة"</strong></li>
+              <li>املأ بيانات الحافلة:
+                <ul className="list-disc list-inside mr-6 mt-2 space-y-1 text-sm">
+                  <li><strong>رقم الحافلة:</strong> رقم الحافلة (مثل: 101)</li>
+                  <li><strong>اسم الحافلة:</strong> اسم الحافلة (مثل: حافلة الطلاب 1)</li>
+                  <li><strong>السعة:</strong> عدد الطلاب (مثل: 50)</li>
+                  <li><strong>رقم اللوحة:</strong> رقم لوحة الحافلة (اختياري)</li>
+                  <li><strong>موقع الحافلة:</strong> موقع الحافلة (اختياري)</li>
+                  <li><strong>السائق:</strong> اختر سائق من القائمة</li>
+                </ul>
+              </li>
+              <li>بعد إضافة الحافلة، اضغط على أيقونة <strong>"تعيين طلاب"</strong> لتعيين الطلاب للحافلة</li>
+              <li>اختر الطلاب المراد تعيينهم للحافلة من القائمة</li>
+              <li>اضغط على <strong>"تعيين"</strong> لإتمام العملية</li>
+            </ol>
+          </div>
+        </div>
+      </StepCard>
+
+      {/* Step 6: Update Phone Numbers */}
+      <StepCard
+        number="6"
+        title="تحديث أرقام الهواتف "
         description="قم بتحديث أرقام الهواتف للطلاب"
       >
         <div className="space-y-4">
@@ -337,9 +428,11 @@ const Guide = () => {
             <ol className="list-decimal list-inside space-y-2 text-green-800">
               <li>شاهد الفيديو التوضيحي</li>
               <li>تسجيل جميع المعلمين</li>
+              <li>تسجيل السائقين (اختياري)</li>
               <li>تسجيل وتعيين الطلاب للفصول</li>
               <li>إنشاء المواد الدراسية</li>
-              <li>تحديث أرقام الهواتف (اختياري)</li>
+              <li>إدارة الحافلات (اختياري)</li>
+              <li>تحديث أرقام الهواتف </li> 
             </ol>
             <p className="mt-4 text-sm text-green-700">
               بعد إتمام هذه الخطوات، سيكون النظام جاهزاً للاستخدام!
@@ -386,12 +479,36 @@ const Guide = () => {
         </div>
       </div>
 
-      {/* Step 1: Delete Attendance */}
+      {/* Step 1: Delete Bus Scans */}
       <StepCard
         number="1"
+        title="حذف سجلات مسح الحافلات"
+        description="ابدأ بحذف جميع سجلات مسح الحافلات"
+        warning="يجب حذف سجلات المسح أولاً قبل حذف الحافلات أو الطلاب"
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <ScanLine className="w-5 h-5 text-red-600" />
+              خطوات حذف سجلات مسح الحافلات:
+            </h4>
+            <ol className="list-decimal list-inside space-y-2 text-gray-700">
+              <li>انتقل إلى صفحة <Link to="/app/delete-school-data" className="text-primary-600 hover:underline font-medium" onClick={(e) => { e.preventDefault(); window.location.href = '/app/delete-school-data'; }}>حذف بيانات المدرسة</Link></li>
+              <li>حدد خيار <strong>"سجلات مسح الحافلات"</strong></li>
+              <li>اضغط على <strong>"حذف البيانات المحددة"</strong></li>
+              <li>اكتب <strong>"تأكيد الحذف"</strong> في حقل التأكيد</li>
+              <li>اضغط على <strong>"حذف نهائي"</strong></li>
+            </ol>
+          </div>
+        </div>
+      </StepCard>
+
+      {/* Step 2: Delete Attendance */}
+      <StepCard
+        number="2"
         title="حذف سجلات الحضور والغياب"
-        description="ابدأ بحذف جميع سجلات الحضور والغياب"
-        warning="يجب حذف سجلات الحضور أولاً قبل حذف الطلاب أو الفصول"
+        description="قم بحذف جميع سجلات الحضور والغياب"
+        warning="يجب حذف سجلات الحضور قبل حذف الطلاب أو الفصول"
       >
         <div className="space-y-4">
           <div className="bg-gray-50 rounded-lg p-4">
@@ -410,9 +527,38 @@ const Guide = () => {
         </div>
       </StepCard>
 
-      {/* Step 2: Delete Classes and Subjects */}
+      {/* Step 3: Delete Buses and Drivers */}
       <StepCard
-        number="2"
+        number="3"
+        title="حذف الحافلات والسائقين"
+        description="قم بحذف الحافلات والسائقين"
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-red-600" />
+              خطوات حذف الحافلات والسائقين:
+            </h4>
+            <ol className="list-decimal list-inside space-y-2 text-gray-700">
+              <li>انتقل إلى صفحة <Link to="/app/delete-school-data" className="text-primary-600 hover:underline font-medium" onClick={(e) => { e.preventDefault(); window.location.href = '/app/delete-school-data'; }}>حذف بيانات المدرسة</Link></li>
+              <li>حدد خيار <strong>"الحافلات"</strong> و/أو <strong>"السائقين"</strong></li>
+              <li>تأكد من حذف سجلات المسح أولاً</li>
+              <li>اضغط على <strong>"حذف البيانات المحددة"</strong></li>
+              <li>اكتب <strong>"تأكيد الحذف"</strong> في حقل التأكيد</li>
+              <li>اضغط على <strong>"حذف نهائي"</strong></li>
+            </ol>
+          </div>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-sm text-yellow-800">
+              <strong>ملاحظة:</strong> عند حذف الحافلات، سيتم حذف جميع العلاقات بين الطلاب والحافلات تلقائياً.
+            </p>
+          </div>
+        </div>
+      </StepCard>
+
+      {/* Step 4: Delete Classes and Subjects */}
+      <StepCard
+        number="4"
         title="حذف الفصول والمواد الدراسية"
         description="قم بحذف الفصول والمواد الدراسية القديمة"
       >
@@ -433,9 +579,9 @@ const Guide = () => {
         </div>
       </StepCard>
 
-      {/* Step 3: Delete Reports and News */}
+      {/* Step 5: Delete Reports and News */}
       <StepCard
-        number="3"
+        number="5"
         title="حذف التقارير والأخبار (اختياري)"
         description="يمكن حذف التقارير والأخبار في أي وقت"
       >
@@ -456,9 +602,9 @@ const Guide = () => {
         </div>
       </StepCard>
 
-      {/* Step 4: Delete Students */}
+      {/* Step 6: Delete Students */}
       <StepCard
-        number="4"
+        number="6"
         title="حذف الطلاب"
         description="قم بحذف جميع الطلاب بعد حذف الفصول والمواد"
         warning="يجب حذف الطلاب قبل حذف المعلمين"
@@ -481,9 +627,9 @@ const Guide = () => {
         </div>
       </StepCard>
 
-      {/* Step 5: Delete Teachers */}
+      {/* Step 7: Delete Teachers */}
       <StepCard
-        number="5"
+        number="7"
         title="حذف المعلمين (اختياري)"
         description="يمكن حذف المعلمين بعد حذف الطلاب"
         warning="لا يمكن حذف حساب مدير المدرسة (school_admin)"
@@ -522,7 +668,9 @@ const Guide = () => {
             </p>
             <div className="bg-white rounded-lg p-4 border border-blue-300">
               <ol className="list-decimal list-inside space-y-2 text-blue-900">
-                <li><strong>سجلات الحضور والغياب</strong> - يجب حذفها أولاً</li>
+                <li><strong>سجلات مسح الحافلات</strong> - يجب حذفها أولاً</li>
+                <li><strong>سجلات الحضور والغياب</strong> - يجب حذفها بعد سجلات المسح</li>
+                <li><strong>الحافلات والسائقين</strong> - يمكن حذفها بعد سجلات المسح</li>
                 <li><strong>الفصول والمواد الدراسية</strong> - يمكن حذفها بعد سجلات الحضور</li>
                 <li><strong>التقارير والأخبار</strong> - يمكن حذفها في أي وقت</li>
                 <li><strong>الطلاب</strong> - يجب حذفهم بعد حذف الفصول والمواد</li>

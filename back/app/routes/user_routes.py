@@ -129,6 +129,7 @@ def get_Students_of_my_school():
         user_list.append({
             "id": student.id,
             "username": student.username,
+            "location": student.location,
             "fullName": student.fullName,
             "phone_number": student.phone_number,
             "is_active": student.is_active,

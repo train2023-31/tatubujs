@@ -2,13 +2,15 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models import Bus, BusScan, Student, User, School, bus_students, Driver
 from app import db
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from app.config import get_oman_time
 from app.logger import log_action
 from sqlalchemy import func, and_, or_
+from flask_cors import CORS
 
 bus_blueprint = Blueprint('bus_blueprint', __name__)
 
+CORS(bus_blueprint)
 
 # =============== Driver Info ===============
 
@@ -96,6 +98,7 @@ def create_bus():
         driver_id=data.get('driver_id'),
         capacity=data.get('capacity', 50),
         plate_number=data.get('plate_number'),
+        location=data.get('location'),
         is_active=data.get('is_active', True)
     )
     
@@ -137,6 +140,8 @@ def update_bus(bus_id):
         bus.capacity = data['capacity']
     if 'plate_number' in data:
         bus.plate_number = data['plate_number']
+    if 'location' in data:
+        bus.location = data['location']
     if 'is_active' in data:
         bus.is_active = data['is_active']
     
@@ -325,6 +330,9 @@ def scan_student():
     if student not in bus.students:
         return jsonify(message="Student is not assigned to this bus", warning=True), 400
     
+    # Get current Oman MCT time (stored directly as Oman local time)
+    oman_now = get_oman_time()
+    
     # Check for duplicate scans (prevent scanning twice in short time)
     last_scan = BusScan.query.filter_by(
         student_id=student.id,
@@ -332,7 +340,8 @@ def scan_student():
     ).order_by(BusScan.scan_time.desc()).first()
     
     if last_scan:
-        time_diff = (get_oman_time().utcnow() - last_scan.scan_time).total_seconds()
+        # Calculate time difference (both are naive datetimes in Oman time)
+        time_diff = (oman_now - last_scan.scan_time).total_seconds()
         # Prevent duplicate scans within 30 seconds
         if time_diff < 30 and last_scan.scan_type == scan_type:
             return jsonify(
@@ -341,12 +350,12 @@ def scan_student():
                 last_scan=last_scan.to_dict()
             ), 400
     
-    # Create scan record
+    # Create scan record with Oman MCT time (stored directly as Oman local time)
     scan = BusScan(
         student_id=student.id,
         bus_id=bus_id,
         scan_type=scan_type,
-        scan_time=get_oman_time().utcnow(),
+        scan_time=oman_now,
         location=location,
         scanned_by=user_id,
         notes=notes

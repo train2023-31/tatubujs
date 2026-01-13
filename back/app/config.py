@@ -1,6 +1,7 @@
 # app/config.py
 
 import os
+from datetime import timezone
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'j4djdbvjk464ljbdljvbj7lkk63ndlk99nsleiputpecbvcx8jborwuteouthebvljoxas24255446n45m5n7nknlk7nk65pinpi')  # Replace with a strong secret key
@@ -45,8 +46,15 @@ except ImportError:
 
 
 def get_oman_time():
+    """Get current time in Oman MCT timezone as naive datetime"""
     try:
-        return datetime.now(ZoneInfo("Asia/Muscat"))
+        oman_tz = ZoneInfo("Asia/Muscat")
+        oman_dt = datetime.now(oman_tz)
+        # Return as naive datetime (Oman local time)
+        return oman_dt.replace(tzinfo=None)
     except Exception:
         import pytz
-        return datetime.now(pytz.timezone("Asia/Muscat"))
+        oman_tz = pytz.timezone("Asia/Muscat")
+        oman_dt = datetime.now(oman_tz)
+        # Return as naive datetime (Oman local time)
+        return oman_dt.replace(tzinfo=None)

@@ -30,6 +30,7 @@ import StudentNotesLog from './pages/StudentNotesLog/StudentNotesLog';
 import Guide from './pages/Guide/Guide';
 import BusManagement from './pages/BusManagement/BusManagement';
 import BusScanner from './pages/BusScanner/BusScanner';
+import BusReports from './pages/BusReports/BusReports';
 import StudentQRCodes from './pages/StudentQRCodes/StudentQRCodes';
 import LoadingSpinner from './components/UI/LoadingSpinner';
 import cacheManager from './utils/cacheManager';
@@ -435,6 +436,16 @@ function App() {
                   element={
                     <ProtectedRoute allowedRoles={['school_admin', 'admin', 'driver']}>
                       <BusScanner />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Bus Reports - School Admin, Admin, and Data Analyst */}
+                <Route 
+                  path="bus-reports" 
+                  element={
+                    <ProtectedRoute allowedRoles={['school_admin', 'admin', 'data_analyst']}>
+                      <BusReports />
                     </ProtectedRoute>
                   } 
                 />

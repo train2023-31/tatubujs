@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { Bus, Plus, Edit, Trash2, Users, UserPlus } from 'lucide-react';
+import { Bus, Plus, Edit, Trash2, Users, UserPlus, MapPin } from 'lucide-react';
 import { busAPI, usersAPI } from '../../services/api';
 import DataTable from '../../components/UI/DataTable';
 import Modal from '../../components/UI/Modal';
@@ -57,6 +57,22 @@ const BusManagement = () => {
       key: 'plate_number',
       header: 'رقم اللوحة',
       render: (row) => row.plate_number || '-',
+    },
+    {
+      key: 'location',
+      header: 'موقع الحافلة',
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          {row.location ? (
+            <>
+              <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+              <span className="text-sm">{row.location}</span>
+            </>
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </div>
+      ),
     },
     {
       key: 'is_active',
@@ -175,6 +191,7 @@ const BusForm = ({ bus, onClose }) => {
     bus_name: bus?.bus_name || '',
     capacity: bus?.capacity || 50,
     plate_number: bus?.plate_number || '',
+    location: bus?.location || '',
     driver_id: bus?.driver_id || '',
     is_active: bus?.is_active !== undefined ? bus.is_active : true,
   });
@@ -253,6 +270,17 @@ const BusForm = ({ bus, onClose }) => {
       </div>
 
       <div>
+        <label className="label">موقع الحافلة</label>
+        <input
+          type="text"
+          value={formData.location}
+          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+          className="input w-full"
+          placeholder="مثال: منطقة السيب، مسقط"
+        />
+      </div>
+
+      <div>
         <label className="label">السائق</label>
         <select
           value={formData.driver_id}
@@ -316,6 +344,7 @@ const AssignStudentsForm = ({ bus, onClose }) => {
   const queryClient = useQueryClient();
   const [selectedStudents, setSelectedStudents] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentStudentsSearchTerm, setCurrentStudentsSearchTerm] = useState('');
   
   // Fetch all students
   const { data: allStudents, isLoading: studentsLoading } = useQuery(
@@ -366,7 +395,8 @@ const AssignStudentsForm = ({ bus, onClose }) => {
     !busStudentIds.has(s.id) &&
     (searchTerm === '' || 
      s.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     s.username?.toLowerCase().includes(searchTerm.toLowerCase()))
+     s.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     s.location?.toLowerCase().includes(searchTerm.toLowerCase()))
   ) || [];
   
   const handleAssign = () => {
@@ -383,27 +413,76 @@ const AssignStudentsForm = ({ bus, onClose }) => {
     }
   };
   
+  // Filter current students based on search
+  const filteredCurrentStudents = useMemo(() => {
+    if (!busStudents) return [];
+    
+    // Get unique students by ID
+    const uniqueStudents = [];
+    const seenIds = new Set();
+    
+    busStudents.forEach((student) => {
+      if (!seenIds.has(student.id)) {
+        seenIds.add(student.id);
+        uniqueStudents.push(student);
+      }
+    });
+    
+    // Filter by search term
+    if (currentStudentsSearchTerm === '') {
+      return uniqueStudents;
+    }
+    
+    const searchLower = currentStudentsSearchTerm.toLowerCase();
+    return uniqueStudents.filter(student => 
+      student.fullName?.toLowerCase().includes(searchLower) ||
+      student.username?.toLowerCase().includes(searchLower) ||
+      student.location?.toLowerCase().includes(searchLower)
+    );
+  }, [busStudents, currentStudentsSearchTerm]);
+
   return (
     <div className="space-y-4">
       {/* Current Students */}
       <div>
         <h3 className="font-medium text-sm mb-2">الطلاب الحاليون ({busStudents?.length || 0} / {bus.capacity})</h3>
+        {busStudents?.length > 0 && (
+          <input
+            type="text"
+            value={currentStudentsSearchTerm}
+            onChange={(e) => setCurrentStudentsSearchTerm(e.target.value)}
+            className="input w-full mb-2"
+            placeholder="ابحث بالاسم، اسم المستخدم، أو الموقع..."
+            style={{ fontSize: '16px' }}
+          />
+        )}
         {busStudentsLoading ? (
           <LoadingSpinner />
         ) : busStudents?.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-4">لا يوجد طلاب مسجلين</p>
+        ) : filteredCurrentStudents.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-4">لا توجد نتائج للبحث</p>
         ) : (
           <div className="max-h-48 overflow-y-auto border rounded-lg">
-            {busStudents?.map((student) => (
-              <div key={student.id} className="flex items-center justify-between p-2 border-b last:border-b-0 hover:bg-gray-50">
-                <span className="text-sm">{student.fullName}</span>
-                <button
-                  onClick={() => handleRemove(student.id)}
-                  className="text-red-600 hover:text-red-900 text-xs"
-                >
-                  إزالة
-                </button>
-              </div>
+            {filteredCurrentStudents.map((student) => (
+                <div key={student.id} className="flex items-center justify-between p-2 border-b last:border-b-0 hover:bg-gray-50">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{student.fullName || student.username}</span>
+                      <span className="text-xs text-gray-500">({student.username})</span>
+                    </div>
+                    {student.location && (
+                      <p className="text-xs text-gray-600 mt-1 truncate">📍 {student.location}</p>
+                    )}
+                 
+                  </div>
+                  <button
+                    onClick={() => handleRemove(student.id)}
+                    className="text-red-600 hover:text-red-900 text-xs mr-2 flex-shrink-0"
+                  >
+                    إزالة
+                  </button>
+                </div>
             ))}
           </div>
         )}
@@ -417,7 +496,7 @@ const AssignStudentsForm = ({ bus, onClose }) => {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="input w-full mb-2"
-          placeholder="ابحث عن طالب..."
+          placeholder="ابحث بالاسم، اسم المستخدم، أو الموقع..."
           style={{ fontSize: '16px' }}
         />
         
@@ -427,26 +506,47 @@ const AssignStudentsForm = ({ bus, onClose }) => {
           <p className="text-sm text-gray-500 text-center py-4">لا يوجد طلاب متاحين</p>
         ) : (
           <div className="max-h-64 overflow-y-auto border rounded-lg">
-            {availableStudents.map((student) => (
-              <div key={student.id} className="flex items-center gap-2 p-2 border-b last:border-b-0 hover:bg-gray-50">
-                <input
-                  type="checkbox"
-                  checked={selectedStudents.has(student.id)}
-                  onChange={(e) => {
-                    const newSet = new Set(selectedStudents);
-                    if (e.target.checked) {
-                      newSet.add(student.id);
-                    } else {
-                      newSet.delete(student.id);
-                    }
-                    setSelectedStudents(newSet);
-                  }}
-                  className="rounded"
-                />
-                <span className="text-sm flex-1">{student.fullName}</span>
-                <span className="text-xs text-gray-500">{student.username}</span>
-              </div>
-            ))}
+            {(() => {
+              // Get unique students by ID
+              const uniqueStudents = [];
+              const seenIds = new Set();
+              
+              availableStudents.forEach((student) => {
+                if (!seenIds.has(student.id)) {
+                  seenIds.add(student.id);
+                  uniqueStudents.push(student);
+                }
+              });
+              
+              return uniqueStudents.map((student) => (
+                <div key={student.id} className="flex items-start gap-2 p-2 border-b last:border-b-0 hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={selectedStudents.has(student.id)}
+                    onChange={(e) => {
+                      const newSet = new Set(selectedStudents);
+                      if (e.target.checked) {
+                        newSet.add(student.id);
+                      } else {
+                        newSet.delete(student.id);
+                      }
+                      setSelectedStudents(newSet);
+                    }}
+                    className="rounded mt-1 flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{student.fullName || student.username}</span>
+                      <span className="text-xs text-gray-500">({student.username})</span>
+                    </div>
+                    {student.location && (
+                      <p className="text-xs text-gray-600 mt-1 truncate">📍 {student.location}</p>
+                    )}
+                  
+                  </div>
+                </div>
+              ));
+            })()}
           </div>
         )}
       </div>

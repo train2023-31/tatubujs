@@ -137,6 +137,7 @@ export const authAPI = {
   registerDriver: (driverData) => api.post('/auth/register_single_driver', driverData), 
   registerDataAnalyst: (dataAnalystData) => api.post('/auth/register_single_data_analyst', dataAnalystData),
   registerTeachers: (teachersData) => api.post('/auth/register_Teacher', teachersData),
+  registerDrivers: (driversData) => api.post('/auth/register_Driver', driversData),
   registerStudents: (studentsData) => api.post('/auth/register_Students', studentsData),
   registerAndAssignStudents: (data) => api.post('/auth/register_and_assign_students_v2', data, { timeout: 300000 }), // 5 minutes timeout for bulk operations
   registerSingleAssignStudent: (data) => api.post('/auth/register_single_assign_student', data),

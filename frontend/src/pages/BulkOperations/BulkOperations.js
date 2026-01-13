@@ -10,6 +10,8 @@ import {
   AlertCircle,
   X,
   Play,
+  Bus,
+  Users,
   Pause,
   Volume2,
   VolumeX,
@@ -37,7 +39,7 @@ const BulkOperations = () => {
   // Handle URL parameters on component mount
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab');
-    if (tabFromUrl && ['teachers', 'assign', 'phones'].includes(tabFromUrl)) {
+    if (tabFromUrl && ['teachers', 'drivers', 'assign', 'phones'].includes(tabFromUrl)) {
       setSelectedTab(tabFromUrl);
     }
   }, [searchParams]);
@@ -48,6 +50,26 @@ const BulkOperations = () => {
     {
       onSuccess: (response) => {
         queryClient.invalidateQueries('teachers');
+        queryClient.invalidateQueries('allUsers');
+        setResults(response.data || []);
+        toast.success('تم معالجة البيانات بنجاح');
+        setIsProcessing(false);
+        setProcessingStage('');
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message?.ar || 'فشل في معالجة البيانات');
+        setIsProcessing(false);
+        setProcessingStage('');
+      },
+    }
+  );
+
+  // Bulk register drivers mutation
+  const bulkRegisterDriversMutation = useMutation(
+    (data) => authAPI.registerDrivers(data),
+    {
+      onSuccess: (response) => {
+        queryClient.invalidateQueries('drivers');
         queryClient.invalidateQueries('allUsers');
         setResults(response.data || []);
         toast.success('تم معالجة البيانات بنجاح');
@@ -188,6 +210,22 @@ const BulkOperations = () => {
         Object.entries(fieldMapping).forEach(([arabicField, englishField]) => {
           mappedRow[englishField] = row[arabicField] || '';
         });
+        // Set email and username to phone_number
+        const phoneNumber = mappedRow.phone_number || '';
+        mappedRow.email = phoneNumber;
+        mappedRow.username = phoneNumber;
+        return mappedRow;
+      });
+    } else if (selectedTab === 'drivers') {
+      processedData = uploadedData.map(row => {
+        const mappedRow = {};
+        Object.entries(fieldMapping).forEach(([arabicField, englishField]) => {
+          mappedRow[englishField] = row[arabicField] || '';
+        });
+        // Set email and username to phone_number
+        const phoneNumber = mappedRow.phone_number || '';
+        mappedRow.email = phoneNumber;
+        mappedRow.username = phoneNumber;
         return mappedRow;
       });
     } else if (selectedTab === 'assign') {
@@ -208,6 +246,10 @@ const BulkOperations = () => {
       case 'teachers':
         setProcessingStage('جاري تسجيل المعلمين...');
         bulkRegisterTeachersMutation.mutate(processedData);
+        break;
+      case 'drivers':
+        setProcessingStage('جاري تسجيل السائقين...');
+        bulkRegisterDriversMutation.mutate(processedData);
         break;
       case 'assign':
         await handleAssignStudentsProcess(processedData);
@@ -270,6 +312,7 @@ const BulkOperations = () => {
     // Generate filename based on selected tab
     const tabNames = {
       'teachers': 'نموذج_تسجيل_المعلمين',
+      'drivers': 'نموذج_تسجيل_السائقين',
       'assign': 'نموذج_تسجيل_وتعيين_الطلاب',
       'phones': 'نموذج_تحديث_الهواتف'
     };
@@ -287,12 +330,16 @@ const BulkOperations = () => {
     switch (selectedTab) {
       case 'teachers':
         return {
-          'اسم المستخدم': 'username',
           'الاسم الكامل': 'fullName',
-          'البريد الإلكتروني': 'email',
           'رقم الهاتف': 'phone_number',
           'المسمى الوظيفي': 'job_name',
           'عدد الحصص الأسبوعية': 'week_Classes_Number'
+        };
+      case 'drivers':
+        return {
+          'الاسم الكامل': 'fullName',
+          'رقم الهاتف': 'phone_number',
+          'رقم الرخصة': 'license_number'
         };
       case 'assign':
         return {
@@ -315,7 +362,9 @@ const BulkOperations = () => {
   const getExpectedHeaders = () => {
     switch (selectedTab) {
       case 'teachers':
-        return ['اسم المستخدم', 'الاسم الكامل', 'البريد الإلكتروني', 'رقم الهاتف', 'المسمى الوظيفي', 'عدد الحصص الأسبوعية'];
+        return ['الاسم الكامل', 'رقم الهاتف', 'المسمى الوظيفي', 'عدد الحصص الأسبوعية'];
+      case 'drivers':
+        return ['الاسم الكامل', 'رقم الهاتف', 'رقم الرخصة'];
       case 'assign':
         return ['الرقم المدرسي', 'الاســـــــــــم', 'الشعبة', 'اسم الصف'];
       case 'phones':
@@ -386,7 +435,8 @@ const BulkOperations = () => {
 
   const tabs = [
     { id: 'teachers', name: 'تسجيل المعلمين', icon: UserPlus },
-    { id: 'assign', name: 'تسجيل وتعيين الطلاب', icon: FileText },
+    { id: 'drivers', name: 'تسجيل السائقين', icon: Bus },
+    { id: 'assign', name: 'تسجيل وتعيين الطلاب', icon: Users },
     { id: 'phones', name: 'تحديث أرقام الهواتف', icon: Upload },
   ];
 
@@ -566,6 +616,8 @@ const BulkOperations = () => {
             switch (selectedTab) {
               case 'teachers':
                 return 'المعلمين';
+              case 'drivers':
+                return 'السائقين';
               case 'assign':
                 return 'الطلبة';
               case 'phones':
@@ -607,11 +659,9 @@ const BulkOperations = () => {
                     </thead>
                     <tbody>
                       <tr>
-                        <td className="px-3 py-2 border border-gray-300 text-gray-800">teacher001  أو 9999##99</td>
                         <td className="px-3 py-2 border border-gray-300 text-gray-800">أحمد محمد علي</td>
-                        <td className="px-3 py-2 border border-gray-300 text-gray-800">teacher001 أو 9999##99</td>
                         <td className="px-3 py-2 border border-gray-300 text-gray-800">9999##99</td>
-                        <td className="px-3 py-2 border border-gray-300 text-gray-800">حاسب الي</td>
+                        <td className="px-3 py-2 border border-gray-300 text-gray-800">حاسب آلي</td>
                         <td className="px-3 py-2 border border-gray-300 text-gray-800">20</td>
                       </tr>
                     </tbody>
@@ -620,7 +670,42 @@ const BulkOperations = () => {
                 <div className="mt-3 space-y-2">
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded">
                     <p className="text-sm text-blue-800 font-medium">
-                      💡 ملاحظة مهمة: يجب تعبئة  <strong>اسم المستخدم</strong> و <strong>البريد الإلكتروني</strong> وينصح أن يكونا رقم هاتف الملعم/ـة لسهولة تذكر تسجيل الدخول في النظام
+                      💡 ملاحظة مهمة: سيتم استخدام <strong>رقم الهاتف</strong> تلقائياً كـ <strong>اسم المستخدم</strong> و <strong>البريد الإلكتروني</strong> لسهولة تذكر تسجيل الدخول في النظام
+                    </p>
+                  </div>
+               
+                </div>
+              </div>
+            )}
+
+            {/* Example for drivers */}
+            {selectedTab === 'drivers' && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-900 mb-3">مثال على البيانات:</h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        {getExpectedHeaders().map((header, index) => (
+                          <th key={index} className="px-3 py-2 text-right border border-gray-300 font-medium text-gray-700">
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="px-3 py-2 border border-gray-300 text-gray-800">محمد أحمد سالم</td>
+                        <td className="px-3 py-2 border border-gray-300 text-gray-800">9999##99</td>
+                        <td className="px-3 py-2 border border-gray-300 text-gray-800">123456789</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-3 space-y-2">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                    <p className="text-sm text-blue-800 font-medium">
+                      💡 ملاحظة مهمة: سيتم استخدام <strong>رقم الهاتف</strong> تلقائياً كـ <strong>اسم المستخدم</strong> و <strong>البريد الإلكتروني</strong> لسهولة تذكر تسجيل الدخول في النظام
                     </p>
                   </div>
                
@@ -632,18 +717,19 @@ const BulkOperations = () => {
               <h4 className="text-sm font-medium text-gray-900 mb-2">نصائح:</h4>
               <ul className="text-sm text-gray-600 space-y-1">
                 
-                <li className="text-red-500">• قم بتنزيل قوائم الفصول من نظام البوابة (شاهد الفيديو للتعرف على كيفية التنزيل) <strong>وقم برفعها بدون التعديل عليها</strong></li>
+                {selectedTab === 'assign' && (
+                  <li className="text-red-500">
+                    • قم بتنزيل قوائم الفصول من نظام البوابة (شاهد الفيديو للتعرف على كيفية التنزيل) <strong>وقم برفعها بدون التعديل عليها</strong>
+                  </li>
+                )}
                 <li>•  استخدم ملف Excel (XLS أو XLSX) </li>
-                <li>• تأكد من أن الصف الأول يحتوي على أسماء الحقول</li>
-                <li>• لا تترك حقول مطلوبة فارغة</li>
-                <li>• تأكد من عدم تكرار أسماء المستخدمين</li>
-                <li>• استخدم الورقة الأولى في الملف فقط</li>
+            
           
                 {selectedTab === 'assign' && (
                   <>
                     <li>• سيتم إنشاء الفصول تلقائياً من (اسم الصف + الشعبة)</li>
-                    <li>• ثم سيتم تسجيل وتعيين الطلاب للفصول المناسبة</li>
-                    <li className="text-red-500">• <strong>دعم التسجيل المتعدد:</strong> يمكن للطالب أن يظهر في عدة صفوف بفصول مختلفة (مثل: أحمد في فصل 12، وفي فصل الفيزياء 1، وفي فصل الكيمياء 2)</li>
+                    <li>• ثم سيتم تسجيل وتعيين الطلاب للفصول </li>
+                    <li className="text-red-500">• <strong>دعم التسجيل المتعدد:</strong> يمكن للطالب أن يظهر في عدة صفوف بفصول مختلفة (مثل: أحمد في فصل 12، وفي فصل الفيزياء 1، وفي فصل الكيمياء 2) لهذا الإجراء قم بتحميل نموذج الطلاب من الزر <strong>"تحميل نموذج الطلبة"</strong></li>
                     <li>• إذا كان الطالب مسجلاً مسبقاً، سيتم تعيينه للفصل الجديد فقط (بدون إعادة التسجيل)</li>
                   </>
                 )}

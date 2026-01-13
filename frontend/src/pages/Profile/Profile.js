@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from 'react-query';
 import { useForm } from 'react-hook-form';
-import { User, Lock, Mail, Phone, Building, Save, Eye, EyeOff } from 'lucide-react';
+import { User, Lock, Mail, Phone, Building, Save, Eye, EyeOff, MapPin, CreditCard, Calendar } from 'lucide-react';
 import { authAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { getRoleDisplayName, formatPhoneNumber } from '../../utils/helpers';
@@ -14,6 +14,15 @@ const Profile = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
+
+  // Set default tab based on user role
+  useEffect(() => {
+    if (user?.role === 'student') {
+      setActiveTab('password');
+    } else {
+      setActiveTab('profile');
+    }
+  }, [user?.role]);
 
   // Profile update mutation
   const updateProfileMutation = useMutation(
@@ -44,8 +53,8 @@ const Profile = () => {
   );
 
   const tabs = [
-    { id: 'profile', name: 'الملف الشخصي'}, // not show for student profile 
-    { id: 'password', name: 'تغيير كلمة المرور' } ,
+    ...(user?.role !== 'student' ? [{ id: 'profile', name: 'الملف الشخصي' }] : []),
+    { id: 'password', name: 'تغيير كلمة المرور' },
   ];
 
   return (
@@ -62,8 +71,8 @@ const Profile = () => {
       <div className="card">
         <div className="card-body">
           <div className="flex items-center space-x-6">
-            <div className="h-20 w-20 bg-primary-600 rounded-full flex items-center justify-center">
-              <User className="h-10 w-10 text-white" />
+            <div className="h-20 w-20 bg-primary-600 rounded-full flex items-center justify-center ml-2 mr-2">
+              <User className="h-10 w-10 text-white ml-2 mr-2" />
             </div>
             <div>
               <h2 className="text-xl font-semibold text-gray-900">{user?.fullName}</h2>
@@ -75,23 +84,25 @@ const Profile = () => {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === tab.id
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {tab.name}
-            </button>
-          ))}
-        </nav>
-      </div>
+      {tabs.length > 0 && (
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === tab.id
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                {tab.name}
+              </button>
+            ))}
+          </nav>
+        </div>
+      )}
 
       {/* Tab Content */}
       {activeTab === 'profile' && (
@@ -126,6 +137,9 @@ const ProfileForm = ({ user, onSubmit, loading }) => {
       phone_number: user?.phone_number || '',
       job_name: user?.job_name || '',
       week_Classes_Number: user?.week_Classes_Number || '',
+      license_number: user?.license_number || '',
+      license_expiry: user?.license_expiry ? user.license_expiry.split('T')[0] : '',
+      location: user?.location || '',
     },
   });
 
@@ -254,6 +268,52 @@ const ProfileForm = ({ user, onSubmit, loading }) => {
                   )}
                 </div>
               </>
+            )}
+
+            {/* Driver-specific fields */}
+            {user?.role === 'driver' && (
+              <>
+                <div>
+                  <label className="label">
+                    <CreditCard className="h-4 w-4 inline mr-1" />
+                    رقم الرخصة
+                  </label>
+                  <input
+                    {...register('license_number')}
+                    type="text"
+                    className="input"
+                    placeholder="رقم رخصة القيادة"
+                  />
+                </div>
+
+                <div>
+                  <label className="label">
+                    <Calendar className="h-4 w-4 inline mr-1" />
+                    تاريخ انتهاء الرخصة
+                  </label>
+                  <input
+                    {...register('license_expiry')}
+                    type="date"
+                    className="input"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Student-specific fields */}
+            {user?.role === 'student' && (
+              <div>
+                <label className="label">
+                  <MapPin className="h-4 w-4 inline mr-1" />
+                  المنطقة السكنية
+                </label>
+                <input
+                  {...register('location')}
+                  type="text"
+                  className="input"
+                  placeholder="المنطقة السكنية"
+                />
+              </div>
             )}
           </div>
 

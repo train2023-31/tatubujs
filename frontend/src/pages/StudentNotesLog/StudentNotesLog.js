@@ -57,9 +57,27 @@ const StudentNotesLog = () => {
     { enabled: !!user }
   );
 
+  // Get unique students by ID first
+  const uniqueStudents = React.useMemo(() => {
+    if (!allStudents) return [];
+    
+    const studentsMap = new Map();
+    
+    allStudents.forEach(student => {
+      const studentId = student.id;
+      
+      if (!studentsMap.has(studentId)) {
+        // New student, add to map
+        studentsMap.set(studentId, student);
+      }
+    });
+    
+    return Array.from(studentsMap.values());
+  }, [allStudents]);
+
   // Get unique classes for filter, ordered by class ID
   const uniqueClasses = React.useMemo(() => {
-    if (!allStudents) return [];
+    if (!uniqueStudents) return [];
     
     // Create a map of class names to their IDs from allClasses
     const classIdMap = new Map();
@@ -71,9 +89,9 @@ const StudentNotesLog = () => {
       });
     }
     
-    // Get unique class names from students
+    // Get unique class names from unique students
     const classNames = new Set();
-    allStudents.forEach(student => {
+    uniqueStudents.forEach(student => {
       if (student.class_name) {
         classNames.add(student.class_name);
       }
@@ -94,13 +112,13 @@ const StudentNotesLog = () => {
     });
     
     return classesArray.map(cls => cls.name);
-  }, [allStudents, allClasses]);
+  }, [uniqueStudents, allClasses]);
 
   // Filter students based on search and filters, ordered by student name
   const filteredStudents = React.useMemo(() => {
-    if (!allStudents) return [];
+    if (!uniqueStudents) return [];
     
-    const filtered = allStudents.filter(student => {
+    const filtered = uniqueStudents.filter(student => {
       // Search filter
       const matchesSearch = !searchTerm || 
         student.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -119,7 +137,7 @@ const StudentNotesLog = () => {
       const nameB = b.fullName || '';
       return nameA.localeCompare(nameB, 'ar', { numeric: true, sensitivity: 'base' });
     });
-  }, [allStudents, searchTerm, filterClass]);
+  }, [uniqueStudents, searchTerm, filterClass]);
 
   // Fetch student attendance log
   const { data: studentAttendanceLog, isLoading: logLoading } = useQuery(
