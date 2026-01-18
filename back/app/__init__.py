@@ -107,6 +107,8 @@ def create_app():
     from app.routes.user_routes import user_blueprint  # Import the new user routes
     from app.routes.static_routes import static_blueprint
     from app.routes.bus_routes import bus_blueprint
+    from app.routes.timetable_routes import timetable_bp
+    from app.routes.substitution_routes import substitution_bp
 
 
 
@@ -116,6 +118,8 @@ def create_app():
     app.register_blueprint(user_blueprint, url_prefix='/api/users')  # Register under '/api/users'
     app.register_blueprint(static_blueprint, url_prefix='/api/static')
     app.register_blueprint(bus_blueprint, url_prefix='/api/bus')
+    app.register_blueprint(timetable_bp, url_prefix='/api/timetable')
+    app.register_blueprint(substitution_bp, url_prefix='/api/substitutions')
 
 
     # --- Security Headers and CORS ---

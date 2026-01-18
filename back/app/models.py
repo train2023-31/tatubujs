@@ -410,3 +410,246 @@ class BusScan(db.Model):
             'scanner_name': self.scanner.fullName if self.scanner else None,
             'notes': self.notes
         }
+
+
+# Timetable Models
+class Timetable(db.Model):
+    """Main timetable that holds all schedule information"""
+    __tablename__ = 'timetables'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)  # e.g., "الفصل الدراسي الأول 2024"
+    school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # Who created/uploaded
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
+    updated_at = db.Column(db.DateTime, default=get_oman_time().utcnow, onupdate=get_oman_time().utcnow)
+    
+    # Raw XML data (optional - for reference)
+    xml_data = db.Column(db.Text, nullable=True)
+    
+    # Relationships
+    school = db.relationship('School', backref='timetables')
+    creator = db.relationship('User', backref='timetables_created')
+    days = db.relationship('TimetableDay', back_populates='timetable', cascade='all, delete-orphan')
+    periods = db.relationship('TimetablePeriod', back_populates='timetable', cascade='all, delete-orphan')
+    schedules = db.relationship('TimetableSchedule', back_populates='timetable', cascade='all, delete-orphan')
+    teacher_mappings = db.relationship('TimetableTeacherMapping', back_populates='timetable', cascade='all, delete-orphan')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'school_id': self.school_id,
+            'user_id': self.user_id,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
+class TimetableDay(db.Model):
+    """Days of the week in the timetable"""
+    __tablename__ = 'timetable_days'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    timetable_id = db.Column(db.Integer, db.ForeignKey('timetables.id'), nullable=False)
+    day_id = db.Column(db.String(50), nullable=False)  # ID from XML
+    name = db.Column(db.String(50), nullable=False)  # e.g., "الأحد"
+    short_name = db.Column(db.String(20), nullable=True)
+    
+    # Relationships
+    timetable = db.relationship('Timetable', back_populates='days')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'timetable_id': self.timetable_id,
+            'day_id': self.day_id,
+            'name': self.name,
+            'short_name': self.short_name
+        }
+
+
+class TimetablePeriod(db.Model):
+    """Time periods/slots in the timetable"""
+    __tablename__ = 'timetable_periods'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    timetable_id = db.Column(db.Integer, db.ForeignKey('timetables.id'), nullable=False)
+    period_id = db.Column(db.String(50), nullable=False)  # ID from XML
+    period_number = db.Column(db.Integer, nullable=False)  # e.g., 1, 2, 3
+    start_time = db.Column(db.String(10), nullable=False)  # e.g., "08:00"
+    end_time = db.Column(db.String(10), nullable=False)  # e.g., "08:45"
+    
+    # Relationships
+    timetable = db.relationship('Timetable', back_populates='periods')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'timetable_id': self.timetable_id,
+            'period_id': self.period_id,
+            'period_number': self.period_number,
+            'start_time': self.start_time,
+            'end_time': self.end_time
+        }
+
+
+class TimetableTeacherMapping(db.Model):
+    """Mapping between XML teacher names and database teachers"""
+    __tablename__ = 'timetable_teacher_mappings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    timetable_id = db.Column(db.Integer, db.ForeignKey('timetables.id'), nullable=False)
+    xml_teacher_id = db.Column(db.String(100), nullable=False)  # ID from XML
+    xml_teacher_name = db.Column(db.String(255), nullable=False)  # Name from XML
+    teacher_id = db.Column(db.Integer, db.ForeignKey('teachers.id'), nullable=True)  # Mapped to real teacher
+    
+    # Relationships
+    timetable = db.relationship('Timetable', back_populates='teacher_mappings')
+    teacher = db.relationship('Teacher', backref='timetable_mappings')
+    
+    __table_args__ = (
+        db.UniqueConstraint('timetable_id', 'xml_teacher_id', name='unique_teacher_mapping'),
+    )
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'timetable_id': self.timetable_id,
+            'xml_teacher_id': self.xml_teacher_id,
+            'xml_teacher_name': self.xml_teacher_name,
+            'teacher_id': self.teacher_id,
+            'teacher_name': self.teacher.fullName if self.teacher else None
+        }
+
+
+class TimetableSchedule(db.Model):
+    """Individual schedule entries (lessons)"""
+    __tablename__ = 'timetable_schedules'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    timetable_id = db.Column(db.Integer, db.ForeignKey('timetables.id'), nullable=False)
+    
+    # From XML
+    class_name = db.Column(db.String(100), nullable=False)
+    class_xml_id = db.Column(db.String(100), nullable=False)
+    subject_name = db.Column(db.String(100), nullable=False)
+    subject_xml_id = db.Column(db.String(100), nullable=False)
+    teacher_xml_id = db.Column(db.String(100), nullable=True)
+    classroom_name = db.Column(db.String(100), nullable=True)
+    day_xml_id = db.Column(db.String(50), nullable=False)
+    period_xml_id = db.Column(db.String(50), nullable=False)
+    
+    # Relationships
+    timetable = db.relationship('Timetable', back_populates='schedules')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'timetable_id': self.timetable_id,
+            'class_name': self.class_name,
+            'class_xml_id': self.class_xml_id,
+            'subject_name': self.subject_name,
+            'subject_xml_id': self.subject_xml_id,
+            'teacher_xml_id': self.teacher_xml_id,
+            'classroom_name': self.classroom_name,
+            'day_xml_id': self.day_xml_id,
+            'period_xml_id': self.period_xml_id
+        }
+
+
+class TeacherSubstitution(db.Model):
+    """Records when a teacher is absent and needs substitution"""
+    __tablename__ = 'teacher_substitutions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    timetable_id = db.Column(db.Integer, db.ForeignKey('timetables.id'), nullable=False)
+    school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=False)
+    
+    # Absent teacher info
+    absent_teacher_xml_id = db.Column(db.String(100), nullable=False)  # XML teacher ID
+    absent_teacher_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # Mapped DB teacher
+    absent_teacher_name = db.Column(db.String(255), nullable=False)  # Teacher name from XML
+    
+    # Date range
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False)
+    
+    # Distribution criteria (stored as JSON)
+    # e.g., ["same_subject", "fewest_classes", "fewest_substitutions", "no_conflict"]
+    distribution_criteria = db.Column(db.Text, nullable=True)
+    
+    # Metadata
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    
+    # Relationships
+    timetable = db.relationship('Timetable', backref='substitutions')
+    assignments = db.relationship('SubstitutionAssignment', back_populates='substitution', cascade='all, delete-orphan')
+    
+    def to_dict(self):
+        import json
+        return {
+            'id': self.id,
+            'timetable_id': self.timetable_id,
+            'school_id': self.school_id,
+            'absent_teacher_xml_id': self.absent_teacher_xml_id,
+            'absent_teacher_user_id': self.absent_teacher_user_id,
+            'absent_teacher_name': self.absent_teacher_name,
+            'start_date': self.start_date.isoformat() if self.start_date else None,
+            'end_date': self.end_date.isoformat() if self.end_date else None,
+            'distribution_criteria': json.loads(self.distribution_criteria) if self.distribution_criteria else [],
+            'created_by': self.created_by,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'is_active': self.is_active,
+            'assignments': [assignment.to_dict() for assignment in self.assignments] if hasattr(self, 'assignments') else []
+        }
+
+
+class SubstitutionAssignment(db.Model):
+    """Individual class assignments to substitute teachers"""
+    __tablename__ = 'substitution_assignments'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    substitution_id = db.Column(db.Integer, db.ForeignKey('teacher_substitutions.id'), nullable=False)
+    
+    # Original schedule info
+    schedule_id = db.Column(db.Integer, db.ForeignKey('timetable_schedules.id'), nullable=False)
+    class_name = db.Column(db.String(100), nullable=False)
+    subject_name = db.Column(db.String(100), nullable=False)
+    day_xml_id = db.Column(db.String(50), nullable=False)
+    period_xml_id = db.Column(db.String(50), nullable=False)
+    
+    # Substitute teacher info
+    substitute_teacher_xml_id = db.Column(db.String(100), nullable=False)  # XML teacher ID
+    substitute_teacher_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # Mapped DB teacher
+    substitute_teacher_name = db.Column(db.String(255), nullable=False)  # Teacher name from XML
+    
+    # Assignment metadata
+    assignment_reason = db.Column(db.Text, nullable=True)  # Why this teacher was selected
+    assignment_date = db.Column(db.Date, nullable=True)  # Specific date for this assignment (if different teachers for same day in different weeks)
+    created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
+    
+    # Relationships
+    substitution = db.relationship('TeacherSubstitution', back_populates='assignments')
+    schedule = db.relationship('TimetableSchedule', backref='substitution_assignments')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'substitution_id': self.substitution_id,
+            'schedule_id': self.schedule_id,
+            'class_name': self.class_name,
+            'subject_name': self.subject_name,
+            'day_xml_id': self.day_xml_id,
+            'period_xml_id': self.period_xml_id,
+            'substitute_teacher_xml_id': self.substitute_teacher_xml_id,
+            'substitute_teacher_user_id': self.substitute_teacher_user_id,
+            'substitute_teacher_name': self.substitute_teacher_name,
+            'assignment_reason': self.assignment_reason,
+            'assignment_date': self.assignment_date.isoformat() if self.assignment_date else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }

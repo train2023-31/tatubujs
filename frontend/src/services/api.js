@@ -267,4 +267,44 @@ export const busAPI = {
   getDailyBusReport: (params) => api.get('/bus/reports/daily', { params }).then(res => res.data),
 };
 
+// Timetable API
+export const timetableAPI = {
+  getTimetables: () => api.get('/timetable/timetables').then(res => res.data),
+  getTimetable: (timetableId) => api.get(`/timetable/timetables/${timetableId}`).then(res => res.data),
+  createTimetable: (data) => api.post('/timetable/timetables', data),
+  updateTimetable: (timetableId, data) => api.put(`/timetable/timetables/${timetableId}`, data),
+  deleteTimetable: (timetableId) => api.delete(`/timetable/timetables/${timetableId}`),
+  getTeacherMappings: (timetableId) => api.get(`/timetable/timetables/${timetableId}/teacher-mappings`).then(res => res.data),
+  updateTeacherMappings: (timetableId, data) => api.put(`/timetable/timetables/${timetableId}/teacher-mappings`, data),
+  activateTimetable: (timetableId) => api.post(`/timetable/timetables/${timetableId}/activate`),
+  getMyTimetable: () => api.get('/timetable/teacher/my-timetable').then(res => res.data),
+};
+
+// Substitution API
+export const substitutionAPI = {
+  // Get all substitutions
+  getSubstitutions: (params = {}) => api.get('/substitutions/', { params }).then(res => res.data),
+  
+  // Get specific substitution
+  getSubstitution: (substitutionId) => api.get(`/substitutions/${substitutionId}`).then(res => res.data),
+  
+  // Calculate substitute teachers (without saving)
+  calculateSubstitution: (data) => api.post('/substitutions/calculate', data).then(res => res.data),
+  
+  // Create new substitution
+  createSubstitution: (data) => api.post('/substitutions/', data),
+  
+  // Update substitution assignments
+  updateSubstitution: (substitutionId, data) => api.put(`/substitutions/${substitutionId}`, data),
+  
+  // Delete substitution
+  deleteSubstitution: (substitutionId) => api.delete(`/substitutions/${substitutionId}`),
+  
+  // Deactivate substitution
+  deactivateSubstitution: (substitutionId) => api.post(`/substitutions/${substitutionId}/deactivate`),
+  
+  // Get teacher's substitutions
+  getTeacherSubstitutions: (teacherUserId) => api.get(`/substitutions/teacher/${teacherUserId}`).then(res => res.data),
+};
+
 export default api;

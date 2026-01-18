@@ -116,7 +116,13 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'جدول الحصص',
           href: '/app/school-timetable',
           icon: CalendarDays,
-          roles: ['admin', 'school_admin', 'teacher', 'data_analyst', 'student'],
+          roles: ['admin', 'school_admin', 'data_analyst'],
+        },
+        {
+          name: 'إحتياط المعلمين',
+          href: '/app/teacher-substitution',
+          icon: UserCheck,
+          roles: ['admin', 'school_admin', 'data_analyst'],
         },
       ]
     },

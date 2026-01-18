@@ -33,6 +33,7 @@ import BusScanner from './pages/BusScanner/BusScanner';
 import BusReports from './pages/BusReports/BusReports';
 import StudentQRCodes from './pages/StudentQRCodes/StudentQRCodes';
 import SchoolTimetable from './pages/SchoolTimetable/SchoolTimetable';
+import TeacherSubstitution from './pages/TeacherSubstitution/TeacherSubstitution';
 import LoadingSpinner from './components/UI/LoadingSpinner';
 import cacheManager from './utils/cacheManager';
 
@@ -461,8 +462,25 @@ function App() {
                   } 
                 />
                 
-                {/* School Timetable - All roles */}
-                <Route path="school-timetable" element={<SchoolTimetable />} />
+                {/* School Timetable - School Admin and Data Analyst only */}
+                <Route 
+                  path="school-timetable" 
+                  element={
+                    <ProtectedRoute allowedRoles={['school_admin', 'data_analyst']}>
+                      <SchoolTimetable />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Teacher Substitution - School Admin and Data Analyst only */}
+                <Route 
+                  path="teacher-substitution" 
+                  element={
+                    <ProtectedRoute allowedRoles={['school_admin', 'data_analyst']}>
+                      <TeacherSubstitution />
+                    </ProtectedRoute>
+                  } 
+                />
                 
                 {/* Profile - All roles */}
                 <Route path="profile" element={<Profile />} />
