@@ -788,6 +788,67 @@ const TeacherSubstitution = () => {
     return uniqueClasses.size;
   };
   
+  // Find conflicts in active substitutions: same teacher, same date, same period, same day
+  const findSubstitutionConflicts = () => {
+    if (!substitutions || substitutions.length === 0) return [];
+    
+    // Collect all assignments from active substitutions
+    const allAssignments = [];
+    substitutions.forEach(sub => {
+      if (sub.is_active && sub.assignments && sub.assignments.length > 0) {
+        sub.assignments.forEach(assignment => {
+          allAssignments.push({
+            ...assignment,
+            substitution_id: sub.id,
+            substitution_start_date: sub.start_date,
+            substitution_end_date: sub.end_date,
+            absent_teacher_name: sub.absent_teacher_name,
+            absent_teacher_xml_id: sub.absent_teacher_xml_id
+          });
+        });
+      }
+    });
+    
+    // Group assignments by conflict key: (substitute_teacher_user_id, assignment_date, period_xml_id, day_xml_id)
+    const conflictGroups = {};
+    
+    allAssignments.forEach(assignment => {
+      // Only check assignments with all required fields
+      if (!assignment.substitute_teacher_user_id || 
+          !assignment.period_xml_id || 
+          !assignment.day_xml_id) {
+        return;
+      }
+      
+      // Create conflict key
+      const assignmentDate = assignment.assignment_date ? assignment.assignment_date.split('T')[0] : 'no_date';
+      const conflictKey = `${assignment.substitute_teacher_user_id}-${assignmentDate}-${assignment.period_xml_id}-${assignment.day_xml_id}`;
+      
+      if (!conflictGroups[conflictKey]) {
+        conflictGroups[conflictKey] = [];
+      }
+      conflictGroups[conflictKey].push(assignment);
+    });
+    
+    // Filter to only groups with more than one assignment (conflicts)
+    const conflicts = [];
+    Object.keys(conflictGroups).forEach(key => {
+      if (conflictGroups[key].length > 1) {
+        conflicts.push({
+          conflictKey: key,
+          assignments: conflictGroups[key],
+          count: conflictGroups[key].length
+        });
+      }
+    });
+    
+    if (conflicts.length > 0) {
+      console.log(`Found ${conflicts.length} conflict groups:`, conflicts);
+    }
+    
+    return conflicts;
+  };
+  
   // Get days between start and end date (Sunday to Thursday only)
   const getSelectedDays = () => {
     // Use editing substitution dates if in edit mode
@@ -1213,6 +1274,95 @@ const TeacherSubstitution = () => {
           </button>
         </div>
       </div>
+      
+      {/* Conflicts List */}
+      {selectedTimetable && (() => {
+        const conflicts = findSubstitutionConflicts();
+        return conflicts.length > 0 && (
+          <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg shadow-sm p-4 sm:p-6 mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertCircle className="h-5 w-5 text-yellow-600" />
+              <h2 className="text-lg font-semibold text-yellow-900">
+                تعارضات في الإحتياط ({conflicts.length})
+              </h2>
+            </div>
+            <div className="space-y-3">
+              {conflicts.map((conflict, idx) => {
+                const firstAssignment = conflict.assignments[0];
+                const teacherName = firstAssignment.substitute_teacher_name || 'غير معروف';
+                const period = firstAssignment.period_xml_id;
+                const dayXmlId = firstAssignment.day_xml_id;
+                const assignmentDate = firstAssignment.assignment_date ? 
+                  new Date(firstAssignment.assignment_date).toLocaleDateString('ar-SA', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                  }) : 'نفس المعلم لجميع الأسابيع';
+                
+                // Find day name
+                const dayName = timetableData?.days?.find(d => 
+                  d.day_id === dayXmlId || d.id === dayXmlId || d.xml_id === dayXmlId
+                )?.name || dayXmlId;
+                
+                return (
+                  <div key={idx} className="bg-white border border-yellow-300 rounded-lg p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertCircle className="h-4 w-4 text-yellow-600" />
+                          <span className="font-semibold text-yellow-900">
+                            تعارض: {conflict.count} إحتياط لنفس المعلم
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-700 space-y-1 mr-6">
+                          <p><span className="font-medium">المعلم البديل:</span> {teacherName}</p>
+                          <p><span className="font-medium">اليوم:</span> {dayName}</p>
+                          <p><span className="font-medium">الحصة:</span> {period}</p>
+                          <p><span className="font-medium">التاريخ:</span> {assignmentDate}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-yellow-200">
+                      <p className="text-xs font-medium text-yellow-800 mb-2">تفاصيل الإحتياط المتعارضة:</p>
+                      <div className="space-y-2">
+                        {conflict.assignments.map((assignment, aIdx) => (
+                          <div key={aIdx} className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-medium text-yellow-900">
+                                  إحتياط #{assignment.substitution_id}
+                                </p>
+                                <p className="text-yellow-700">
+                                  معلم غائب: {assignment.absent_teacher_name || 'غير معروف'}
+                                </p>
+                                <p className="text-yellow-600">
+                                  {assignment.class_name} - {assignment.subject_name}
+                                </p>
+                                {assignment.substitution_start_date && assignment.substitution_end_date && (
+                                  <p className="text-yellow-600 text-xs mt-1">
+                                    من {new Date(assignment.substitution_start_date).toLocaleDateString('ar-SA', {
+                                      day: 'numeric',
+                                      month: 'short'
+                                    })} إلى {new Date(assignment.substitution_end_date).toLocaleDateString('ar-SA', {
+                                      day: 'numeric',
+                                      month: 'short',
+                                      year: 'numeric'
+                                    })}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
       
       {/* Substitutions List */}
       {selectedTimetable && (
