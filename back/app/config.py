@@ -32,6 +32,15 @@ class Config:
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'f8276b9a3dffa9c0d6ed13184b9dbeeb15d11h86g8jo0c1f29a327d5eb95eb7d262ab32b0e9')  # Replace with a strong secret key your-jwt-secret-key
     JWT_ACCESS_TOKEN_EXPIRES = int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRES', 60 * 60 * 24))  # Default: 15 minutes (in seconds)
     JWT_REFRESH_TOKEN_EXPIRES = int(os.environ.get('JWT_REFRESH_TOKEN_EXPIRES', 1 * 24 * 60 * 60))  # Default: 7 days (in seconds)
+    
+    # VAPID keys for Web Push Notifications (Background notifications)
+    # Generate these using one of these methods:
+    # 1. pip install py_vapid && python -c "from py_vapid import Vapid01; v = Vapid01(); print('Private:', v.private_key.pem); print('Public:', v.public_key.pem)"
+    # 2. Use online generator: https://web-push-codelab.glitch.me/
+    # 3. Use the generate_vapid_keys() function (see BACKGROUND_NOTIFICATIONS_GUIDE.md)
+    VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', 'BEl62iUYgUivxIkv69yViEuiBIa-Ib27SGeUmo6GNfhPNGa4VB91iZKqQ5SDMIpOUwfEhvJZ-8N5-P2iEzDQXCw')
+    VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
+    VAPID_CLAIM_EMAIL = os.environ.get('VAPID_CLAIM_EMAIL', 'admin@tatubu.com')
      
 
 

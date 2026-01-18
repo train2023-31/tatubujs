@@ -653,3 +653,172 @@ class SubstitutionAssignment(db.Model):
             'assignment_date': self.assignment_date.isoformat() if self.assignment_date else None,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+
+
+# Notification Models
+class Notification(db.Model):
+    """Notifications sent to users"""
+    __tablename__ = 'notifications'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=False)
+    
+    # Notification content
+    title = db.Column(db.String(255), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    type = db.Column(db.String(50), nullable=False)  # 'attendance', 'bus', 'behavior', 'timetable', 'substitution', 'news', 'general'
+    priority = db.Column(db.String(20), nullable=False, default='normal')  # 'low', 'normal', 'high', 'urgent'
+    
+    # Target users
+    target_role = db.Column(db.String(50), nullable=True)  # 'student', 'teacher', 'school_admin', 'analyst', 'driver' or None for specific users
+    target_user_ids = db.Column(db.Text, nullable=True)  # JSON array of specific user IDs
+    target_class_ids = db.Column(db.Text, nullable=True)  # JSON array of class IDs (for class-specific notifications)
+    
+    # Related entities (for linking notifications to specific records)
+    related_entity_type = db.Column(db.String(50), nullable=True)  # 'attendance', 'bus_scan', 'substitution', 'timetable', 'news', 'behavior'
+    related_entity_id = db.Column(db.Integer, nullable=True)
+    
+    # Metadata
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    expires_at = db.Column(db.DateTime, nullable=True)  # Optional expiration
+    
+    # Action link (optional)
+    action_url = db.Column(db.String(500), nullable=True)  # Deep link to specific page
+    
+    # Relationships
+    school = db.relationship('School', backref='notifications')
+    creator = db.relationship('User', foreign_keys=[created_by], backref='notifications_created')
+    reads = db.relationship('NotificationRead', back_populates='notification', cascade='all, delete-orphan')
+    
+    def to_dict(self):
+        import json
+        return {
+            'id': self.id,
+            'school_id': self.school_id,
+            'title': self.title,
+            'message': self.message,
+            'type': self.type,
+            'priority': self.priority,
+            'target_role': self.target_role,
+            'target_user_ids': json.loads(self.target_user_ids) if self.target_user_ids else None,
+            'target_class_ids': json.loads(self.target_class_ids) if self.target_class_ids else None,
+            'related_entity_type': self.related_entity_type,
+            'related_entity_id': self.related_entity_id,
+            'created_by': self.created_by,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'is_active': self.is_active,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None,
+            'action_url': self.action_url
+        }
+
+
+class NotificationRead(db.Model):
+    """Track which users have read which notifications"""
+    __tablename__ = 'notification_reads'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    notification_id = db.Column(db.Integer, db.ForeignKey('notifications.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    read_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
+    
+    # Relationships
+    notification = db.relationship('Notification', back_populates='reads')
+    user = db.relationship('User', backref='notification_reads')
+    
+    __table_args__ = (
+        db.UniqueConstraint('notification_id', 'user_id', name='unique_notification_read'),
+    )
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'notification_id': self.notification_id,
+            'user_id': self.user_id,
+            'read_at': self.read_at.isoformat() if self.read_at else None
+        }
+
+
+class PushSubscription(db.Model):
+    """Store push notification subscriptions for PWA"""
+    __tablename__ = 'push_subscriptions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    
+    # Push subscription data (from browser Push API)
+    endpoint = db.Column(db.Text, nullable=False)
+    p256dh_key = db.Column(db.Text, nullable=False)  # Public key
+    auth_key = db.Column(db.Text, nullable=False)  # Auth secret
+    
+    # Device info
+    user_agent = db.Column(db.Text, nullable=True)
+    device_name = db.Column(db.String(255), nullable=True)
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
+    last_used_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    
+    # Relationships
+    user = db.relationship('User', backref='push_subscriptions')
+    
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'endpoint', name='unique_user_subscription'),
+    )
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'endpoint': self.endpoint,
+            'p256dh_key': self.p256dh_key,
+            'auth_key': self.auth_key,
+            'device_name': self.device_name,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_used_at': self.last_used_at.isoformat() if self.last_used_at else None,
+            'is_active': self.is_active
+        }
+
+
+class NotificationPreference(db.Model):
+    """User notification preferences"""
+    __tablename__ = 'notification_preferences'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True)
+    
+    # Notification type preferences (True = enabled, False = disabled)
+    attendance_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    bus_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    behavior_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    timetable_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    substitution_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    news_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    general_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    
+    # Push notification settings
+    push_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
+    updated_at = db.Column(db.DateTime, default=get_oman_time().utcnow, onupdate=get_oman_time().utcnow)
+    
+    # Relationships
+    user = db.relationship('User', backref='notification_preference')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'attendance_enabled': self.attendance_enabled,
+            'bus_enabled': self.bus_enabled,
+            'behavior_enabled': self.behavior_enabled,
+            'timetable_enabled': self.timetable_enabled,
+            'substitution_enabled': self.substitution_enabled,
+            'news_enabled': self.news_enabled,
+            'general_enabled': self.general_enabled,
+            'push_enabled': self.push_enabled,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }

@@ -10,6 +10,7 @@ from app.logger import log_action
 from app.config import get_oman_time
 from sqlalchemy import func , or_ ,case, and_
 from ibulk_sms_service import get_attendance_sms_service, get_ibulk_sms_service
+from app.routes.notification_routes import create_notification
 
 
 
@@ -117,6 +118,87 @@ def take_attendances():
 
     # Commit changes once for all records
     db.session.commit()
+
+    # Create notifications for absent and excused students
+    try:
+        user = User.query.get(teacher_id)
+        if user and user.school_id:
+            absent_students = []
+            excused_students = []
+            
+            for record in attendance_records:
+                student = Student.query.get(record['student_id'])
+                if not student:
+                    continue
+                
+                # Handle absent students
+                if record.get('is_Acsent'):
+                    absent_students.append(student)
+                    
+                    # Create notification for the specific student
+                    create_notification(
+                        school_id=user.school_id,
+                        title="غياب طالب",
+                        message=f"الطالب {student.fullName} غائب في التاريخ {attendance_date.strftime('%Y-%m-%d')}",
+                        notification_type='attendance',
+                        created_by=teacher_id,
+                        priority='normal',
+                        target_user_ids=[student.id],
+                        related_entity_type='attendance',
+                        action_url='/app/attendance-details'
+                    )
+                
+                # Handle excused students
+                if record.get('is_Excus'):
+                    excused_students.append(student)
+                    
+                    excuse_note = record.get('ExcusNote', '')
+                    message = f"الطالب {student.fullName} لديه عذر في التاريخ {attendance_date.strftime('%Y-%m-%d')}"
+                    if excuse_note and excuse_note.strip() not in ['-', '', ' ']:
+                        message += f"\nالعذر: {excuse_note}"
+                    
+                    # Create notification for the specific student
+                    create_notification(
+                        school_id=user.school_id,
+                        title="عذر طالب",
+                        message=message,
+                        notification_type='attendance',
+                        created_by=teacher_id,
+                        priority='normal',
+                        target_user_ids=[student.id],
+                        related_entity_type='attendance',
+                        action_url='/app/attendance-details'
+                    )
+            
+            # If there are multiple absences, notify teachers and admins
+            if len(absent_students) > 2:
+                create_notification(
+                    school_id=user.school_id,
+                    title="تنبيه: غياب متعدد",
+                    message=f"تم تسجيل غياب {len(absent_students)} طالب/طالبة في الصف {class_obj.name}",
+                    notification_type='attendance',
+                    created_by=teacher_id,
+                    priority='high',
+                    target_role='school_admin',
+                    related_entity_type='attendance',
+                    action_url='/app/attendance-details'
+                )
+            
+            # If there are multiple excuses, notify admins
+            if len(excused_students) > 3:
+                create_notification(
+                    school_id=user.school_id,
+                    title="تنبيه: أعذار متعددة",
+                    message=f"تم تسجيل {len(excused_students)} عذر في الصف {class_obj.name}",
+                    notification_type='attendance',
+                    created_by=teacher_id,
+                    priority='normal',
+                    target_role='school_admin',
+                    related_entity_type='attendance',
+                    action_url='/app/attendance-details'
+                )
+    except Exception as e:
+        print(f"Error creating attendance notifications: {str(e)}")
 
     return jsonify(message="Attendance recorded , تم التسجيل بنجاح"), 200
 

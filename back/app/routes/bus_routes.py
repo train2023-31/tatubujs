@@ -7,6 +7,7 @@ from app.config import get_oman_time
 from app.logger import log_action
 from sqlalchemy import func, and_, or_
 from flask_cors import CORS
+from app.routes.notification_routes import create_notification
 
 bus_blueprint = Blueprint('bus_blueprint', __name__)
 
@@ -363,6 +364,31 @@ def scan_student():
     
     db.session.add(scan)
     db.session.commit()
+    
+    # Create notification for bus scan
+    try:
+        if scan_type == 'board':
+            message = f"الطالب {student.fullName} صعد إلى الحافلة {bus.bus_name}"
+            title = "صعود حافلة"
+        else:
+            message = f"الطالب {student.fullName} نزل من الحافلة {bus.bus_name}"
+            title = "نزول من الحافلة"
+        
+        # Notify the student
+        create_notification(
+            school_id=bus.school_id,
+            title=title,
+            message=message,
+            notification_type='bus',
+            created_by=user_id,
+            priority='normal',
+            target_user_ids=[student.id],
+            related_entity_type='bus_scan',
+            related_entity_id=scan.id,
+            action_url='/app/bus-reports'
+        )
+    except Exception as e:
+        print(f"Error creating bus notification: {str(e)}")
     
     # Return student info for confirmation
     return jsonify(

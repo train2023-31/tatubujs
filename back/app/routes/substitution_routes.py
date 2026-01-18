@@ -5,6 +5,7 @@ from app.models import TeacherSubstitution, SubstitutionAssignment, TimetableSch
 from datetime import datetime, date, timedelta
 import json
 from flask_cors import CORS
+from app.routes.notification_routes import create_notification
 
 substitution_bp = Blueprint('substitution', __name__, url_prefix='/api/substitutions')
 CORS(substitution_bp)
@@ -684,6 +685,59 @@ def create_substitution():
     print(f"DEBUG: Created {len(unique_assignments)} unique assignments from {len(data['assignments'])} total assignments")
     
     db.session.commit()
+    
+    # Create notifications for substitution
+    try:
+        # Notify the absent teacher
+        if absent_teacher_user_id:
+            create_notification(
+                school_id=user.school_id,
+                title="تم تعيين بديل",
+                message=f"تم تعيين معلمين بدلاء لحصصك من {start_date.strftime('%Y-%m-%d')} إلى {end_date.strftime('%Y-%m-%d')}",
+                notification_type='substitution',
+                created_by=current_user,
+                priority='high',
+                target_user_ids=[absent_teacher_user_id],
+                related_entity_type='substitution',
+                related_entity_id=substitution.id,
+                action_url='/app/teacher-substitution'
+            )
+        
+        # Notify all substitute teachers
+        substitute_teacher_ids = set()
+        for assignment_data in data['assignments']:
+            if assignment_data.get('substitute_teacher_user_id'):
+                substitute_teacher_ids.add(assignment_data['substitute_teacher_user_id'])
+        
+        for teacher_id in substitute_teacher_ids:
+            create_notification(
+                school_id=user.school_id,
+                title="حصة احتياطية جديدة",
+                message=f"تم تعيينك كبديل للمعلم {data['absent_teacher_name']} من {start_date.strftime('%Y-%m-%d')} إلى {end_date.strftime('%Y-%m-%d')}",
+                notification_type='substitution',
+                created_by=current_user,
+                priority='high',
+                target_user_ids=[teacher_id],
+                related_entity_type='substitution',
+                related_entity_id=substitution.id,
+                action_url='/app/teacher-substitution'
+            )
+        
+        # Notify school admins
+        create_notification(
+            school_id=user.school_id,
+            title="استبدال معلم جديد",
+            message=f"تم إنشاء استبدال للمعلم {data['absent_teacher_name']} بـ {len(substitute_teacher_ids)} معلم بديل",
+            notification_type='substitution',
+            created_by=current_user,
+            priority='normal',
+            target_role='school_admin',
+            related_entity_type='substitution',
+            related_entity_id=substitution.id,
+            action_url='/app/teacher-substitution'
+        )
+    except Exception as e:
+        print(f"Error creating substitution notifications: {str(e)}")
     
     return jsonify({
         'message': 'Substitution created successfully',

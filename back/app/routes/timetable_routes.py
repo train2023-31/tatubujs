@@ -7,6 +7,7 @@ from app.models import (
 )
 from datetime import datetime
 from flask_cors import CORS
+from app.routes.notification_routes import create_notification
 timetable_bp = Blueprint('timetable', __name__)
 CORS(timetable_bp)
 
@@ -129,6 +130,37 @@ def create_timetable():
             db.session.add(schedule)
         
         db.session.commit()
+        
+        # Create notification for new timetable
+        try:
+            create_notification(
+                school_id=current_user.school_id,
+                title="جدول دراسي جديد",
+                message=f"تم إضافة جدول دراسي جديد: {data['name']}",
+                notification_type='timetable',
+                created_by=user_id,
+                priority='high',
+                target_role='teacher',
+                related_entity_type='timetable',
+                related_entity_id=timetable.id,
+                action_url='/app/school-timetable'
+            )
+            
+            # Also notify school admins
+            create_notification(
+                school_id=current_user.school_id,
+                title="جدول دراسي جديد",
+                message=f"تم إضافة جدول دراسي جديد: {data['name']}",
+                notification_type='timetable',
+                created_by=user_id,
+                priority='high',
+                target_role='school_admin',
+                related_entity_type='timetable',
+                related_entity_id=timetable.id,
+                action_url='/app/school-timetable'
+            )
+        except Exception as e:
+            print(f"Error creating timetable notification: {str(e)}")
         
         return jsonify({
             'message': 'Timetable created successfully',

@@ -1,6 +1,6 @@
 # app/__init__.py
 
-from flask import Flask, send_from_directory, request, jsonify
+from flask import Flask, send_from_directory, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
@@ -50,8 +50,8 @@ def create_app():
          supports_credentials=True,
          origins=allowed_origins_list,
          methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Access-Control-Request-Method', 'Access-Control-Request-Headers'],
-         expose_headers=['Content-Type', 'Authorization', 'X-Total-Count'],
+         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+         expose_headers=['Content-Type', 'Authorization'],
          max_age=3600)
     
     # Helper function to check if origin is allowed (for manual fallback)
@@ -70,23 +70,44 @@ def create_app():
         
         return None
 
-    # Handle OPTIONS preflight requests globally
-    @app.before_request
-    def handle_preflight():
-        """Handle OPTIONS preflight requests for CORS"""
-        if request.method == 'OPTIONS':
-            origin = request.headers.get('Origin')
-            if origin:
-                allowed_origin = cors_origin_check(origin)
-                if allowed_origin:
-                    response = jsonify({})
-                    response.headers['Access-Control-Allow-Origin'] = allowed_origin
-                    response.headers['Access-Control-Allow-Credentials'] = 'true'
-                    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS'
-                    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers'
-                    response.headers['Access-Control-Max-Age'] = '3600'
-                    return response
-            return jsonify({}), 200
+    @app.after_request
+    def after_request_func(response):
+        """Additional CORS handling for mobile browsers that might not send Origin header"""
+        origin = request.headers.get('Origin')
+        referer = request.headers.get('Referer')
+        
+        # Debug logging (remove in production if needed)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"CORS Debug - Origin: {origin}, Referer: {referer}, Path: {request.path}")
+        
+        # Handle "null" origin
+        if origin == 'null':
+            origin = None
+        
+        # If no Origin header, try to extract from Referer (mobile browser fallback)
+        if not origin and referer:
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(referer)
+                origin = f"{parsed.scheme}://{parsed.netloc}"
+                logger.info(f"CORS Debug - Extracted origin from Referer: {origin}")
+            except Exception as e:
+                logger.warning(f"CORS Debug - Failed to parse Referer: {e}")
+        
+        # If we have an origin, check if it's allowed and set CORS headers
+        if origin:
+            allowed_origin = cors_origin_check(origin)
+            if allowed_origin:
+                response.headers['Access-Control-Allow-Origin'] = allowed_origin
+                response.headers['Access-Control-Allow-Credentials'] = 'true'
+                logger.info(f"CORS Debug - Allowed origin: {allowed_origin}")
+            else:
+                logger.warning(f"CORS Debug - Origin not allowed: {origin}")
+        else:
+            logger.warning(f"CORS Debug - No origin found (Origin: {request.headers.get('Origin')}, Referer: {referer})")
+        
+        return response
 
 
     db.init_app(app)
@@ -109,6 +130,7 @@ def create_app():
     from app.routes.bus_routes import bus_blueprint
     from app.routes.timetable_routes import timetable_bp
     from app.routes.substitution_routes import substitution_bp
+    from app.routes.notification_routes import notification_routes
 
 
 
@@ -120,9 +142,10 @@ def create_app():
     app.register_blueprint(bus_blueprint, url_prefix='/api/bus')
     app.register_blueprint(timetable_bp, url_prefix='/api/timetable')
     app.register_blueprint(substitution_bp, url_prefix='/api/substitutions')
+    app.register_blueprint(notification_routes, url_prefix='/api/notifications')
+    
 
-
-    # --- Security Headers and CORS ---
+    # --- Security Headers ---
     @app.after_request
     def unified_after_request(response):
         from urllib.parse import urlparse
@@ -144,8 +167,6 @@ def create_app():
             r"^https://tatubu\.com$",
             r"^https://.*\.vercel\.app$",
             r"^https://.*\.pythonanywhere\.com$",
-            r"^https://.*\.hostinger\.com$",
-            r"^https://.*\.000webhostapp\.com$",
             r"^https?://localhost(:\d+)?$",
             r"^https?://38\.60\.243\.25(:\d+)?$"
         ]
@@ -156,32 +177,23 @@ def create_app():
                 if re.match(pattern, origin):
                     response.headers['Access-Control-Allow-Origin'] = origin
                     response.headers['Access-Control-Allow-Credentials'] = 'true'
-                    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS'
-                    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers'
-                    response.headers['Access-Control-Expose-Headers'] = 'Content-Type, Authorization, X-Total-Count'
                     break
     
-        # Security headers (only if not already set by CORS)
-        if 'X-Content-Type-Options' not in response.headers:
-            response.headers['X-Content-Type-Options'] = 'nosniff'
-        if 'X-Frame-Options' not in response.headers:
-            response.headers['X-Frame-Options'] = 'DENY'
-        if 'X-XSS-Protection' not in response.headers:
-            response.headers['X-XSS-Protection'] = '1; mode=block'
-        if 'Strict-Transport-Security' not in response.headers:
-            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-        if 'Referrer-Policy' not in response.headers:
-            response.headers['Referrer-Policy'] = 'origin-when-cross-origin'
-        if 'Content-Security-Policy' not in response.headers:
-            response.headers['Content-Security-Policy'] = (
-                "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-                "font-src 'self' https://fonts.gstatic.com; "
-                "img-src 'self' data: blob: https://*; "
-                "connect-src 'self' https://api.tatubu.com https://*.tatubu.com "
-                "http://localhost:3000 http://localhost:5000;"
-            )
+        # Security headers
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        response.headers['Referrer-Policy'] = 'origin-when-cross-origin'
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: blob: https://*; "
+            "connect-src 'self' https://api.tatubu.com https://*.tatubu.com "
+            "http://localhost:3000 http://localhost:5000;"
+        )
     
         return response
 
