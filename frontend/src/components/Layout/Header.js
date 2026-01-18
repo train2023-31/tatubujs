@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { getRoleDisplayName } from '../../utils/helpers';
 import { useAddToHomeScreen } from '../../hooks/useAddToHomeScreen';
+import NotificationBell from '../Notifications/NotificationBell';
 import toast from 'react-hot-toast';
 
 const Header = ({ onMenuClick }) => {
@@ -81,6 +82,10 @@ const Header = ({ onMenuClick }) => {
               <span className="text-xs lg:text-sm hidden sm:inline">إضافة للتطبيق</span>
             </button>
           )}
+          
+          {/* Notification Bell */}
+          <NotificationBell />
+          
           {/* Cache clear button (mobile-friendly) */}
           <button
             onClick={() => navigate('/app/guide')}

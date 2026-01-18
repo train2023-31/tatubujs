@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Worker Diagnostic</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #ddd;
+        }
+        .status.success {
+            background: #d4edda;
+            border-left-color: #28a745;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+            color: #721c24;
+        }
+        .status.warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+            color: #856404;
+        }
+        .status.info {
+            background: #d1ecf1;
+            border-left-color: #17a2b8;
+            color: #0c5460;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        button.danger {
+            background: #dc3545;
+        }
+        button.danger:hover {
+            background: #c82333;
+        }
+        .actions {
+            text-align: center;
+            margin-top: 30px;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .section {
+            margin: 20px 0;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Service Worker Diagnostic Tool</h1>
+        
+        <div class="section">
+            <div class="section-title">Service Worker Status</div>
+            <div id="sw-status"></div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Cache Status</div>
+            <div id="cache-status"></div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Notification Permission</div>
+            <div id="notification-status"></div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Backend Connection</div>
+            <div id="backend-status"></div>
+        </div>
+
+        <div class="actions">
+            <button onclick="runDiagnostics()">🔄 Re-run Diagnostics</button>
+            <button onclick="clearServiceWorker()" class="danger">🗑️ Clear Service Worker</button>
+            <button onclick="clearCaches()" class="danger">🗑️ Clear All Caches</button>
+            <button onclick="fixAll()" class="danger">⚡ Fix All Issues</button>
+        </div>
+    </div>
+
+    <script>
+        // Run diagnostics on load
+        window.addEventListener('load', runDiagnostics);
+
+        async function runDiagnostics() {
+            console.log('Running diagnostics...');
+            
+            // Check Service Worker
+            await checkServiceWorker();
+            
+            // Check Caches
+            await checkCaches();
+            
+            // Check Notifications
+            await checkNotifications();
+            
+            // Check Backend
+            await checkBackend();
+        }
+
+        async function checkServiceWorker() {
+            const statusDiv = document.getElementById('sw-status');
+            
+            if (!('serviceWorker' in navigator)) {
+                statusDiv.innerHTML = '<div class="status error">❌ Service Worker not supported in this browser</div>';
+                return;
+            }
+
+            try {
+                const registration = await navigator.serviceWorker.getRegistration();
+                
+                if (registration) {
+                    const state = registration.active?.state || 'unknown';
+                    statusDiv.innerHTML = `
+                        <div class="status success">✅ Service Worker registered</div>
+                        <div class="status info">State: ${state}</div>
+                        <div class="status info">Scope: ${registration.scope}</div>
+                    `;
+                } else {
+                    statusDiv.innerHTML = '<div class="status warning">⚠️ Service Worker not registered</div>';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function checkCaches() {
+            const statusDiv = document.getElementById('cache-status');
+            
+            try {
+                const cacheNames = await caches.keys();
+                const totalSize = await getTotalCacheSize();
+                
+                if (cacheNames.length > 0) {
+                    statusDiv.innerHTML = `
+                        <div class="status success">✅ ${cacheNames.length} cache(s) found</div>
+                        <div class="status info">Total size: ~${totalSize} KB</div>
+                        <pre>${cacheNames.join('\n')}</pre>
+                    `;
+                } else {
+                    statusDiv.innerHTML = '<div class="status warning">⚠️ No caches found</div>';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function getTotalCacheSize() {
+            try {
+                const cacheNames = await caches.keys();
+                let totalSize = 0;
+                
+                for (const cacheName of cacheNames) {
+                    const cache = await caches.open(cacheName);
+                    const requests = await cache.keys();
+                    totalSize += requests.length * 10; // Rough estimate
+                }
+                
+                return totalSize;
+            } catch {
+                return 0;
+            }
+        }
+
+        async function checkNotifications() {
+            const statusDiv = document.getElementById('notification-status');
+            
+            if (!('Notification' in window)) {
+                statusDiv.innerHTML = '<div class="status error">❌ Notifications not supported</div>';
+                return;
+            }
+
+            const permission = Notification.permission;
+            const statusClass = permission === 'granted' ? 'success' : permission === 'denied' ? 'error' : 'warning';
+            const icon = permission === 'granted' ? '✅' : permission === 'denied' ? '❌' : '⚠️';
+            
+            statusDiv.innerHTML = `<div class="status ${statusClass}">${icon} Permission: ${permission}</div>`;
+            
+            if (permission === 'default') {
+                statusDiv.innerHTML += '<button onclick="requestNotificationPermission()">Request Permission</button>';
+            }
+        }
+
+        async function requestNotificationPermission() {
+            try {
+                const permission = await Notification.requestPermission();
+                await checkNotifications();
+                
+                if (permission === 'granted') {
+                    new Notification('Success!', {
+                        body: 'Notifications enabled successfully',
+                        icon: '/logo.png'
+                    });
+                }
+            } catch (error) {
+                alert('Error requesting permission: ' + error.message);
+            }
+        }
+
+        async function checkBackend() {
+            const statusDiv = document.getElementById('backend-status');
+            statusDiv.innerHTML = '<div class="status info">🔄 Testing backend connection...</div>';
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'OPTIONS'
+                });
+                
+                if (response.ok || response.status === 405) {
+                    statusDiv.innerHTML = '<div class="status success">✅ Backend is reachable</div>';
+                } else {
+                    statusDiv.innerHTML = `<div class="status error">❌ Backend error: ${response.status}</div>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">❌ Backend unreachable: ${error.message}</div>`;
+            }
+        }
+
+        async function clearServiceWorker() {
+            if (!confirm('Clear Service Worker? This will unregister the service worker.')) {
+                return;
+            }
+
+            try {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                
+                for (const registration of registrations) {
+                    await registration.unregister();
+                }
+                
+                alert('✅ Service Worker cleared! Please reload the page.');
+                await runDiagnostics();
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
+        async function clearCaches() {
+            if (!confirm('Clear all caches? This will delete all cached files.')) {
+                return;
+            }
+
+            try {
+                const cacheNames = await caches.keys();
+                
+                for (const cacheName of cacheNames) {
+                    await caches.delete(cacheName);
+                }
+                
+                alert('✅ All caches cleared! Please reload the page.');
+                await runDiagnostics();
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
+        async function fixAll() {
+            if (!confirm('This will:\n- Unregister service worker\n- Clear all caches\n- Reload the page\n\nContinue?')) {
+                return;
+            }
+
+            try {
+                // Unregister service workers
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (const registration of registrations) {
+                    await registration.unregister();
+                }
+
+                // Clear caches
+                const cacheNames = await caches.keys();
+                for (const cacheName of cacheNames) {
+                    await caches.delete(cacheName);
+                }
+
+                alert('✅ All fixed! Reloading page...');
+                
+                // Hard reload
+                location.reload(true);
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1842,90 +1842,95 @@ const SchoolTimetable = () => {
               <p className="text-sm mt-1">قم بإنشاء جدول جديد عن طريق رفع ملف XML</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {savedTimetables.map(timetable => (
-                <div
-                  key={timetable.id}
-                  className={`p-4 border-2 rounded-lg transition-all ${
-                    timetable.is_active 
-                      ? 'border-green-500 bg-green-50' 
-                      : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div 
-                      className="flex-1 cursor-pointer"
-                      onClick={() => handleLoadTimetable(timetable.id)}
-                    >
-                      <h3 className="font-medium text-gray-900">{timetable.name}</h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {new Date(timetable.created_at).toLocaleDateString('ar-EG', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                      </p>
+            <>
+              <div className="text-center mb-4 text-sm text-gray-500">
+                قم بالضغط على الجدول لعرضه
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {savedTimetables.map(timetable => (
+                  <div
+                    key={timetable.id}
+                    className={`p-4 border-2 rounded-lg transition-all ${
+                      timetable.is_active 
+                        ? 'border-green-500 bg-green-50' 
+                        : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div 
+                        className="flex-1 cursor-pointer"
+                        onClick={() => handleLoadTimetable(timetable.id)}
+                      >
+                        <h3 className="font-medium text-gray-900">{timetable.name}</h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {new Date(timetable.created_at).toLocaleDateString('ar-EG', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                      <div className="flex gap-1 ml-2 flex-shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditTimetable(timetable);
+                          }}
+                          className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                          title="تعديل الاسم"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleActivateTimetable(timetable.id);
+                          }}
+                          className={`p-1.5 rounded transition-colors ${
+                            timetable.is_active
+                              ? 'text-green-600 hover:bg-green-100'
+                              : 'text-gray-600 hover:bg-gray-100'
+                          }`}
+                          title={timetable.is_active ? 'نشط (سيتم تعطيل الجداول الأخرى)' : 'تفعيل (سيتم تعطيل الجداول الأخرى)'}
+                        >
+                          <Power className={`h-4 w-4 ${timetable.is_active ? 'fill-current' : ''}`} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTimetable(timetable.id);
+                          }}
+                          className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
+                          title="حذف"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-1 ml-2 flex-shrink-0">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditTimetable(timetable);
-                        }}
-                        className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                        title="تعديل الاسم"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleActivateTimetable(timetable.id);
-                        }}
-                        className={`p-1.5 rounded transition-colors ${
-                          timetable.is_active
-                            ? 'text-green-600 hover:bg-green-100'
-                            : 'text-gray-600 hover:bg-gray-100'
-                        }`}
-                        title={timetable.is_active ? 'نشط (سيتم تعطيل الجداول الأخرى)' : 'تفعيل (سيتم تعطيل الجداول الأخرى)'}
-                      >
-                        <Power className={`h-4 w-4 ${timetable.is_active ? 'fill-current' : ''}`} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteTimetable(timetable.id);
-                        }}
-                        className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
-                        title="حذف"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+                    {timetable.is_active && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="inline-block px-2 py-1 bg-green-100 text-green-700 text-xs rounded font-medium">
+                          ✓ نشط
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          (هذا الجدول النشط الوحيد)
+                        </span>
+                      </div>
+                    )}
+                    {!timetable.is_active && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="inline-block px-2 py-1 bg-red-100 text-red-700 text-xs rounded font-medium">
+                          ✗ غير نشط
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          (هذا الجدول غير نشط)
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  {timetable.is_active && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className="inline-block px-2 py-1 bg-green-100 text-green-700 text-xs rounded font-medium">
-                        ✓ نشط
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        (هذا الجدول النشط الوحيد)
-                      </span>
-                    </div>
-                  )}
-                  {!timetable.is_active && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className="inline-block px-2 py-1 bg-red-100 text-red-700 text-xs rounded font-medium">
-                        ✗ غير نشط
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        (هذا الجدول غير نشط)
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </>
           )}
           </div>
         )}

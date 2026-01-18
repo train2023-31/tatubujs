@@ -63,7 +63,7 @@ const obfuscateStrings = (buildPath) => {
         let content = fs.readFileSync(filePath, 'utf8');
         
         // Replace common API patterns
-        content = content.replace(/localhost:5000/g, 'api.example.com');
+        content = content.replace(/localhost:5000/g, 'api.tatubu.com');
         content = content.replace(/http:\/\/localhost/g, 'https://api');
         
         fs.writeFileSync(filePath, content);

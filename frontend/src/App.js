@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import { useAuth } from './hooks/useAuth';
 import Layout from './components/Layout/Layout';
 import Home from './pages/Home/Home';
@@ -34,6 +35,8 @@ import BusReports from './pages/BusReports/BusReports';
 import StudentQRCodes from './pages/StudentQRCodes/StudentQRCodes';
 import SchoolTimetable from './pages/SchoolTimetable/SchoolTimetable';
 import TeacherSubstitution from './pages/TeacherSubstitution/TeacherSubstitution';
+import Notifications from './pages/Notifications/Notifications';
+import NotificationSettings from './pages/NotificationSettings/NotificationSettings';
 import LoadingSpinner from './components/UI/LoadingSpinner';
 import cacheManager from './utils/cacheManager';
 
@@ -186,14 +189,15 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router
-          future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true
-          }}
-        >
-          <div className="App" dir="rtl">
-            <Toaster 
+        <NotificationProvider>
+          <Router
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true
+            }}
+          >
+            <div className="App" dir="rtl">
+              <Toaster 
               position="top-center"
               toastOptions={{
                 duration: 4000,
@@ -482,6 +486,12 @@ function App() {
                   } 
                 />
                 
+                {/* Notifications - All roles */}
+                <Route path="notifications" element={<Notifications />} />
+                
+                {/* Notification Settings - All roles */}
+                <Route path="notification-settings" element={<NotificationSettings />} />
+                
                 {/* Profile - All roles */}
                 <Route path="profile" element={<Profile />} />
               </Route>
@@ -491,6 +501,7 @@ function App() {
             </Routes>
           </div>
         </Router>
+        </NotificationProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

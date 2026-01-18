@@ -24,5 +24,7 @@
   "background_color": "#ffffff",
   "categories": ["education", "productivity"],
   "lang": "ar",
-  "dir": "rtl"
+  "dir": "rtl",
+  "permissions": ["notifications"],
+  "gcm_sender_id": "103953800507"
 }
