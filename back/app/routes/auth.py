@@ -3,7 +3,7 @@
 from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from app.models import User, Student, Teacher, School ,Class , Subject , student_classes ,Attendance ,News ,ActionLog, Driver, Bus, BusScan, bus_students
+from app.models import User, Student, Teacher, School ,Class , Subject , student_classes ,Attendance ,News ,ActionLog, Driver, Bus, BusScan, bus_students, Timetable, TimetableDay, TimetablePeriod, TimetableSchedule, TimetableTeacherMapping, TeacherSubstitution, SubstitutionAssignment, Notification, NotificationRead
 from app import db ,limiter
 import csv
 from flask import send_file, Response
@@ -1919,11 +1919,71 @@ def delete_school_data():
         if "classes" in delete_options:
             db.session.query(Class).filter_by(school_id=school_id).delete(synchronize_session=False)
 
-        ### **1️⃣1️⃣ Delete News (if selected)**
+        ### **1️⃣1️⃣ Delete Substitutions (if selected)**
+        # Delete substitution assignments first (they reference substitutions and schedules)
+        if "substitutions" in delete_options:
+            # Get all substitution IDs for this school
+            substitution_ids = [
+                s.id for s in TeacherSubstitution.query.filter_by(school_id=school_id).all()
+            ]
+            if substitution_ids:
+                # Delete substitution assignments first
+                db.session.query(SubstitutionAssignment).filter(
+                    SubstitutionAssignment.substitution_id.in_(substitution_ids)
+                ).delete(synchronize_session=False)
+            # Delete teacher substitutions
+            db.session.query(TeacherSubstitution).filter_by(school_id=school_id).delete(synchronize_session=False)
+
+        ### **1️⃣2️⃣ Delete Timetable (if selected)**
+        # Delete timetable and all related tables (cascade will handle most, but we'll be explicit)
+        if "timetable" in delete_options:
+            # Get all timetable IDs for this school
+            timetable_ids = [t.id for t in Timetable.query.filter_by(school_id=school_id).all()]
+            if timetable_ids:
+                # Delete substitution assignments that reference timetable schedules
+                db.session.query(SubstitutionAssignment).filter(
+                    SubstitutionAssignment.schedule_id.in_(
+                        db.session.query(TimetableSchedule.id).filter(
+                            TimetableSchedule.timetable_id.in_(timetable_ids)
+                        )
+                    )
+                ).delete(synchronize_session=False)
+                # Delete timetable schedules
+                db.session.query(TimetableSchedule).filter(
+                    TimetableSchedule.timetable_id.in_(timetable_ids)
+                ).delete(synchronize_session=False)
+                # Delete timetable teacher mappings
+                db.session.query(TimetableTeacherMapping).filter(
+                    TimetableTeacherMapping.timetable_id.in_(timetable_ids)
+                ).delete(synchronize_session=False)
+                # Delete timetable periods
+                db.session.query(TimetablePeriod).filter(
+                    TimetablePeriod.timetable_id.in_(timetable_ids)
+                ).delete(synchronize_session=False)
+                # Delete timetable days
+                db.session.query(TimetableDay).filter(
+                    TimetableDay.timetable_id.in_(timetable_ids)
+                ).delete(synchronize_session=False)
+                # Delete timetables
+                db.session.query(Timetable).filter_by(school_id=school_id).delete(synchronize_session=False)
+
+        ### **1️⃣3️⃣ Delete Notifications (if selected)**
+        if "notifications" in delete_options:
+            # Get all notification IDs for this school
+            notification_ids = [n.id for n in Notification.query.filter_by(school_id=school_id).all()]
+            if notification_ids:
+                # Delete notification reads first
+                db.session.query(NotificationRead).filter(
+                    NotificationRead.notification_id.in_(notification_ids)
+                ).delete(synchronize_session=False)
+            # Delete notifications
+            db.session.query(Notification).filter_by(school_id=school_id).delete(synchronize_session=False)
+
+        ### **1️⃣4️⃣ Delete News (if selected)**
         if "news" in delete_options:
             db.session.query(News).filter_by(school_id=school_id).delete(synchronize_session=False)
 
-        ### **1️⃣2️⃣ Delete School (if selected)**
+        ### **1️⃣5️⃣ Delete School (if selected)**
         if "school" in delete_options:
             # Ensure the school admin is NOT deleted
             db.session.query(User).filter(

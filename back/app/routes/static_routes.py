@@ -2,7 +2,7 @@
 
 from flask import Blueprint, jsonify ,request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app.models import User, Student, Teacher, School ,Class,Attendance ,student_classes,News,Subject
+from app.models import User, Student, Teacher, School ,Class,Attendance ,student_classes,News,Subject,Timetable,TeacherSubstitution,Driver,Bus
 from app import db
 from werkzeug.security import generate_password_hash
 from io import StringIO
@@ -1147,17 +1147,49 @@ def get_bulk_operations_status():
         'message': f"Found {subjects_count} active subjects" if subjects_count > 0 else "No subjects found"
     }
 
-    # Step 5: Check if attendance has been taken (any attendance records exist)
+    # Step 5: Check if timetable exists
+    timetable_count = Timetable.query.filter_by(school_id=school_id, is_active=True).count()
+    step_status['step5_timetable'] = {
+        'completed': timetable_count > 0,
+        'count': timetable_count,
+        'message': f"Found {timetable_count} active timetable(s)" if timetable_count > 0 else "No timetable found"
+    }
+
+    # Step 6: Check if substitutions exist
+    substitutions_count = TeacherSubstitution.query.filter_by(school_id=school_id).count()
+    step_status['step6_substitutions'] = {
+        'completed': substitutions_count > 0,
+        'count': substitutions_count,
+        'message': f"Found {substitutions_count} substitution record(s)" if substitutions_count > 0 else "No substitutions found"
+    }
+
+    # Step 7: Check if attendance has been taken (any attendance records exist)
     attendance_count = Attendance.query.join(Class).filter(
         and_(
             Class.school_id == school_id,
             Attendance.date >= date.today() - timedelta(days=30)  # Check last 30 days
         )
     ).count()
-    step_status['step5_attendance'] = {
+    step_status['step7_attendance'] = {
         'completed': attendance_count > 0,
         'count': attendance_count,
         'message': f"Found {attendance_count} attendance records in the last 30 days" if attendance_count > 0 else "No attendance records found"
+    }
+
+    # Step 8: Check if drivers exist
+    drivers_count = Driver.query.filter_by(school_id=school_id, is_active=True).count()
+    step_status['step8_drivers'] = {
+        'completed': drivers_count > 0,
+        'count': drivers_count,
+        'message': f"Found {drivers_count} active driver(s)" if drivers_count > 0 else "No drivers found"
+    }
+
+    # Step 9: Check if buses exist
+    buses_count = Bus.query.filter_by(school_id=school_id, is_active=True).count()
+    step_status['step9_buses'] = {
+        'completed': buses_count > 0,
+        'count': buses_count,
+        'message': f"Found {buses_count} active bus(es)" if buses_count > 0 else "No buses found"
     }
 
     # Calculate overall completion status

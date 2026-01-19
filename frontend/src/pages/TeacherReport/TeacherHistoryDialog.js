@@ -99,7 +99,6 @@ const TeacherHistoryDialog = ({ isOpen, onClose, teacher }) => {
       
       toast.success('تم تحميل السجل بنجاح');
     } catch (error) {
-      console.error('Error generating PDF:', error);
       toast.error('فشل في إنشاء ملف PDF');
     } finally {
       setIsGeneratingPDF(false);

@@ -10,9 +10,11 @@ from datetime import datetime, timedelta
 import json
 from sqlalchemy import or_, and_
 import threading
+from flask_cors import CORS
 
-notification_routes = Blueprint('notification_routes', __name__)
-# CORS is handled at app level
+notification_routes = Blueprint('notification_routes', __name__, url_prefix='/api/notifications')
+# CORS is handled at app level - no need for blueprint-level CORS
+CORS(notification_routes, supports_credentials=True)
 
 def send_push_notification(notification):
     """
@@ -182,7 +184,7 @@ def create_notification(school_id, title, message, notification_type,
         return None
 
 
-@notification_routes.route('/', methods=['GET'])
+@notification_routes.route('', methods=['GET'], strict_slashes=False)
 @jwt_required()
 def get_notifications():
     """Get notifications for the current user"""
@@ -415,7 +417,7 @@ def mark_all_notifications_read():
         return jsonify({"message": f"Error marking notifications as read: {str(e)}"}), 500
 
 
-@notification_routes.route('/', methods=['POST'])
+@notification_routes.route('', methods=['POST'], strict_slashes=False)
 @jwt_required()
 def create_notification_endpoint():
     """Create a new notification (admin/teacher only)"""

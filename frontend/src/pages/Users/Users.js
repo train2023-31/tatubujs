@@ -1309,8 +1309,6 @@ const ViewUserDetails = ({ user, userDetails, loading, onClose }) => {
       </div>
     );
   }
-  console.log(displayData);
-  
 
   return (
     <div className="space-y-6">

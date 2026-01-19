@@ -111,19 +111,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           href: '/app/bulk-messaging',
           icon: MessageCircle,
           roles: ['admin', 'school_admin', 'data_analyst'],
-        },
-        {
-          name: 'جدول الحصص',
-          href: '/app/school-timetable',
-          icon: CalendarDays,
-          roles: ['admin', 'school_admin', 'data_analyst'],
-        },
-        {
-          name: 'إحتياط المعلمين',
-          href: '/app/teacher-substitution',
-          icon: UserCheck,
-          roles: ['admin', 'school_admin', 'data_analyst'],
-        },
+        }
       ]
     },
     {
@@ -174,6 +162,18 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'التقارير والإحصائيات',
           href: '/app/reports',
           icon: BarChart3,
+          roles: ['admin', 'school_admin', 'data_analyst'],
+        },
+        {
+          name: 'جدول الحصص',
+          href: '/app/school-timetable',
+          icon: CalendarDays,
+          roles: ['admin', 'school_admin', 'data_analyst'],
+        },
+        {
+          name: 'إحتياط المعلمين',
+          href: '/app/teacher-substitution',
+          icon: UserCheck,
           roles: ['admin', 'school_admin', 'data_analyst'],
         },
        

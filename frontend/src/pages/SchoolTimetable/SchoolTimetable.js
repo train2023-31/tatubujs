@@ -182,8 +182,6 @@ const SchoolTimetable = () => {
         // Sort by index and add to data.days
         parsedDays.sort((a, b) => a.index - b.index);
         data.days = parsedDays.map(d => ({ id: d.id, name: d.name, short: d.short }));
-        
-        console.log('Parsed days from daysdefs:', data.days);
       }
 
       // ========== Parse Periods (Support multiple formats) ==========
@@ -331,10 +329,6 @@ const SchoolTimetable = () => {
               });
             });
           });
-          
-          console.log('Daysdef Map:', Array.from(daysdefMap.entries()));
-          console.log('Lessons Map size:', lessonsMap.size);
-          console.log('Cards count:', cardElements.length);
 
           // Process cards to create schedules
           cardElements.forEach(card => {
@@ -400,8 +394,6 @@ const SchoolTimetable = () => {
                     }
                   }
                   
-                  console.log(`Card ${lessonId}: day pattern "${cardDays}", day index ${i}, found dayId: ${dayId}`);
-                  
                   // Create schedule for each class and teacher combination
                   const classIds = lesson.classIds.length > 0 ? lesson.classIds : ['*'];
                   const teacherIds = lesson.teacherIds.length > 0 ? lesson.teacherIds : ['*'];
@@ -430,7 +422,6 @@ const SchoolTimetable = () => {
 
       // Validate and set defaults if needed
       if (data.days.length === 0) {
-        console.warn('No days found in XML, using default days');
         data.days = [
           { id: '1', name: 'الأحد', short: 'أحد' },
           { id: '2', name: 'الإثنين', short: 'إثنين' },
@@ -444,18 +435,8 @@ const SchoolTimetable = () => {
         throw new Error('لم يتم العثور على فترات الحصص في الملف');
       }
 
-      console.log('Parsed XML data:', {
-        days: data.days.length,
-        periods: data.periods.length,
-        subjects: data.subjects.length,
-        teachers: data.teachers.length,
-        classes: data.classes.length,
-        schedules: data.schedules.length
-      });
-
       return data;
     } catch (error) {
-      console.error('Error parsing XML:', error);
       throw new Error('فشل في تحليل ملف XML: ' + error.message);
     }
   };
@@ -489,15 +470,12 @@ const SchoolTimetable = () => {
                               (xmlString.length > 100 && !/[\u0600-\u06FF]/.test(xmlString.substring(0, 500)) && xmlString.includes('?'));
         
         if (hasCorruption) {
-          console.log('FileReader result appears corrupted, trying ArrayBuffer conversion...');
           // Try reading as ArrayBuffer and converting manually
           try {
             const arrayBuffer = await file.arrayBuffer();
             const uint8Array = new Uint8Array(arrayBuffer);
             xmlString = convertWindows1256ToUTF8(uint8Array);
-            console.log('Manual conversion result sample:', xmlString.substring(0, 200));
           } catch (convError) {
-            console.error('Manual conversion failed:', convError);
             toast.error('فشل في تحويل الترميز. يرجى التأكد من أن الملف بصيغة صحيحة.');
             return;
           }
@@ -552,7 +530,6 @@ const SchoolTimetable = () => {
             loadSavedTimetables();
             setShowTeacherMapping(true); // Show teacher mapping after update
           } catch (error) {
-            console.error('Error updating timetable:', error);
             toast.error('فشل في تحديث الجدول: ' + (error.response?.data?.error || error.message));
           } finally {
             setIsSaving(false);
@@ -561,7 +538,6 @@ const SchoolTimetable = () => {
           toast.success('تم تحميل الجدول بنجاح');
         }
       } catch (error) {
-        console.error('Parse error:', error);
         toast.error('فشل في تحليل ملف XML: ' + error.message);
       }
     };
@@ -574,7 +550,6 @@ const SchoolTimetable = () => {
     try {
       reader.readAsText(file, 'windows-1256');
     } catch (e) {
-      console.log('windows-1256 not supported, trying UTF-8');
       reader.readAsText(file, 'UTF-8');
     }
     
@@ -893,7 +868,6 @@ const SchoolTimetable = () => {
         const substitutions = await substitutionAPI.getTeacherSubstitutions(teacherMappings[teacherId]);
         setTeacherSubstitutions(substitutions.substitutions || []);
       } catch (error) {
-        console.error('Error loading teacher substitutions:', error);
         setTeacherSubstitutions([]);
       }
     } else {
@@ -1081,7 +1055,7 @@ const SchoolTimetable = () => {
           height: contentHeight,
         });
 
-        document.body.removeChild(tempDiv);
+        tempDiv.remove();
 
         const imgData = canvas.toDataURL('image/png', 0.95);
         const pdf = new jsPDF('l', 'mm', 'a4'); // 'l' for landscape orientation
@@ -1146,12 +1120,11 @@ const SchoolTimetable = () => {
       link.download = 'جداول_الحصص_لجميع_الفصول.zip';
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       URL.revokeObjectURL(url);
 
       toast.success(`تم تحميل ${timetableData.classes.length} جدول بنجاح`, { id: 'downloading' });
     } catch (error) {
-      console.error('Error downloading all classes:', error);
       toast.error('فشل في تحميل الجداول', { id: 'downloading' });
     } finally {
       setIsDownloadingAll(false);
@@ -1189,12 +1162,11 @@ const SchoolTimetable = () => {
       link.download = 'جداول_الحصص_لجميع_المعلمين.zip';
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       URL.revokeObjectURL(url);
 
       toast.success(`تم تحميل ${timetableData.teachers.length} جدول بنجاح`, { id: 'downloading' });
     } catch (error) {
-      console.error('Error downloading all teachers:', error);
       toast.error('فشل في تحميل الجداول', { id: 'downloading' });
     } finally {
       setIsDownloadingAll(false);
@@ -1212,7 +1184,7 @@ const SchoolTimetable = () => {
       const timetables = await timetableAPI.getTimetables();
       setSavedTimetables(timetables);
     } catch (error) {
-      console.error('Error loading timetables:', error);
+      // Error loading timetables
     }
   };
 
@@ -1221,7 +1193,6 @@ const SchoolTimetable = () => {
       const teachers = await usersAPI.getMySchoolTeachers();
       setSchoolTeachers(teachers);
     } catch (error) {
-      console.error('Error loading teachers:', error);
       toast.error('فشل في تحميل قائمة المعلمين');
     }
   };
@@ -1276,7 +1247,6 @@ const SchoolTimetable = () => {
       loadSavedTimetables();
       setShowTeacherMapping(true); // Show teacher mapping after save
     } catch (error) {
-      console.error('Error saving timetable:', error);
       toast.error('فشل في حفظ الجدول: ' + (error.response?.data?.error || error.message));
     } finally {
       setIsSaving(false);
@@ -1341,14 +1311,12 @@ const SchoolTimetable = () => {
           const substitutions = await substitutionAPI.getTeacherSubstitutions(mappingsObj[selectedTeacher]);
           setTeacherSubstitutions(substitutions.substitutions || []);
         } catch (error) {
-          console.error('Error loading teacher substitutions:', error);
           setTeacherSubstitutions([]);
         }
       }
 
       toast.success('تم تحميل الجدول بنجاح');
     } catch (error) {
-      console.error('Error loading timetable:', error);
       toast.error('فشل في تحميل الجدول');
     }
   };
@@ -1374,7 +1342,6 @@ const SchoolTimetable = () => {
       toast.success('تم حفظ ربط المعلمين بنجاح');
       setShowTeacherMapping(false);
     } catch (error) {
-      console.error('Error saving teacher mappings:', error);
       toast.error('فشل في حفظ ربط المعلمين');
     } finally {
       setIsSaving(false);
@@ -1407,7 +1374,6 @@ const SchoolTimetable = () => {
       setEditTimetableName('');
       loadSavedTimetables();
     } catch (error) {
-      console.error('Error updating timetable:', error);
       toast.error('فشل في تحديث الجدول: ' + (error.response?.data?.error || error.message));
     } finally {
       setIsSaving(false);
@@ -1421,7 +1387,6 @@ const SchoolTimetable = () => {
       toast.success('تم تفعيل الجدول بنجاح');
       loadSavedTimetables();
     } catch (error) {
-      console.error('Error activating timetable:', error);
       toast.error('فشل في تفعيل الجدول: ' + (error.response?.data?.error || error.message));
     }
   };
@@ -1444,7 +1409,6 @@ const SchoolTimetable = () => {
       
       loadSavedTimetables();
     } catch (error) {
-      console.error('Error deleting timetable:', error);
       toast.error('فشل في حذف الجدول: ' + (error.response?.data?.error || error.message));
     } finally {
       setIsSaving(false);

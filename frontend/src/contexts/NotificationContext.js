@@ -180,16 +180,16 @@ export const NotificationProvider = ({ children }) => {
       );
 
       if (response.status === 200 || response.status === 201) {
-        setIsSubscribed(true);
-        toast.success('تم الاشتراك في الإشعارات بنجاح');
-        return true;
-      }
-    } catch (error) {
-      console.error('Error subscribing to push notifications:', error);
-      toast.error('فشل في الاشتراك في الإشعارات');
-      return false;
+      setIsSubscribed(true);
+      toast.success('تم الاشتراك في الإشعارات بنجاح');
+      return true;
     }
-  }, [token, getAxiosConfig, requestNotificationPermission]);
+  } catch (error) {
+    console.error('Error subscribing to push notifications:', error);
+    toast.error('فشل في الاشتراك في الإشعارات');
+    return false;
+  }
+}, [token, getAxiosConfig, requestNotificationPermission]);
 
   // Unsubscribe from push notifications
   const unsubscribeFromPush = useCallback(async () => {
@@ -212,7 +212,7 @@ export const NotificationProvider = ({ children }) => {
       console.error('Error unsubscribing from push notifications:', error);
       toast.error('فشل في إلغاء الاشتراك');
     }
-  }, [pushSubscription, getAxiosConfig]);
+  }, [pushSubscription, token, getAxiosConfig]);
 
   // Check if already subscribed
   useEffect(() => {

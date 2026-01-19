@@ -27,20 +27,14 @@ import toast from 'react-hot-toast';
 const SmsConfiguration = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  
-  console.log('SmsConfiguration component rendered:', { 
-    user: user, 
-    school_id: user?.school_id,
-    user_role: user?.user_role 
-  });
-  
+
   // State for SMS configuration
   const [config, setConfig] = useState({
     ibulk_username: '',
     ibulk_password: '',
     ibulk_sender_id: '',
     ibulk_api_url: 'https://ismartsms.net/RestApi/api/SMS/PostSMS',
-    ibulk_balance_threshold: 10.0
+    ibulk_balance_threshold: 10.0,
   });
   
   // UI state
@@ -60,16 +54,12 @@ const SmsConfiguration = () => {
   // Fetch SMS configuration
   const { data: smsConfig, isLoading, error, refetch } = useQuery(
     ['smsConfig', user?.school_id],
-    () => {
-      console.log('Fetching SMS config for school_id:', user?.school_id);
-      return authAPI.getSmsConfig(user?.school_id);
-    },
+    () => authAPI.getSmsConfig(user?.school_id),
     {
       enabled: !!user,
       staleTime: 5 * 60 * 1000, // 5 minutes
       cacheTime: 10 * 60 * 1000, // 10 minutes
       onSuccess: (data) => {
-        console.log('SMS config fetched successfully:', data);
         const smsConfigData = data.sms_config || {};
         setConfig({
           ibulk_username: smsConfigData.ibulk_username || '',
@@ -89,7 +79,6 @@ const SmsConfiguration = () => {
         }
       },
       onError: (error) => {
-        console.error('Error fetching SMS config:', error);
         toast.error('فشل في تحميل إعدادات SMS');
       },
       retry: 2,
@@ -99,17 +88,8 @@ const SmsConfiguration = () => {
 
   // Fetch configuration when component mounts or user changes
   useEffect(() => {
-    console.log('SmsConfiguration useEffect triggered:', { 
-      school_id: user?.school_id, 
-      user: user,
-      isLoading 
-    });
-    
     if (user) {
-      console.log('User available, refetching SMS config...');
       refetch();
-    } else {
-      console.log('No user available, skipping fetch');
     }
   }, [user, refetch]);
 
@@ -320,7 +300,6 @@ const SmsConfiguration = () => {
         <div className="flex items-center space-x-3">
           <button
             onClick={() => {
-              console.log('Manual refetch triggered');
               refetch();
             }}
             className="btn btn-outline ml-2"

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { Plus, Newspaper, Edit, Trash2, Eye, EyeOff, Calendar, Shield } from 'lucide-react';
+import { Plus, Newspaper, Edit, Trash2, Eye, EyeOff, Calendar, Shield, ChevronDown, ChevronUp } from 'lucide-react';
 import { reportsAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { hasRole } from '../../utils/helpers';
@@ -15,6 +15,7 @@ const News = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedNews, setSelectedNews] = useState(null);
+  const [expandedNews, setExpandedNews] = useState(new Set());
 
   // Fetch news data
   const { data: news, isLoading: newsLoading } = useQuery(
@@ -64,14 +65,50 @@ const News = () => {
           </div>
           <div className="min-w-0 flex-1 overflow-hidden">
             <p className="text-sm sm:text-base font-medium text-gray-900 break-words">{row.title}</p>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1" style={{
-              display: '-webkit-box',
-              WebkitLineClamp: 3,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-              wordBreak: 'break-word',
-              lineHeight: '1.5'
-            }}>{row.description}</p>
+            <div className="mt-1">
+              <p 
+                className="text-xs sm:text-sm text-gray-500"
+                style={{
+                  ...(expandedNews.has(row.id) ? {} : {
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }),
+                  wordBreak: 'break-word',
+                  lineHeight: '1.5'
+                }}
+              >
+                {row.description}
+              </p>
+              {row.description && row.description.length > 150 && (
+                <button
+                  onClick={() => {
+                    const newExpanded = new Set(expandedNews);
+                    if (newExpanded.has(row.id)) {
+                      newExpanded.delete(row.id);
+                    } else {
+                      newExpanded.add(row.id);
+                    }
+                    setExpandedNews(newExpanded);
+                  }}
+                  className="mt-1 text-xs text-primary-600 hover:text-primary-800 flex items-center gap-1 transition-colors"
+                >
+                  {expandedNews.has(row.id) ? (
+                    <>
+                      <ChevronUp className="h-3 w-3" />
+                      <span>عرض أقل</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-3 w-3" />
+                      <span>عرض المزيد</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       ),

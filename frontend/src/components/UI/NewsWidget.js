@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from 'react-query';
-import { Newspaper, Calendar, User, ArrowRight } from 'lucide-react';
+import { Newspaper, Calendar, User, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { reportsAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import LoadingSpinner from './LoadingSpinner';
@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 const NewsWidget = ({ limit = 3, showHeader = true, onViewAll }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [expandedNews, setExpandedNews] = useState(new Set());
   // Fetch news data
   const { data: news, isLoading: newsLoading } = useQuery(
     'news',
@@ -163,20 +164,58 @@ const NewsWidget = ({ limit = 3, showHeader = true, onViewAll }) => {
                       {newsItem.type === 'global' ? 'عام' : 'مدرسي'}
                     </span>
                   </div>
-                  <p className={`text-sm ${
-                    index === 0 
-                      ? 'text-blue-700' 
-                      : 'text-gray-600'
-                  }`} style={{
-                    display: '-webkit-box',
-                    WebkitLineClamp: 3,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    wordBreak: 'break-word'
-                  }}>
-                    {newsItem.description}
-                  </p>
+                  <div>
+                    <p 
+                      className={`text-sm ${
+                        index === 0 
+                          ? 'text-blue-700' 
+                          : 'text-gray-600'
+                      }`}
+                      style={{
+                        ...(expandedNews.has(newsItem.id) ? {} : {
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }),
+                        wordBreak: 'break-word',
+                        lineHeight: '1.5'
+                      }}
+                    >
+                      {newsItem.description}
+                    </p>
+                    {newsItem.description && newsItem.description.length > 150 && (
+                      <button
+                        onClick={() => {
+                          const newExpanded = new Set(expandedNews);
+                          if (newExpanded.has(newsItem.id)) {
+                            newExpanded.delete(newsItem.id);
+                          } else {
+                            newExpanded.add(newsItem.id);
+                          }
+                          setExpandedNews(newExpanded);
+                        }}
+                        className={`mt-1 text-xs flex items-center gap-1 transition-colors ${
+                          index === 0 
+                            ? 'text-blue-600 hover:text-blue-800' 
+                            : 'text-primary-600 hover:text-primary-800'
+                        }`}
+                      >
+                        {expandedNews.has(newsItem.id) ? (
+                          <>
+                            <ChevronUp className="h-3 w-3" />
+                            <span>عرض أقل</span>
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-3 w-3" />
+                            <span>عرض المزيد</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                   <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2">
                     <div className="flex items-center text-xs text-gray-500">
                       <User className="h-3 w-3 mr-1 flex-shrink-0" />

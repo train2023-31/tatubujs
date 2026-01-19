@@ -119,7 +119,6 @@ const Attendance = () => {
         // You can process the class attendance data here
       },
       onError: (error) => {
-        console.error('Error fetching class attendance:', error);
         toast.error('فشل في تحميل بيانات الحضور للفصل');
       }
     }

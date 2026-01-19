@@ -96,7 +96,6 @@ const TeacherSubstitution = () => {
         setSelectedTimetable(activeTimetable.id);
       }
     } catch (error) {
-      console.error('Error loading timetables:', error);
       toast.error('فشل في تحميل الجداول الدراسية');
     }
   };
@@ -167,12 +166,7 @@ const TeacherSubstitution = () => {
       }));
       
       setTeachers(teachersList);
-      
-      // Debug: Log available teachers
-      console.log('Loaded teachers:', teachersList.length);
-      console.log('Teacher mappings:', response.teacher_mappings?.length || 0);
     } catch (error) {
-      console.error('Error loading timetable data:', error);
       toast.error('فشل في تحميل بيانات الجدول');
     }
   };
@@ -229,7 +223,6 @@ const TeacherSubstitution = () => {
       });
       setSubstitutions(response.substitutions || []);
     } catch (error) {
-      console.error('Error loading substitutions:', error);
       toast.error('فشل في تحميل الإحتياط');
     }
   };
@@ -280,7 +273,6 @@ const TeacherSubstitution = () => {
         }
       }
     } catch (error) {
-      console.error('Error calculating substitution:', error);
       if (!silent) {
         toast.error('فشل في حساب الإحتياط');
       }
@@ -327,7 +319,6 @@ const TeacherSubstitution = () => {
           
           // Skip if duplicate
           if (uniqueAssignmentKeys.has(uniqueKey)) {
-            console.log('Skipping duplicate assignment:', uniqueKey);
             return false;
           }
           
@@ -347,10 +338,6 @@ const TeacherSubstitution = () => {
           date: a.date || a.dateString // ALWAYS include date - one assignment per schedule per date
         }));
       
-      console.log(`Mode: ${sameTeacherForAllWeeks ? 'Same teacher for all weeks' : 'Different teachers'}`);
-      console.log(`Created ${assignmentsToSave.length} unique assignments from ${calculatedAssignments.length} calculated`);
-      console.log(`Each assignment is for a specific schedule on a specific date`);
-      
       const data = {
         timetable_id: selectedTimetable,
         absent_teacher_xml_id: selectedAbsentTeacher,
@@ -361,12 +348,6 @@ const TeacherSubstitution = () => {
         same_teacher_for_all_weeks: sameTeacherForAllWeeks,
         assignments: assignmentsToSave
       };
-      
-      console.log('=== Submitting Substitution ===');
-      console.log(`Mode: ${sameTeacherForAllWeeks ? 'Same teacher for all weeks' : 'Different teachers'}`);
-      console.log(`Total assignments to save: ${assignmentsToSave.length}`);
-      console.log(`Calculated assignments: ${calculatedAssignments.length}`);
-      console.log('Sample assignments:', assignmentsToSave.slice(0, 3));
       
       await substitutionAPI.createSubstitution(data);
       toast.success('تم حفظ الإحتياط بنجاح');
@@ -381,7 +362,6 @@ const TeacherSubstitution = () => {
       // Reload substitutions
       loadSubstitutions();
     } catch (error) {
-      console.error('Error saving substitution:', error);
       toast.error('فشل في حفظ الإحتياط');
     } finally {
       setIsSaving(false);
@@ -402,10 +382,7 @@ const TeacherSubstitution = () => {
   
   // Check for conflicts when selecting a substitute teacher
   const checkTeacherConflicts = async (assignment, newTeacherXmlId) => {
-    console.log('checkTeacherConflicts called:', { assignmentId: assignment?.id, newTeacherXmlId });
-    
     if (!newTeacherXmlId || !assignment) {
-      console.log('Missing teacher or assignment, clearing conflict info');
       setConflictInfo(prev => {
         const updated = { ...prev };
         if (assignment?.id) {
@@ -420,16 +397,12 @@ const TeacherSubstitution = () => {
       // Find teacher user_id
       const teacher = getAvailableTeachersForSelection().find(t => t.xml_id === newTeacherXmlId);
       if (!teacher || !teacher.user_id) {
-        console.log('Teacher not found or no user_id:', teacher);
         return;
       }
       
-      console.log('Fetching teacher substitutions for user_id:', teacher.user_id);
       // Get all active substitutions for this teacher
       const response = await substitutionAPI.getTeacherSubstitutions(teacher.user_id);
       const teacherSubstitutions = response.assignments || [];
-      console.log('Teacher substitutions found:', teacherSubstitutions.length);
-      console.log('Teacher substitutions data:', teacherSubstitutions);
       
       // Find conflicts: same date + same period + same class (or same schedule)
       const conflicts = [];
@@ -439,15 +412,6 @@ const TeacherSubstitution = () => {
       const assignmentScheduleId = assignment.schedule_id;
       const assignmentDayXmlId = assignment.day_xml_id;
       const currentSubstitutionId = editingSubstitution?.id;
-      
-      console.log('Checking conflicts for assignment:', {
-        assignmentDate,
-        assignmentPeriod,
-        assignmentClass,
-        assignmentScheduleId,
-        assignmentDayXmlId,
-        currentSubstitutionId
-      });
       
       // Check teacher's regular schedule for conflicts
       if (timetableData && timetableData.schedules && editingSubstitution) {
@@ -467,7 +431,6 @@ const TeacherSubstitution = () => {
         });
         
         if (teacherRegularSchedules.length > 0) {
-          console.log('Found regular schedule conflicts:', teacherRegularSchedules.length);
           
           // For each regular schedule, check if it conflicts with the assignment date
           teacherRegularSchedules.forEach(regularSchedule => {
@@ -535,17 +498,8 @@ const TeacherSubstitution = () => {
       }
       
       teacherSubstitutions.forEach((subAssignment, index) => {
-        console.log(`Checking substitution ${index + 1}/${teacherSubstitutions.length}:`, {
-          substitution_id: subAssignment.substitution_id,
-          assignment_date: subAssignment.assignment_date,
-          period_xml_id: subAssignment.period_xml_id,
-          class_name: subAssignment.class_name,
-          schedule_id: subAssignment.schedule_id
-        });
-        
         // Skip if it's from the current substitution being edited
         if (subAssignment.substitution_id === currentSubstitutionId) {
-          console.log('  Skipping: same substitution being edited');
           return;
         }
         
@@ -555,13 +509,11 @@ const TeacherSubstitution = () => {
         const today = new Date().toISOString().split('T')[0];
         
         if (subEndDate && subEndDate < today) {
-          console.log('  Skipping: substitution expired');
           return; // Substitution is expired
         }
         
         // Check period match FIRST (most restrictive)
         const periodMatches = String(subAssignment.period_xml_id) === String(assignmentPeriod);
-        console.log(`  Period match: ${periodMatches} (${subAssignment.period_xml_id} vs ${assignmentPeriod})`);
         
         if (!periodMatches) {
           return; // No point checking further if period doesn't match
@@ -573,12 +525,10 @@ const TeacherSubstitution = () => {
           // Both have specific dates - exact match required
           const subAssignmentDate = subAssignment.assignment_date.split('T')[0];
           dateMatches = assignmentDate === subAssignmentDate;
-          console.log(`  Date match (both specific): ${dateMatches} (${assignmentDate} vs ${subAssignmentDate})`);
         } else if (assignmentDate && !subAssignment.assignment_date && subStartDate && subEndDate) {
           // Current assignment has specific date, but other assignment is "same teacher for all weeks"
           // Check if assignmentDate is within the other substitution's date range
           dateMatches = assignmentDate >= subStartDate && assignmentDate <= subEndDate;
-          console.log(`  Date match (current specific, other range): ${dateMatches} (${assignmentDate} in [${subStartDate}, ${subEndDate}])`);
         } else if (!assignmentDate && subAssignment.assignment_date && editingSubstitution?.start_date && editingSubstitution?.end_date) {
           // Current assignment is "same teacher for all weeks", other has specific date
           // Check if other's date is within current substitution's range
@@ -586,15 +536,11 @@ const TeacherSubstitution = () => {
           const currentEnd = editingSubstitution.end_date.split('T')[0];
           const subAssignmentDate = subAssignment.assignment_date.split('T')[0];
           dateMatches = subAssignmentDate >= currentStart && subAssignmentDate <= currentEnd;
-          console.log(`  Date match (current range, other specific): ${dateMatches} (${subAssignmentDate} in [${currentStart}, ${currentEnd}])`);
         } else if (!assignmentDate && !subAssignment.assignment_date && subStartDate && subEndDate && editingSubstitution?.start_date && editingSubstitution?.end_date) {
           // Both are "same teacher for all weeks" - check if date ranges overlap
           const currentStart = editingSubstitution.start_date.split('T')[0];
           const currentEnd = editingSubstitution.end_date.split('T')[0];
           dateMatches = !(currentEnd < subStartDate || currentStart > subEndDate);
-          console.log(`  Date match (both ranges): ${dateMatches} ([${currentStart}, ${currentEnd}] overlaps [${subStartDate}, ${subEndDate}])`);
-        } else {
-          console.log('  Date match: false (no valid date comparison)');
         }
         
         if (!dateMatches) {
@@ -604,12 +550,9 @@ const TeacherSubstitution = () => {
         // Check class/schedule match
         const classMatches = subAssignment.class_name === assignmentClass;
         const scheduleMatches = String(subAssignment.schedule_id) === String(assignmentScheduleId);
-        console.log(`  Class match: ${classMatches} (${subAssignment.class_name} vs ${assignmentClass})`);
-        console.log(`  Schedule match: ${scheduleMatches} (${subAssignment.schedule_id} vs ${assignmentScheduleId})`);
         
         // Conflict if: date matches AND period matches AND (class matches OR schedule matches)
         if (dateMatches && periodMatches && (classMatches || scheduleMatches)) {
-          console.log('  ✅ CONFLICT FOUND!');
           conflicts.push({
             type: 'substitution',
             substitution_id: subAssignment.substitution_id,
@@ -618,8 +561,6 @@ const TeacherSubstitution = () => {
             period: subAssignment.period_xml_id,
             absent_teacher: subAssignment.absent_teacher_name || 'غير معروف'
           });
-        } else {
-          console.log('  No conflict: class/schedule mismatch');
         }
       });
       
@@ -641,7 +582,6 @@ const TeacherSubstitution = () => {
             icon: '⚠️'
           }
         );
-        console.log('Conflicts found:', conflicts);
       } else {
         // Clear conflict info if no conflicts
         setConflictInfo(prev => ({
@@ -653,7 +593,6 @@ const TeacherSubstitution = () => {
         }));
       }
     } catch (error) {
-      console.error('Error checking conflicts:', error);
       toast.error('حدث خطأ أثناء التحقق من التعارضات');
     }
   };
@@ -720,7 +659,6 @@ const TeacherSubstitution = () => {
       setEditAssignments([]);
       loadSubstitutions();
     } catch (error) {
-      console.error('Error updating substitution:', error);
       toast.error('فشل في تحديث البديل');
     } finally {
       setIsUpdating(false);
@@ -737,7 +675,6 @@ const TeacherSubstitution = () => {
       toast.success('تم حذف البديل بنجاح');
       loadSubstitutions();
     } catch (error) {
-      console.error('Error deleting substitution:', error);
       toast.error('فشل في حذف البديل');
     }
   };
@@ -841,10 +778,6 @@ const TeacherSubstitution = () => {
         });
       }
     });
-    
-    if (conflicts.length > 0) {
-      console.log(`Found ${conflicts.length} conflict groups:`, conflicts);
-    }
     
     return conflicts;
   };
@@ -1222,7 +1155,6 @@ const TeacherSubstitution = () => {
       teachersList.push(...Object.values(uniqueTeachers));
     }
     
-    // Debug log
     if (teachersList.length === 0) {
       console.warn('No teachers available for selection', {
         hasTimetableData: !!timetableData,

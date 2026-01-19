@@ -41,7 +41,6 @@ const Login = () => {
         setLoginError(result?.error || 'اسم المستخدم أو كلمة المرور غير صحيحة');
       }
     } catch (error) {
-      console.error('Login submission error:', error);
       setLoginError('حدث خطأ في تسجيل الدخول. يرجى المحاولة مرة أخرى.');
     } finally {
       setIsSubmitting(false);

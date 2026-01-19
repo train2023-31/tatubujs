@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNotifications } from '../../hooks/useNotifications';
 import { Bell, X, Check, CheckCheck } from 'lucide-react';
 import { format } from 'date-fns';
@@ -35,8 +36,20 @@ const NotificationBell = () => {
   // Close dropdown when clicking outside (mobile-friendly)
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
+      // Check if click is outside both the button and the dropdown content
+      const isOutsideButton = dropdownRef.current && !dropdownRef.current.contains(event.target);
+      const isOutsideDropdown = dropdownContentRef.current && !dropdownContentRef.current.contains(event.target);
+      
+      // On mobile, dropdown is in portal, so only check dropdown content
+      // On desktop, check both button and dropdown
+      if (isMobile) {
+        if (isOutsideDropdown) {
+          setIsOpen(false);
+        }
+      } else {
+        if (isOutsideButton && isOutsideDropdown) {
+          setIsOpen(false);
+        }
       }
     };
 
@@ -47,10 +60,13 @@ const NotificationBell = () => {
     };
 
     if (isOpen) {
-      // Support both mouse and touch events for mobile
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
-      document.addEventListener('keydown', handleEscape);
+      // Use a small delay to avoid immediate closure on open
+      const timeoutId = setTimeout(() => {
+        // Support both mouse and touch events for mobile
+        document.addEventListener('mousedown', handleClickOutside, true);
+        document.addEventListener('touchstart', handleClickOutside, true);
+        document.addEventListener('keydown', handleEscape);
+      }, 100);
       
       // Prevent body scroll when dropdown is open on mobile
       if (isMobile) {
@@ -58,18 +74,19 @@ const NotificationBell = () => {
         document.body.style.position = 'fixed';
         document.body.style.width = '100%';
       }
-    }
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-      if (isMobile) {
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.width = '';
-      }
-    };
+      return () => {
+        clearTimeout(timeoutId);
+        document.removeEventListener('mousedown', handleClickOutside, true);
+        document.removeEventListener('touchstart', handleClickOutside, true);
+        document.removeEventListener('keydown', handleEscape);
+        if (isMobile) {
+          document.body.style.overflow = '';
+          document.body.style.position = '';
+          document.body.style.width = '';
+        }
+      };
+    }
   }, [isOpen, isMobile]);
 
   const handleToggle = () => {
@@ -134,7 +151,7 @@ const NotificationBell = () => {
       bus: 'الحافلة',
       behavior: 'السلوك',
       timetable: 'الجدول',
-      substitution: 'الاستبدال',
+      substitution: 'الإحتياط',
       news: 'الأخبار',
       general: 'عام',
     };
@@ -178,54 +195,70 @@ const NotificationBell = () => {
     }
   };
 
-  return (
-    <div className="relative" ref={dropdownRef}>
-      {/* Bell Icon Button */}
-      <button
-        onClick={handleToggle}
-        onTouchStart={(e) => {
-          // Prevent double-tap zoom on mobile
-          e.preventDefault();
-          handleToggle();
-        }}
-        className="relative p-2 sm:p-2.5 text-gray-600 hover:text-gray-900 active:bg-gray-100 rounded-full transition-colors touch-manipulation"
-        aria-label="الإشعارات"
-      >
-        <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
-        {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full min-w-[18px] sm:min-w-[20px]">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
-      </button>
-
-      {/* Notification Dropdown */}
-      {isOpen && (
-        <>
-          {/* Mobile backdrop */}
-          {isMobile && (
-            <div 
-              className="fixed inset-0 bg-black bg-opacity-50 z-40"
-              onClick={() => setIsOpen(false)}
-              onTouchStart={(e) => {
-                e.preventDefault();
-                setIsOpen(false);
-              }}
-            />
-          )}
-          
-          <div 
+  // Render dropdown content
+  const dropdownContent = isOpen ? (
+    <>
+      {/* Mobile backdrop - always on top except dropdown */}
+      {isMobile && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-[9998] touch-none"
+          onClick={(e) => {
+            // Only close if clicking directly on backdrop, not if event bubbled from dropdown
+            if (e.target === e.currentTarget) {
+              setIsOpen(false);
+            }
+          }}
+          onTouchStart={(e) => {
+            // Only close if touching directly on backdrop
+            if (e.target === e.currentTarget) {
+              e.preventDefault();
+              setIsOpen(false);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setIsOpen(false);
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label="إغلاق الإشعارات"
+          style={{ WebkitTapHighlightColor: 'transparent' }}
+        />
+      )}
+      
+      <div 
             ref={dropdownContentRef}
             className={`
               notification-dropdown
               ${isMobile 
-                ? 'fixed inset-x-0 bottom-0 top-auto mb-0 rounded-t-2xl rounded-b-none max-h-[85vh] w-full' 
-                : 'absolute left-0 mt-2 w-96 max-w-[calc(100vw-2rem)] rounded-lg'
+                ? 'fixed inset-x-0 bottom-0 top-auto mb-0 rounded-t-2xl rounded-b-none max-h-[85vh] min-h-[50vh] w-full z-[9999]' 
+                : 'absolute left-0 mt-2 w-120 max-w-[calc(100vw-2rem)] rounded-lg z-[9999] max-h-[80vh]'
               }
-              bg-white shadow-2xl border border-gray-200 z-50 flex flex-col
+              bg-white shadow-2xl border border-gray-200 flex flex-col
               ${isMobile ? 'transition-transform duration-200 ease-out' : ''}
             `}
-            onTouchStart={isMobile ? handleTouchStart : undefined}
+            style={isMobile ? { 
+              position: 'fixed',
+              zIndex: 9999,
+              height: '85vh',
+              maxHeight: '85vh',
+              display: 'flex',
+              flexDirection: 'column',
+              WebkitTransform: 'translateZ(0)', // Hardware acceleration for mobile
+              transform: 'translateZ(0)'
+            } : {
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              if (isMobile) {
+                handleTouchStart(e);
+              }
+            }}
             onTouchMove={isMobile ? handleTouchMove : undefined}
             onTouchEnd={isMobile ? handleTouchEnd : undefined}
           >
@@ -249,7 +282,10 @@ const NotificationBell = () => {
             <div className="flex items-center gap-2">
               {notifications.length > 0 && (
                 <button
-                  onClick={handleMarkAllAsRead}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMarkAllAsRead();
+                  }}
                   onTouchStart={(e) => e.stopPropagation()}
                   className="text-xs sm:text-sm text-indigo-600 active:text-indigo-800 flex items-center gap-1 px-2 py-1 rounded touch-manipulation"
                   title="تحديد الكل كمقروء"
@@ -259,7 +295,10 @@ const NotificationBell = () => {
                 </button>
               )}
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                }}
                 onTouchStart={(e) => e.stopPropagation()}
                 className="text-gray-400 active:text-gray-600 p-1 rounded touch-manipulation"
                 aria-label="إغلاق"
@@ -270,11 +309,28 @@ const NotificationBell = () => {
           </div>
 
           {/* Filter Tabs */}
-          <div className="p-2 border-b border-gray-200 bg-gray-50 flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide sticky top-[60px] sm:top-[73px] z-10">
+          <div 
+            className="p-2 border-b border-gray-200 bg-gray-50 flex gap-1.5 sm:gap-2 overflow-x-auto sticky top-[60px] sm:top-[73px] z-10 notification-filter-tabs"
+            style={{
+              ...(isMobile ? {
+                scrollbarWidth: 'auto',
+                scrollbarColor: '#64748b #e2e8f0',
+              } : {
+                scrollbarWidth: 'thin',
+                scrollbarColor: '#94a3b8 #f1f5f9',
+              }),
+              WebkitOverflowScrolling: 'touch',
+              overflowX: 'auto',
+              overflowY: 'hidden',
+            }}
+          >
             {['all', 'attendance', 'bus', 'timetable', 'substitution', 'news'].map((type) => (
               <button
                 key={type}
-                onClick={() => setSelectedType(type)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedType(type);
+                }}
                 onTouchStart={(e) => e.stopPropagation()}
                 className={`px-3 py-1.5 sm:px-3 sm:py-1 text-xs font-medium rounded-full whitespace-nowrap transition-colors touch-manipulation active:scale-95 ${
                   selectedType === type
@@ -287,24 +343,47 @@ const NotificationBell = () => {
             ))}
           </div>
 
-          {/* Notifications List */}
-          <div className="flex-1 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+          {/* Notifications List - Scrollable Container */}
+          <div 
+            className={`overflow-y-auto overscroll-contain bg-white ${isMobile ? '' : 'flex-1'}`}
+            style={{ 
+              WebkitOverflowScrolling: 'touch',
+              ...(isMobile ? { 
+                flex: '1 1 0%',
+                height: 'calc(85vh - 250px)',
+                minHeight: 'calc(85vh - 250px)',
+                maxHeight: 'calc(85vh - 250px)',
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column'
+              } : {
+                flex: '1 1 0%',
+                minHeight: '200px',
+                maxHeight: 'calc(80vh - 180px)'
+              })
+            }}
+          >
             {loading && notifications.length === 0 ? (
-              <div className="p-6 sm:p-8 text-center text-gray-500">
+              <div className="p-6 sm:p-8 text-center text-gray-500" style={{ minHeight: isMobile ? '300px' : '200px', display: 'block' }}>
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
                 <p className="mt-2 text-sm">جاري التحميل...</p>
               </div>
             ) : filteredNotifications.length === 0 ? (
-              <div className="p-6 sm:p-8 text-center text-gray-500">
+              <div className="p-6 sm:p-8 text-center text-gray-500" style={{ minHeight: isMobile ? '300px' : '200px', display: 'block' }}>
                 <Bell className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 text-gray-300" />
                 <p className="text-sm">لا توجد إشعارات</p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-gray-100" style={{ display: 'block', width: '100%', minHeight: isMobile ? '100%' : 'auto' }}>
                 {filteredNotifications.map((notification) => (
                   <div
                     key={notification.id}
-                    onClick={() => handleNotificationClick(notification)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNotificationClick(notification);
+                    }}
                     onTouchStart={(e) => {
                       // Prevent event bubbling on touch
                       e.stopPropagation();
@@ -354,7 +433,8 @@ const NotificationBell = () => {
           {notifications.length > 0 && (
             <div className="p-3 sm:p-4 border-t border-gray-200 bg-gray-50 sticky bottom-0">
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   window.location.href = '/app/notifications';
                   setIsOpen(false);
                 }}
@@ -365,10 +445,42 @@ const NotificationBell = () => {
               </button>
             </div>
           )}
-          </div>
-        </>
+      </div>
+    </>
+  ) : null;
+
+  return (
+    <>
+      <div className="relative z-[9999]" ref={dropdownRef}>
+        {/* Bell Icon Button */}
+        <button
+          onClick={handleToggle}
+          onTouchStart={(e) => {
+            // Prevent double-tap zoom on mobile
+            e.preventDefault();
+            handleToggle();
+          }}
+          className="relative p-2 sm:p-2.5 text-gray-600 hover:text-gray-900 active:bg-gray-100 rounded-full transition-colors touch-manipulation"
+          aria-label="الإشعارات"
+        >
+          <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
+          {unreadCount > 0 && (
+            <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full min-w-[18px] sm:min-w-[20px]">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </button>
+
+        {/* Desktop Dropdown - render normally */}
+        {isOpen && !isMobile && dropdownContent}
+      </div>
+
+      {/* Mobile Dropdown - render via portal to body */}
+      {isOpen && isMobile && typeof document !== 'undefined' && createPortal(
+        dropdownContent,
+        document.body
       )}
-    </div>
+    </>
   );
 };
 

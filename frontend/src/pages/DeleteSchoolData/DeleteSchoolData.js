@@ -19,6 +19,9 @@ const DeleteSchoolData = () => {
     attendance: false,
     logs: false,
     news: false,
+    timetable: false,
+    substitutions: false,
+    notifications: false,
     deleteAll: false
   });
   const [confirmationText, setConfirmationText] = useState('');
@@ -40,6 +43,9 @@ const DeleteSchoolData = () => {
           attendance: false,
           logs: false,
           news: false,
+          timetable: false,
+          substitutions: false,
+          notifications: false,
           deleteAll: false
         });
         setConfirmationText('');
@@ -64,6 +70,9 @@ const DeleteSchoolData = () => {
         attendance: newValue,
         logs: newValue,
         news: newValue,
+        timetable: newValue,
+        substitutions: newValue,
+        notifications: newValue,
         deleteAll: newValue
       });
     } else {
@@ -132,9 +141,12 @@ const DeleteSchoolData = () => {
       'attendance',
       'buses',
       'drivers',
+      'substitutions',
+      'timetable',
       'classes',
       'subjects', 
       'logs',
+      'notifications',
       'news',
       'students',
       'teachers'
@@ -199,8 +211,9 @@ const DeleteSchoolData = () => {
                   <li><strong>سجلات مسح الحافلات</strong> - يجب حذفها أولاً</li>
                   <li><strong>سجلات الحضور والغياب</strong> - يجب حذفها بعد سجلات المسح</li>
                   <li><strong>الحافلات والسائقين</strong> - يمكن حذفها بعد سجلات المسح</li>
-                  <li><strong>الفصول والمواد الدراسية</strong> - يمكن حذفها بعد سجلات الحضور</li>
-                  <li><strong>التقارير والأخبار</strong> - يمكن حذفها في أي وقت</li>
+                  <li><strong>الإحتياط والجداول الدراسية</strong> - يجب حذف الإحتياطقبل الجداول</li>
+                  <li><strong>الفصول والمواد الدراسية</strong> - يمكن حذفها بعد الجداول الدراسية</li>
+                  <li><strong>سجلات النظام  والإشعارات والأخبار</strong> - يمكن حذفها في أي وقت</li>
                   <li><strong>الطلاب</strong> - يجب حذفهم بعد حذف الفصول والمواد</li>
                   <li><strong>المعلمين</strong> - يجب حذفهم أخيراً بعد حذف الطلاب</li>
                 </ol>
@@ -338,8 +351,41 @@ const DeleteSchoolData = () => {
                 </div>
               </div>
 
-              {/* Priority 5: Reports and News */}
+              {/* Priority 5: Substitutions and Timetable */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="border-l-4 border-teal-500 bg-teal-50 rounded-lg p-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={deleteOptions.substitutions}
+                      onChange={() => handleOptionChange('substitutions')}
+                      className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="bg-teal-600 text-white text-xs px-2 py-1 rounded-full">5</span>
+                      <span className="text-gray-700">الإحتياط</span>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="border-l-4 border-teal-500 bg-teal-50 rounded-lg p-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={deleteOptions.timetable}
+                      onChange={() => handleOptionChange('timetable')}
+                      className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="bg-teal-600 text-white text-xs px-2 py-1 rounded-full">5</span>
+                      <span className="text-gray-700">الجدول الدراسي</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Priority 6: Reports, News, and Notifications */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="border-l-4 border-yellow-500 bg-yellow-50 rounded-lg p-3">
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
@@ -349,8 +395,23 @@ const DeleteSchoolData = () => {
                       className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                     />
                     <div className="flex items-center gap-2">
-                      <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">3</span>
-                      <span className="text-gray-700">التقارير</span>
+                      <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">6</span>
+                      <span className="text-gray-700">سجلات النظام </span>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="border-l-4 border-yellow-500 bg-yellow-50 rounded-lg p-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={deleteOptions.notifications}
+                      onChange={() => handleOptionChange('notifications')}
+                      className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">6</span>
+                      <span className="text-gray-700">الإشعارات</span>
                     </div>
                   </label>
                 </div>
@@ -364,14 +425,14 @@ const DeleteSchoolData = () => {
                       className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                     />
                     <div className="flex items-center gap-2">
-                      <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">3</span>
+                      <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">6</span>
                       <span className="text-gray-700">الأخبار</span>
                     </div>
                   </label>
                 </div>
               </div>
 
-              {/* Priority 6: Students */}
+              {/* Priority 7: Students */}
               <div className="border-l-4 border-orange-500 bg-orange-50 rounded-lg p-3">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
@@ -381,14 +442,14 @@ const DeleteSchoolData = () => {
                     className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                   />
                   <div className="flex items-center gap-2">
-                    <span className="bg-orange-600 text-white text-xs px-2 py-1 rounded-full">6</span>
+                    <span className="bg-orange-600 text-white text-xs px-2 py-1 rounded-full">7</span>
                     <span className="text-gray-700 font-medium">الطلاب</span>
                     <span className="text-orange-600 text-xs">(قبل المعلمين)</span>
                   </div>
                 </label>
               </div>
 
-              {/* Priority 7: Teachers */}
+              {/* Priority 8: Teachers */}
               <div className="border-l-4 border-red-500 bg-red-50 rounded-lg p-3">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
@@ -398,7 +459,7 @@ const DeleteSchoolData = () => {
                     className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                   />
                   <div className="flex items-center gap-2">
-                    <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">7</span>
+                    <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">8</span>
                     <span className="text-gray-700 font-medium">المعلمين</span>
                     <span className="text-red-600 text-xs">(أخيراً)</span>
                   </div>
@@ -446,11 +507,14 @@ const DeleteSchoolData = () => {
                 {deleteOptions.attendance && <li>جميع سجلات الحضور والغياب</li>}
                 {deleteOptions.buses && <li>جميع الحافلات</li>}
                 {deleteOptions.drivers && <li>جميع السائقين</li>}
+                {deleteOptions.substitutions && <li>جميع الإحتياط</li>}
+                {deleteOptions.timetable && <li>جميع الجداول الدراسية</li>}
                 {deleteOptions.students && <li>جميع الطلاب</li>}
                 {deleteOptions.teachers && <li>جميع المعلمين</li>}
                 {deleteOptions.classes && <li>جميع الفصول</li>}
                 {deleteOptions.subjects && <li>جميع المواد الدراسية</li>}
-                {deleteOptions.logs && <li>جميع التقارير</li>}
+                {deleteOptions.logs && <li>جميع سجلات النظام </li>}
+                {deleteOptions.notifications && <li>جميع الإشعارات</li>}
                 {deleteOptions.news && <li>جميع الأخبار</li>}
               </ul>
               <p className="text-red-700 font-semibold">

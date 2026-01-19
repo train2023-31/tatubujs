@@ -54,7 +54,6 @@ const TeacherReport = () => {
   // Load current month weeks on component mount
   React.useEffect(() => {
     const weeks = getCurrentMonthWeeks();
-    console.log('Current month weeks:', weeks);
     setCurrentMonthWeeks(weeks);
   }, []);
 
@@ -190,7 +189,6 @@ const TeacherReport = () => {
       
       toast.success('تم تحميل التقرير بنجاح');
     } catch (error) {
-      console.error('Error generating PDF:', error);
       toast.error('فشل في إنشاء ملف PDF');
     } finally {
       setIsGeneratingPDF(false);

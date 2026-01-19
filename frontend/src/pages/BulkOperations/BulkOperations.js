@@ -184,7 +184,6 @@ const BulkOperations = () => {
         setUploadedData(processedData);
         toast.success(`تم تحميل ${processedData.length} سجل`);
       } catch (error) {
-        console.error('Error reading Excel file:', error);
         toast.error('خطأ في قراءة الملف. تأكد من أن الملف صحيح');
       }
     };
@@ -289,7 +288,6 @@ const BulkOperations = () => {
       bulkRegisterAndAssignMutation.mutate({ students: processedData });
       
     } catch (error) {
-      console.error('Error in assign students process:', error);
       toast.dismiss('creating-classes');
       toast.dismiss('registering-students');
       toast.error('فشل في عملية تسجيل وتعيين الطلاب');

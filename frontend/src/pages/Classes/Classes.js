@@ -207,18 +207,18 @@ const Classes = () => {
         </div>
       ),
     },
-    {
-      key: 'teacher_name',
-      header: 'المعلم',
-      render: (row) => (
-        <div className="flex items-center">
-          <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
-            <Users className="h-4 w-4 text-gray-600" />
-          </div>
-          <span className="mr-2 text-sm text-gray-900">{row.teacher_name}</span>
-        </div>
-      ),
-    },
+    // {
+    //   key: 'teacher_name',
+    //   header: 'المعلم',
+    //   render: (row) => (
+    //     <div className="flex items-center">
+    //       <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
+    //         <Users className="h-4 w-4 text-gray-600" />
+    //       </div>
+    //       <span className="mr-2 text-sm text-gray-900">{row.teacher_name}</span>
+    //     </div>
+    //   ),
+    // },
     {
       key: 'actions',
       header: 'الإجراءات',
@@ -301,18 +301,18 @@ const Classes = () => {
         </div>
       ),
     },
-    {
-      key: 'teacher_name',
-      header: 'المعلم',
-      render: (row) => (
-        <div className="flex items-center">
-          <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
-            <Users className="h-4 w-4 text-gray-600" />
-          </div>
-          <span className="mr-2 text-sm text-gray-900">{row.teacher_name}</span>
-        </div>
-      ),
-    },
+    // {
+    //   key: 'teacher_name',
+    //   header: 'المعلم',
+    //   render: (row) => (
+    //     <div className="flex items-center">
+    //       <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
+    //         <Users className="h-4 w-4 text-gray-600" />
+    //       </div>
+    //       <span className="mr-2 text-sm text-gray-900">{row.teacher_name}</span>
+    //     </div>
+    //   ),
+    // },
     {
       key: 'actions',
       header: 'الإجراءات',

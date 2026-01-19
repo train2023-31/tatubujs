@@ -189,7 +189,6 @@ const Reports = () => {
       
       toast.success('تم تحميل التقرير بنجاح');
     } catch (error) {
-      console.error('Error generating PDF:', error);
       toast.error('فشل في إنشاء ملف PDF');
     } finally {
       setIsGeneratingPDF(false);

@@ -273,9 +273,115 @@ const Guide = () => {
         </div>
       </StepCard>
 
-      {/* Step 2.5: Register Drivers */}
+
+      {/* Step 3: Update Phone Numbers */}
       <StepCard
-        number="2.5"
+        number="4"
+        title="تحديث أرقام الهواتف "
+        description="قم بتحديث أرقام الهواتف للطلاب"
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Upload className="w-5 h-5 text-primary-600" />
+              خطوات تحديث أرقام الهواتف:
+            </h4>
+            <ol className="list-decimal list-inside space-y-2 text-gray-700">
+              <li>انتقل إلى صفحة <Link to="/app/bulk-operations?tab=phones" className="text-primary-600 hover:underline font-medium" onClick={(e) => { e.preventDefault(); window.location.href = '/app/bulk-operations?tab=phones'; }}>رفع وتحديث البيانات</Link></li>
+              <li>اختر تبويب <strong>"تحديث أرقام الهواتف"</strong></li>
+              <li className="text-red-500">قم بتنزيل قائمة أرقام الهواتف من نظام البوابة (شاهد الفيديو للتعرف على كيفية التنزيل) <strong>وقم برفعها بدون التعديل عليها</strong></li>
+              <li> أو قم بتحميل النموذج من الزر <strong>"تحميل نموذج الهواتف"</strong></li>
+              <li>املأ النموذج بالبيانات التالية:
+                <ul className="list-disc list-inside mr-6 mt-2 space-y-1 text-sm">
+                  <li><strong>الرقم المدرسي:</strong> رقم الطالب المدرسي</li>
+                  <li><strong>الهاتف النقال:</strong> رقم هاتف الطالب</li>
+                  <li><strong>المنطقة السكنية:</strong> المنطقة السكنية للطالب (اختياري)</li>
+                </ul>
+              </li>
+              <li>احفظ الملف وارفعه</li>
+              <li>اضغط على <strong>"معالجة البيانات"</strong></li>
+            </ol>
+          </div>
+        </div>
+      </StepCard>
+
+     
+
+        {/* Step 4: Create Classes */}
+      <StepCard
+        number="5"
+        title="إنشاء الفصول والمواد الدراسية"
+        description="قم بإنشاء الفصول الدراسية والمواد الدراسية"
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-green-500 mb-3 flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              يتم إنشاء الفصول الدراسية تلقائياً من خلال رفع قوائم الفصول من نظام البوابة. (عند رفع قوائم الطلاب في الخطوة السابقة)
+            <Link to="/app/classes" className="text-primary-600 hover:underline font-medium" onClick={(e) => { e.preventDefault(); window.location.href = '/app/classes'; }}>إدارة الفصول</Link>
+           </h4>
+             <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-primary-600" />
+              خطوات إنشاءالمواد:
+            </h4>
+            <ol className="list-decimal list-inside space-y-2 text-gray-700">
+              <li>انتقل إلى صفحة <Link to="/app/classes?tab=subjects" className="text-primary-600 hover:underline font-medium" onClick={(e) => { e.preventDefault(); window.location.href = '/app/classes?tab=subjects'; }}>إدارة المواد</Link></li>
+              <li>قم بإنشاء المواد الدراسية  </li>
+            </ol>
+          </div>
+        </div>
+      </StepCard>
+
+
+      {/* Step 6: Upload Timetable XML */}
+      <StepCard
+        number="6"
+        title="رفع الجدول الدراسي (XML)"
+        description="قم برفع ملف الجدول الدراسي من نظام البوابة"
+        tip="💡 نصيحة: قم بتنزيل ملف الجدول الدراسي (XML) من نظام البوابة وارفعه مباشرة بدون التعديل عليه."
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Upload className="w-5 h-5 text-primary-600" />
+              خطوات رفع الجدول الدراسي:
+            </h4>
+            <ol className="list-decimal list-inside space-y-2 text-gray-700">
+              <li>انتقل إلى صفحة <Link to="/app/school-timetable" className="text-primary-600 hover:underline font-medium" onClick={(e) => { e.preventDefault(); window.location.href = '/app/school-timetable'; }}>الجدول الدراسي</Link></li>
+              <li className="text-red-500">قم بتنزيل ملف الجدول الدراسي (XML Oman) من نظام (aSc Timetables)  <strong>وقم برفعه مباشرة بدون التعديل عليه</strong></li>
+              <li>اضغط على زر <strong>"رفع ملف XML"</strong> أو <strong>"رفع جدول جديد"</strong></li>
+              <li>اختر ملف XML من جهازك</li>
+              <li>انتظر حتى يتم تحليل الملف وعرض البيانات</li>
+              <li>قم بربط المعلمين في الجدول مع المعلمين المسجلين في النظام (إذا لزم الأمر)</li>
+              <li>أدخل اسم للجدول الدراسي (مثل: "الفصل الدراسي الأول 2024")</li>
+              <li>اضغط على <strong>"حفظ الجدول"</strong> لإتمام العملية</li>
+            </ol>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">معلومات مهمة:</h4>
+            <ul className="list-disc list-inside mr-6 space-y-1 text-sm text-blue-800">
+              <li>يجب أن يكون الملف بصيغة XML فقط</li>
+              <li>يمكنك رفع عدة جداول دراسية (مثل: جدول للفصل الأول وجدول للفصل الثاني)</li>
+              <li>يمكنك تفعيل أو تعطيل أي جدول دراسي حسب الحاجة</li>
+              <li>بعد رفع الجدول، يمكنك استخدام نظام البدائل لإدارة غياب المعلمين</li>
+            </ul>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <h4 className="font-semibold text-yellow-900 mb-2">⚠️ تحذير:</h4>
+            <p className="text-sm text-yellow-800">
+              تأكد من أن جميع المعلمين المذكورين في الجدول الدراسي مسجلين في النظام قبل رفع الجدول. 
+              يمكنك ربط المعلمين بعد الرفع إذا لزم الأمر.
+            </p>
+          </div>
+        </div>
+      </StepCard>
+
+
+       {/* Step 5: Register Drivers */}
+       <StepCard
+        number="7"
         title="تسجيل السائقين (اختياري)"
         description="قم بتسجيل سائقين الحافلات في المدرسة"
         tip="💡 نصيحة: استخدم رقم هاتف السائق كاسم مستخدم وبريد إلكتروني لسهولة تذكر تسجيل الدخول."
@@ -331,33 +437,11 @@ const Guide = () => {
         </div>
       </StepCard>
 
-        {/* Step 4: Create Classes */}
+      
+
+      {/* Step 7: Bus Management */}
       <StepCard
-        number="4"
-        title="إنشاء الفصول والمواد الدراسية"
-        description="قم بإنشاء الفصول الدراسية والمواد الدراسية"
-      >
-        <div className="space-y-4">
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h4 className="font-semibold text-green-500 mb-3 flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-500" />
-              يتم إنشاء الفصول الدراسية تلقائياً من خلال رفع قوائم الفصول من نظام البوابة. (عند رفع قوائم الطلاب في الخطوة السابقة)
-            <Link to="/app/classes" className="text-primary-600 hover:underline font-medium" onClick={(e) => { e.preventDefault(); window.location.href = '/app/classes'; }}>إدارة الفصول</Link>
-           </h4>
-             <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-primary-600" />
-              خطوات إنشاءالمواد:
-            </h4>
-            <ol className="list-decimal list-inside space-y-2 text-gray-700">
-              <li>انتقل إلى صفحة <Link to="/app/classes?tab=subjects" className="text-primary-600 hover:underline font-medium" onClick={(e) => { e.preventDefault(); window.location.href = '/app/classes?tab=subjects'; }}>إدارة المواد</Link></li>
-              <li>قم بإنشاء المواد الدراسية  </li>
-            </ol>
-          </div>
-        </div>
-      </StepCard>
-      {/* Step 5: Bus Management */}
-      <StepCard
-        number="5"
+        number="8"
         title="إدارة الحافلات (اختياري)"
         description="قم بإضافة الحافلات وتعيين السائقين والطلاب"
       >
@@ -388,37 +472,6 @@ const Guide = () => {
         </div>
       </StepCard>
 
-      {/* Step 6: Update Phone Numbers */}
-      <StepCard
-        number="6"
-        title="تحديث أرقام الهواتف "
-        description="قم بتحديث أرقام الهواتف للطلاب"
-      >
-        <div className="space-y-4">
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Upload className="w-5 h-5 text-primary-600" />
-              خطوات تحديث أرقام الهواتف:
-            </h4>
-            <ol className="list-decimal list-inside space-y-2 text-gray-700">
-              <li>انتقل إلى صفحة <Link to="/app/bulk-operations?tab=phones" className="text-primary-600 hover:underline font-medium" onClick={(e) => { e.preventDefault(); window.location.href = '/app/bulk-operations?tab=phones'; }}>رفع وتحديث البيانات</Link></li>
-              <li>اختر تبويب <strong>"تحديث أرقام الهواتف"</strong></li>
-              <li className="text-red-500">قم بتنزيل قائمة أرقام الهواتف من نظام البوابة (شاهد الفيديو للتعرف على كيفية التنزيل) <strong>وقم برفعها بدون التعديل عليها</strong></li>
-              <li> أو قم بتحميل النموذج من الزر <strong>"تحميل نموذج الهواتف"</strong></li>
-              <li>املأ النموذج بالبيانات التالية:
-                <ul className="list-disc list-inside mr-6 mt-2 space-y-1 text-sm">
-                  <li><strong>الرقم المدرسي:</strong> رقم الطالب المدرسي</li>
-                  <li><strong>الهاتف النقال:</strong> رقم هاتف الطالب</li>
-                  <li><strong>المنطقة السكنية:</strong> المنطقة السكنية للطالب (اختياري)</li>
-                </ul>
-              </li>
-              <li>احفظ الملف وارفعه</li>
-              <li>اضغط على <strong>"معالجة البيانات"</strong></li>
-            </ol>
-          </div>
-        </div>
-      </StepCard>
-
       {/* Summary */}
       <div className="bg-green-50 border border-green-200 rounded-lg p-6">
         <div className="flex items-start gap-4">
@@ -428,11 +481,15 @@ const Guide = () => {
             <ol className="list-decimal list-inside space-y-2 text-green-800">
               <li>شاهد الفيديو التوضيحي</li>
               <li>تسجيل جميع المعلمين</li>
-              <li>تسجيل السائقين (اختياري)</li>
-              <li>تسجيل وتعيين الطلاب للفصول</li>
+              <li>تسجيل جميع الطلاب</li>
+              <li>تحديث أرقام الهواتف</li>
+              
+             
               <li>إنشاء المواد الدراسية</li>
+              <li>رفع الجدول الدراسي (XML)</li>
+              <li>تسجيل السائقين (اختياري)</li>
+              
               <li>إدارة الحافلات (اختياري)</li>
-              <li>تحديث أرقام الهواتف </li> 
             </ol>
             <p className="mt-4 text-sm text-green-700">
               بعد إتمام هذه الخطوات، سيكون النظام جاهزاً للاستخدام!
@@ -556,9 +613,39 @@ const Guide = () => {
         </div>
       </StepCard>
 
-      {/* Step 4: Delete Classes and Subjects */}
+      {/* Step 4: Delete Substitutions and Timetable */}
       <StepCard
         number="4"
+        title="حذف البدائل والجداول الدراسية"
+        description="قم بحذف البدائل والجداول الدراسية القديمة"
+        warning="يجب حذف البدائل قبل حذف الجداول الدراسية"
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-red-600" />
+              خطوات حذف البدائل والجداول:
+            </h4>
+            <ol className="list-decimal list-inside space-y-2 text-gray-700">
+              <li>انتقل إلى صفحة <Link to="/app/delete-school-data" className="text-primary-600 hover:underline font-medium" onClick={(e) => { e.preventDefault(); window.location.href = '/app/delete-school-data'; }}>حذف بيانات المدرسة</Link></li>
+              <li>حدد خيار <strong>"البدائل"</strong> أولاً (إذا كان هناك بدائل مسجلة)</li>
+              <li>حدد خيار <strong>"الجدول الدراسي"</strong></li>
+              <li>اضغط على <strong>"حذف البيانات المحددة"</strong></li>
+              <li>اكتب <strong>"تأكيد الحذف"</strong> في حقل التأكيد</li>
+              <li>اضغط على <strong>"حذف نهائي"</strong></li>
+            </ol>
+          </div>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-sm text-yellow-800">
+              <strong>ملاحظة:</strong> عند حذف الجداول الدراسية، سيتم حذف جميع البيانات المرتبطة بها بما في ذلك الأيام، الفترات، الجداول، وربط المعلمين.
+            </p>
+          </div>
+        </div>
+      </StepCard>
+
+      {/* Step 5: Delete Classes and Subjects */}
+      <StepCard
+        number="5"
         title="حذف الفصول والمواد الدراسية"
         description="قم بحذف الفصول والمواد الدراسية القديمة"
       >
@@ -579,21 +666,21 @@ const Guide = () => {
         </div>
       </StepCard>
 
-      {/* Step 5: Delete Reports and News */}
+      {/* Step 6: Delete Reports, Notifications and News */}
       <StepCard
-        number="5"
-        title="حذف التقارير والأخبار (اختياري)"
-        description="يمكن حذف التقارير والأخبار في أي وقت"
+        number="6"
+        title="حذف التقارير والإشعارات والأخبار (اختياري)"
+        description="يمكن حذف التقارير والإشعارات والأخبار في أي وقت"
       >
         <div className="space-y-4">
           <div className="bg-gray-50 rounded-lg p-4">
             <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
               <Trash2 className="w-5 h-5 text-red-600" />
-              خطوات حذف التقارير والأخبار:
+              خطوات حذف التقارير والإشعارات والأخبار:
             </h4>
             <ol className="list-decimal list-inside space-y-2 text-gray-700">
               <li>انتقل إلى صفحة <Link to="/app/delete-school-data" className="text-primary-600 hover:underline font-medium" onClick={(e) => { e.preventDefault(); window.location.href = '/app/delete-school-data'; }}>حذف بيانات المدرسة</Link></li>
-              <li>حدد خيار <strong>"التقارير"</strong> و/أو <strong>"الأخبار"</strong></li>
+              <li>حدد خيار <strong>"التقارير"</strong> و/أو <strong>"الإشعارات"</strong> و/أو <strong>"الأخبار"</strong></li>
               <li>اضغط على <strong>"حذف البيانات المحددة"</strong></li>
               <li>اكتب <strong>"تأكيد الحذف"</strong> في حقل التأكيد</li>
               <li>اضغط على <strong>"حذف نهائي"</strong></li>
@@ -602,9 +689,9 @@ const Guide = () => {
         </div>
       </StepCard>
 
-      {/* Step 6: Delete Students */}
+      {/* Step 7: Delete Students */}
       <StepCard
-        number="6"
+        number="7"
         title="حذف الطلاب"
         description="قم بحذف جميع الطلاب بعد حذف الفصول والمواد"
         warning="يجب حذف الطلاب قبل حذف المعلمين"
@@ -627,9 +714,9 @@ const Guide = () => {
         </div>
       </StepCard>
 
-      {/* Step 7: Delete Teachers */}
+      {/* Step 8: Delete Teachers */}
       <StepCard
-        number="7"
+        number="8"
         title="حذف المعلمين (اختياري)"
         description="يمكن حذف المعلمين بعد حذف الطلاب"
         warning="لا يمكن حذف حساب مدير المدرسة (school_admin)"
@@ -671,8 +758,9 @@ const Guide = () => {
                 <li><strong>سجلات مسح الحافلات</strong> - يجب حذفها أولاً</li>
                 <li><strong>سجلات الحضور والغياب</strong> - يجب حذفها بعد سجلات المسح</li>
                 <li><strong>الحافلات والسائقين</strong> - يمكن حذفها بعد سجلات المسح</li>
-                <li><strong>الفصول والمواد الدراسية</strong> - يمكن حذفها بعد سجلات الحضور</li>
-                <li><strong>التقارير والأخبار</strong> - يمكن حذفها في أي وقت</li>
+                <li><strong>البدائل والجداول الدراسية</strong> - يجب حذف البدائل قبل الجداول</li>
+                <li><strong>الفصول والمواد الدراسية</strong> - يمكن حذفها بعد الجداول الدراسية</li>
+                <li><strong>التقارير والإشعارات والأخبار</strong> - يمكن حذفها في أي وقت</li>
                 <li><strong>الطلاب</strong> - يجب حذفهم بعد حذف الفصول والمواد</li>
                 <li><strong>المعلمين</strong> - يجب حذفهم أخيراً بعد حذف الطلاب</li>
               </ol>
@@ -696,6 +784,7 @@ const Guide = () => {
             <ol className="list-decimal list-inside space-y-2 text-green-800">
               <li>تسجيل المعلمين الجدد</li>
               <li>إنشاء الفصول والمواد الدراسية الجديدة</li>
+              <li>رفع الجدول الدراسي الجديد (XML)</li>
               <li>تسجيل وتعيين الطلاب الجدد</li>
               <li>تحديث أرقام الهواتف (اختياري)</li>
             </ol>

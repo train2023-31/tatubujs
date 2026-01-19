@@ -22,7 +22,7 @@ const VersionFeatures = () => {
         const data = await response.json();
         setServerVersion(data);
       } catch (error) {
-        console.log('Could not fetch server version:', error);
+        // Could not fetch server version
       } finally {
         setLoading(false);
       }

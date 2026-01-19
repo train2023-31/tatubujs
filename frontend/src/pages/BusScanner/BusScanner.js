@@ -90,7 +90,7 @@ const BusScanner = () => {
       try {
         scannerRef.current.pause(true);
       } catch (e) {
-        console.log('Scanner pause error:', e);
+        // Scanner pause error
       }
     }
     
@@ -122,7 +122,7 @@ const BusScanner = () => {
           try {
             scannerRef.current.resume();
           } catch (e) {
-            console.log('Scanner resume error:', e);
+            // Scanner resume error
           }
         }
       }, 2000);
@@ -144,7 +144,7 @@ const BusScanner = () => {
           try {
             scannerRef.current.resume();
           } catch (e) {
-            console.log('Scanner resume error:', e);
+            // Scanner resume error
           }
         }
       }, 2000);

@@ -14,7 +14,7 @@ const StudentQRCode = ({ student, schoolName }) => {
     downloadLink.download = `${student.username}_QR.png`;
     document.body.appendChild(downloadLink);
     downloadLink.click();
-    document.body.removeChild(downloadLink);
+    downloadLink.remove();
   };
 
   const printQR = () => {

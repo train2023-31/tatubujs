@@ -203,10 +203,7 @@ const DailyReport = () => {
     'allClasses',
     classesAPI.getMyClasses,
     { 
-      enabled: !!user,
-      onError: (error) => {
-        console.error('Failed to fetch classes:', error);
-      }
+      enabled: !!user
     }
   );
 
@@ -218,9 +215,6 @@ const DailyReport = () => {
       enabled: !!user && (user.role === 'school_admin' || user.role === 'data_analyst'),
       onSuccess: (data) => {
         setConfirmationStatus(data);
-      },
-      onError: (error) => {
-        console.error('Failed to fetch confirmation status:', error);
       }
     }
   );
@@ -366,7 +360,6 @@ const DailyReport = () => {
       
       toast.success(`تم تحديث حالة العذر لـ ${studentsWithRecords.length} طالب بنجاح`);
     } catch (error) {
-      console.error('Error updating excuse status:', error);
       toast.error('فشل في تحديث حالة العذر');
     } finally {
       setIsUpdatingExcuse(false);
@@ -388,7 +381,6 @@ const DailyReport = () => {
       
       toast.success('تم تحديث حالة العذر بنجاح');
     } catch (error) {
-      console.error('Error updating individual excuse status:', error);
       toast.error('فشل في تحديث حالة العذر');
     } finally {
       setUpdatingStudents(prev => {
@@ -413,7 +405,6 @@ const DailyReport = () => {
       
       toast.success(isConfirm ? 'تم تأكيد غياب اليوم بنجاح' : 'تم إلغاء تأكيد غياب اليوم بنجاح');
     } catch (error) {
-      console.error('Error confirming day absents:', error);
       toast.error('فشل في تأكيد غياب اليوم');
     } finally {
       setIsConfirming(false);
@@ -521,17 +512,12 @@ ${attendanceStatus}
   const handleBulkWhatsAppSend = () => {
     setIsSendingBulkWhatsApp(true);
     
-    // Debug: Log user object to see what's available
-    console.log('User object:', user);
-    console.log('User school_id:', user?.school_id);
-    
     const data = {
       date: selectedDate,
       school_id: user?.school_id, // Will be undefined if not present, backend will use current_user.school_id
       delay_between_messages: 0.25 // 15 seconds between messages (0.25 minutes)
     };
 
-    console.log('Sending data:', data);
     sendBulkWhatsAppMutation.mutate(data);
   };
 
@@ -758,7 +744,6 @@ ${attendanceStatus}
       
       toast.success('تم تحميل التقرير بنجاح');
     } catch (error) {
-      console.error('Error generating PDF:', error);
       toast.error('فشل في إنشاء ملف PDF');
     } finally {
       setIsGeneratingPDF(false);

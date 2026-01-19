@@ -420,11 +420,10 @@ const StudentNotesLog = () => {
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       
       toast.success('تم تحميل سجل الحضور بنجاح');
     } catch (error) {
-      console.error('Error downloading attendance log:', error);
       toast.error('حدث خطأ أثناء تحميل سجل الحضور');
     } finally {
       setIsDownloading(false);

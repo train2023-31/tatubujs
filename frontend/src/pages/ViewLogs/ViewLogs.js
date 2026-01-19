@@ -191,7 +191,6 @@ const ViewLogs = () => {
       pdf.save(`سجلات_النظام_${new Date().toLocaleDateString('ar-SA')}.pdf`);
       toast.success('تم تصدير السجلات بنجاح');
     } catch (error) {
-      console.error('Error generating PDF:', error);
       toast.error('فشل في تصدير السجلات');
     } finally {
       setIsGeneratingPDF(false);

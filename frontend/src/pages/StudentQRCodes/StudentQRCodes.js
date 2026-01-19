@@ -187,7 +187,6 @@ const StudentQRCodes = () => {
             await new Promise(resolve => setTimeout(resolve, 200));
             canvas = document.getElementById(`qr-${student.id}`);
             if (!canvas || canvas.tagName !== 'CANVAS') {
-              console.warn(`QR code not found for student: ${student.id}`);
               cardIndex++;
               continue;
             }
@@ -255,7 +254,6 @@ const StudentQRCodes = () => {
               resolve();
             };
             qrImg.onerror = () => {
-              console.error(`Failed to load QR image for student: ${student.id}`);
               resolve(); // Continue even if one fails
             };
             qrImg.src = qrImageData;
@@ -271,7 +269,6 @@ const StudentQRCodes = () => {
 
       toast.success(`تم تحميل ${filteredStudents.length} بطاقة QR في ملف PDF`, { id: 'pdf-download' });
     } catch (error) {
-      console.error('Error creating PDF:', error);
       toast.error('حدث خطأ أثناء إنشاء ملف PDF', { id: 'pdf-download' });
     }
   };
@@ -360,7 +357,6 @@ const StudentQRCodes = () => {
                 }, 'image/png');
               };
               qrImg.onerror = () => {
-                console.error('Failed to load QR image for student:', student.id);
                 resolve();
               };
               qrImg.src = pngUrl;
@@ -438,12 +434,11 @@ const StudentQRCodes = () => {
       link.download = `QR_Codes_${new Date().toISOString().split('T')[0]}.zip`;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       URL.revokeObjectURL(link.href);
       
       toast.success(`تم تحميل ${filteredStudents.length} بطاقة QR في ملف ZIP`, { id: 'bulk-download' });
     } catch (error) {
-      console.error('Error downloading QR codes:', error);
       toast.error('حدث خطأ أثناء التحميل', { id: 'bulk-download' });
     }
   };

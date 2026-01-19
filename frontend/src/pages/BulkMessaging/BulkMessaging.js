@@ -324,7 +324,7 @@ const BulkMessaging = () => {
                     } catch (e) {
                       toast.error('فشل نسخ الرابط. يرجى نسخه يدوياً');
                     }
-                    document.body.removeChild(textArea);
+                    textArea.remove();
                   }
                   toast.dismiss(t.id);
                 }}
@@ -342,13 +342,11 @@ const BulkMessaging = () => {
       }
     } catch (error) {
       // Fallback: try direct navigation
-      console.error('Error opening WhatsApp:', error);
       try {
         window.location.href = whatsappUrl;
         toast.success(`جاري فتح WhatsApp للطالب ${student.fullName}...`);
       } catch (e) {
         toast.error('حدث خطأ في فتح WhatsApp. يرجى المحاولة مرة أخرى');
-        console.error('Error navigating to WhatsApp:', e);
       }
     }
   };

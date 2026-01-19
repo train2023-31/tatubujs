@@ -31,7 +31,8 @@ import {
   History,
   QrCode,
   MapPin,
-  Globe
+  Globe,
+  Upload
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { reportsAPI, attendanceAPI, authAPI, busAPI, timetableAPI, substitutionAPI } from '../../services/api';
@@ -143,7 +144,6 @@ const Dashboard = () => {
       
       toast.success('تم تحميل التقرير بنجاح');
     } catch (error) {
-      console.error('Error generating PDF:', error);
       toast.error('فشل في إنشاء ملف PDF');
     } finally {
       setIsGeneratingPDF(false);
@@ -358,13 +358,13 @@ const Dashboard = () => {
           </div>
           {(user?.role === 'school_admin' || user?.role === 'data_analyst') && (
             <div className="flex items-center space-x-2">
-              <button
+              {/* <button
                 onClick={handlePrint}
                 className="btn btn-outline mr-2"
               >
                 <Printer className="h-5 w-5 mr-2" />
                 طباعة
-              </button>
+              </button> */}
               {/* <button
                 onClick={handleDownloadPDF}
                 disabled={isGeneratingPDF}
@@ -670,30 +670,30 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
             </div>
           </div>
           <div className="card-body">
-            <p className="text-blue-800 mb-4">
+            <p className="text-blue-800 mb-2 text-sm">
               يبدو أن هذه هي المرة الأولى التي تدخل فيها إلى النظام. دعنا نساعدك في إعداد مدرستك خطوة بخطوة:
             </p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2">
               {/* Step 1 */}
-              <div className={`flex flex-col items-center p-4 rounded-lg border text-center ${
+              <div className={`flex flex-col items-center p-2 rounded-lg border text-center ${
                 bulkOpsStatus?.step_status?.step1_teachers?.completed 
                   ? 'bg-green-50 border-green-200' 
                   : 'bg-white border-blue-200'
               }`}>
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1.5 ${
                   bulkOpsStatus?.step_status?.step1_teachers?.completed 
                     ? 'bg-green-100' 
                     : 'bg-blue-100'
                 }`}>
                   {bulkOpsStatus?.step_status?.step1_teachers?.completed ? (
-                    <CheckCircle className="h-6 w-6 text-green-600" />
+                    <CheckCircle className="h-5 w-5 text-green-600" />
                   ) : (
-                    <span className="text-lg font-medium text-blue-600">1</span>
+                    <span className="text-base font-medium text-blue-600">1</span>
                   )}
                 </div>
-                <h4 className="font-medium text-gray-900 mb-2">إضافة المعلمين</h4>
-                <p className="text-sm text-gray-600 mb-3">
+                <h4 className="font-medium text-gray-900 mb-1 text-sm">إضافة المعلمين</h4>
+                <p className="text-xs text-gray-600 mb-2">
                   {bulkOpsStatus?.step_status?.step1_teachers?.completed 
                     ? `تم إضافة ${bulkOpsStatus.step_status.step1_teachers.count} معلم`
                     : 'ابدأ بإضافة معلمي مدرستك إلى النظام'
@@ -711,24 +711,24 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
               </div>
 
               {/* Step 2 */}
-              <div className={`flex flex-col items-center p-4 rounded-lg border text-center ${
+              <div className={`flex flex-col items-center p-2 rounded-lg border text-center ${
                 bulkOpsStatus?.step_status?.step2_students_classes?.completed 
                   ? 'bg-green-50 border-green-200' 
                   : 'bg-white border-blue-200'
               }`}>
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1.5 ${
                   bulkOpsStatus?.step_status?.step2_students_classes?.completed 
                     ? 'bg-green-100' 
                     : 'bg-blue-100'
                 }`}>
                   {bulkOpsStatus?.step_status?.step2_students_classes?.completed ? (
-                    <CheckCircle className="h-6 w-6 text-green-600" />
+                    <CheckCircle className="h-5 w-5 text-green-600" />
                   ) : (
-                    <span className="text-lg font-medium text-blue-600">2</span>
+                    <span className="text-base font-medium text-blue-600">2</span>
                   )}
                 </div>
-                <h4 className="font-medium text-gray-900 mb-2">إضافة الطلاب والفصول</h4>
-                <p className="text-sm text-gray-600 mb-3">
+                <h4 className="font-medium text-gray-900 mb-1 text-sm">إضافة الطلاب والفصول</h4>
+                <p className="text-xs text-gray-600 mb-2">
                   {bulkOpsStatus?.step_status?.step2_students_classes?.completed 
                     ? `تم إضافة ${bulkOpsStatus.step_status.step2_students_classes.students_count} طالب و ${bulkOpsStatus.step_status.step2_students_classes.classes_count} فصل`
                     : 'أضف طلاب مدرستك، قم برفع قوائم الفصول ويتم توزيع الطلاب عليها تلقائياً'
@@ -746,24 +746,24 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
               </div>
 
               {/* Step 3 - New Phone Numbers Step */}
-              <div className={`flex flex-col items-center p-4 rounded-lg border text-center ${
+              <div className={`flex flex-col items-center p-2 rounded-lg border text-center ${
                 bulkOpsStatus?.step_status?.step3_phone_numbers?.completed 
                   ? 'bg-green-50 border-green-200' 
                   : 'bg-white border-blue-200'
               }`}>
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1.5 ${
                   bulkOpsStatus?.step_status?.step3_phone_numbers?.completed 
                     ? 'bg-green-100' 
                     : 'bg-blue-100'
                 }`}>
                   {bulkOpsStatus?.step_status?.step3_phone_numbers?.completed ? (
-                    <CheckCircle className="h-6 w-6 text-green-600" />
+                    <CheckCircle className="h-5 w-5 text-green-600" />
                   ) : (
-                    <span className="text-lg font-medium text-blue-600">3</span>
+                    <span className="text-base font-medium text-blue-600">3</span>
                   )}
                 </div>
-                <h4 className="font-medium text-gray-900 mb-2">إضافة أرقام أولياء الأمور</h4>
-                <p className="text-sm text-gray-600 mb-3">
+                <h4 className="font-medium text-gray-900 mb-1 text-sm">إضافة أرقام أولياء الأمور</h4>
+                <p className="text-xs text-gray-600 mb-2">
                   {bulkOpsStatus?.step_status?.step3_phone_numbers?.completed 
                     ? `${bulkOpsStatus.step_status.step3_phone_numbers.percentage}% من الطلاب لديهم أرقام هواتف`
                     : 'أضف أرقام هواتف أولياء الأمور للتواصل معهم'
@@ -781,24 +781,24 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
               </div>
 
               {/* Step 4 */}
-              <div className={`flex flex-col items-center p-4 rounded-lg border text-center ${
+              <div className={`flex flex-col items-center p-2 rounded-lg border text-center ${
                 bulkOpsStatus?.step_status?.step4_subjects?.completed 
                   ? 'bg-green-50 border-green-200' 
                   : 'bg-white border-blue-200'
               }`}>
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1.5 ${
                   bulkOpsStatus?.step_status?.step4_subjects?.completed 
                     ? 'bg-green-100' 
                     : 'bg-blue-100'
                 }`}>
                   {bulkOpsStatus?.step_status?.step4_subjects?.completed ? (
-                    <CheckCircle className="h-6 w-6 text-green-600" />
+                    <CheckCircle className="h-5 w-5 text-green-600" />
                   ) : (
-                    <span className="text-lg font-medium text-blue-600">4</span>
+                    <span className="text-base font-medium text-blue-600">4</span>
                   )}
                 </div>
-                <h4 className="font-medium text-gray-900 mb-2">إضافة المواد الدراسية</h4>
-                <p className="text-sm text-gray-600 mb-3">
+                <h4 className="font-medium text-gray-900 mb-1 text-sm">إضافة المواد الدراسية</h4>
+                <p className="text-xs text-gray-600 mb-2">
                   {bulkOpsStatus?.step_status?.step4_subjects?.completed 
                     ? `تم إضافة ${bulkOpsStatus.step_status.step4_subjects.count} مادة دراسية`
                     : 'أضف المواد الدراسية التي تدرسها في مدرستك'
@@ -815,31 +815,101 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                 )}
               </div>
 
-              {/* Step 5 */}
-              <div className={`flex flex-col items-center p-4 rounded-lg border text-center ${
-                bulkOpsStatus?.step_status?.step5_attendance?.completed 
+              {/* Step 5: Timetable */}
+              <div className={`flex flex-col items-center p-2 rounded-lg border text-center ${
+                bulkOpsStatus?.step_status?.step5_timetable?.completed 
                   ? 'bg-green-50 border-green-200' 
                   : 'bg-white border-blue-200'
               }`}>
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
-                  bulkOpsStatus?.step_status?.step5_attendance?.completed 
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1.5 ${
+                  bulkOpsStatus?.step_status?.step5_timetable?.completed 
                     ? 'bg-green-100' 
                     : 'bg-blue-100'
                 }`}>
-                  {bulkOpsStatus?.step_status?.step5_attendance?.completed ? (
-                    <CheckCircle className="h-6 w-6 text-green-600" />
+                  {bulkOpsStatus?.step_status?.step5_timetable?.completed ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
                   ) : (
-                    <span className="text-lg font-medium text-blue-600">5</span>
+                    <span className="text-base font-medium text-blue-600">5</span>
                   )}
                 </div>
-                <h4 className="font-medium text-gray-900 mb-2">بدء تسجيل الحضور</h4>
-                <p className="text-sm text-gray-600 mb-3">
-                  {bulkOpsStatus?.step_status?.step5_attendance?.completed 
-                    ? `تم تسجيل ${bulkOpsStatus.step_status.step5_attendance.count} سجل حضور في آخر 30 يوم`
+                <h4 className="font-medium text-gray-900 mb-1 text-sm">رفع الجدول الدراسي</h4>
+                <p className="text-xs text-gray-600 mb-2">
+                  {bulkOpsStatus?.step_status?.step5_timetable?.completed 
+                    ? `تم رفع ${bulkOpsStatus.step_status.step5_timetable.count || 1} جدول دراسي`
+                    : 'قم برفع ملف الجدول الدراسي (XML) من نظام aSc Timetables'
+                  }
+                </p>
+                {!bulkOpsStatus?.step_status?.step5_timetable?.completed && (
+                  <button 
+                    onClick={() => navigate('/app/school-timetable')}
+                    className="btn btn-sm btn-primary w-full"
+                  >
+                    <Calendar className="h-4 w-4 mr-1 ml-1" />
+                    رفع الجدول
+                  </button>
+                )}
+              </div>
+
+              {/* Step 6: Substitutions (Optional) */}
+              <div className={`flex flex-col items-center p-2 rounded-lg border text-center ${
+                bulkOpsStatus?.step_status?.step6_substitutions?.completed 
+                  ? 'bg-green-50 border-green-200' 
+                  : 'bg-white border-blue-200'
+              }`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1.5 ${
+                  bulkOpsStatus?.step_status?.step6_substitutions?.completed 
+                    ? 'bg-green-100' 
+                    : 'bg-blue-100'
+                }`}>
+                  {bulkOpsStatus?.step_status?.step6_substitutions?.completed ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <span className="text-base font-medium text-blue-600">6</span>
+                  )}
+                </div>
+                <h4 className="font-medium text-gray-900 mb-1 text-sm">إدارة الإحتياط </h4>
+                <p className="text-xs text-gray-600 mb-2">
+                  {bulkOpsStatus?.step_status?.step6_substitutions?.completed 
+                    ? `تم إعداد نظام الإحتياط `
+                    : 'قم بإعداد نظام الإحتياط لإدارة غياب المعلمين'
+                  }
+                </p>
+                {!bulkOpsStatus?.step_status?.step6_substitutions?.completed && (
+                  <button 
+                    onClick={() => navigate('/app/school-timetable')}
+                    className="btn btn-sm btn-primary w-full"
+                  >
+                    <UserCheck className="h-4 w-4 mr-1 ml-1" />
+                    إدارة الإحتياط 
+                  </button>
+                )}
+              </div>
+
+              {/* Step 7: Attendance */}
+              <div className={`flex flex-col items-center p-2 rounded-lg border text-center ${
+                bulkOpsStatus?.step_status?.step7_attendance?.completed 
+                  ? 'bg-green-50 border-green-200' 
+                  : 'bg-white border-blue-200'
+              }`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1.5 ${
+                  bulkOpsStatus?.step_status?.step7_attendance?.completed 
+                    ? 'bg-green-100' 
+                    : 'bg-blue-100'
+                }`}>
+                  {bulkOpsStatus?.step_status?.step7_attendance?.completed ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <span className="text-base font-medium text-blue-600">7</span>
+                  )}
+                </div>
+                <h4 className="font-medium text-gray-900 mb-1 text-sm">بدء تسجيل الحضور</h4>
+                <p className="text-xs text-gray-600 mb-2">
+                  {bulkOpsStatus?.step_status?.step7_attendance?.completed 
+                    ? `تم تسجيل ${bulkOpsStatus.step_status.step7_attendance?.count || bulkOpsStatus.step_status.step5_attendance?.count || 0} سجل حضور في آخر 30 يوم`
                     : 'بعد إضافة المعلمين والطلاب والمواد، يمكنك البدء في تسجيل الحضور اليومي'
                   }
                 </p>
-                {!bulkOpsStatus?.step_status?.step5_attendance?.completed && (
+                {!bulkOpsStatus?.step_status?.step7_attendance?.completed && (
                   <button 
                     onClick={onNavigateToAttendance}
                     className="btn btn-sm btn-primary w-full"
@@ -849,24 +919,94 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                   </button>
                 )}
               </div>
+
+              {/* Step 8: Drivers (Optional) */}
+              <div className={`flex flex-col items-center p-2 rounded-lg border text-center ${
+                bulkOpsStatus?.step_status?.step8_drivers?.completed 
+                  ? 'bg-green-50 border-green-200' 
+                  : 'bg-white border-blue-200'
+              }`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1.5 ${
+                  bulkOpsStatus?.step_status?.step8_drivers?.completed 
+                    ? 'bg-green-100' 
+                    : 'bg-blue-100'
+                }`}>
+                  {bulkOpsStatus?.step_status?.step8_drivers?.completed ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <span className="text-base font-medium text-blue-600">8</span>
+                  )}
+                </div>
+                <h4 className="font-medium text-gray-900 mb-1 text-sm">إضافة السائقين (اختياري)</h4>
+                <p className="text-xs text-gray-600 mb-2">
+                  {bulkOpsStatus?.step_status?.step8_drivers?.completed 
+                    ? `تم إضافة ${bulkOpsStatus.step_status.step8_drivers?.count || 0} سائق`
+                    : 'أضف سائقين الحافلات في مدرستك'
+                  }
+                </p>
+                {!bulkOpsStatus?.step_status?.step8_drivers?.completed && (
+                  <button 
+                    onClick={() => navigate('/app/bulk-operations?tab=drivers')}
+                    className="btn btn-sm btn-outline w-full"
+                  >
+                    <User className="h-4 w-4 mr-1 ml-1" />
+                    إضافة السائقين
+                  </button>
+                )}
+              </div>
+
+              {/* Step 9: Buses (Optional) */}
+              <div className={`flex flex-col items-center p-2 rounded-lg border text-center ${
+                bulkOpsStatus?.step_status?.step9_buses?.completed 
+                  ? 'bg-green-50 border-green-200' 
+                  : 'bg-white border-blue-200'
+              }`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1.5 ${
+                  bulkOpsStatus?.step_status?.step9_buses?.completed 
+                    ? 'bg-green-100' 
+                    : 'bg-blue-100'
+                }`}>
+                  {bulkOpsStatus?.step_status?.step9_buses?.completed ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <span className="text-base font-medium text-blue-600">9</span>
+                  )}
+                </div>
+                <h4 className="font-medium text-gray-900 mb-1 text-sm">إدارة الحافلات (اختياري)</h4>
+                <p className="text-xs text-gray-600 mb-2">
+                  {bulkOpsStatus?.step_status?.step9_buses?.completed 
+                    ? `تم إضافة ${bulkOpsStatus.step_status.step9_buses?.count || 0} حافلة`
+                    : 'أضف الحافلات وربطها بالسائقين والطلاب'
+                  }
+                </p>
+                {!bulkOpsStatus?.step_status?.step9_buses?.completed && (
+                  <button 
+                    onClick={() => navigate('/app/buses')}
+                    className="btn btn-sm btn-outline w-full"
+                  >
+                    <Bus className="h-4 w-4 mr-1 ml-1" />
+                    إدارة الحافلات
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="mt-4 p-3 bg-blue-100 rounded-lg">
+            <div className="mt-2 p-2 bg-blue-100 rounded-lg">
               <div className="flex items-center space-x-2">
-                <CheckCircle className="h-5 w-5 text-blue-600" />
-                <p className="text-sm text-blue-800">
-                  <strong>التقدم:</strong> {bulkOpsStatus?.completed_steps || 0} من {bulkOpsStatus?.total_steps || 5} خطوات مكتملة ({bulkOpsStatus?.overall_completion || 0}%)
+                <CheckCircle className="h-4 w-4 text-blue-600" />
+                <p className="text-xs text-blue-800">
+                  <strong>التقدم:</strong> {bulkOpsStatus?.completed_steps || 0} من {bulkOpsStatus?.total_steps || 9} خطوات مكتملة ({bulkOpsStatus?.overall_completion || 0}%)
                 </p>
               </div>
-              <div className="mt-2">
-                <div className="w-full bg-blue-200 rounded-full h-2">
+              <div className="mt-1.5">
+                <div className="w-full bg-blue-200 rounded-full h-1.5">
                   <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                    className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" 
                     style={{ width: `${bulkOpsStatus?.overall_completion || 0}%` }}
                   ></div>
                 </div>
               </div>
-              <p className="text-xs text-blue-700 mt-2">
+              <p className="text-xs text-blue-700 mt-1.5">
                 <strong>نصيحة:</strong> يمكنك استخدام رفع الملفات الجماعي لتسريع عملية الإعداد
               </p>
             </div>
@@ -904,7 +1044,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
             />
             <QuickAccessCard 
               title="التقرير اليومي"
-              description=" عرض التقرير اليومي للحضور وإشعار اولياء أمور الطلاب الغائبين"
+              description="عرض التقرير اليومي للحضور وإشعار اولياء أمور الطلاب الغائبين"
               icon={FileText}
               color="purple"
               onClick={() => navigate('/app/daily-report')}
@@ -915,23 +1055,22 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
               icon={Users}
               color="orange"
               onClick={() => navigate('/app/teacher-report')}
+              
+            />
+            <QuickAccessCard
+              title="جدول الحصص"
+              description="إدارة ورفع الجدول الدراسي"
+              icon={Calendar}
+              color="cyan"
+              onClick={() => navigate('/app/school-timetable')}
               isNew={true}
             />
             <QuickAccessCard
-              title="إرسال رسائل مخصصة"
-              description="إرسال رسائل SMS للطلاب"
-              icon={MessageCircle}
-              color="indigo"
-              onClick={() => navigate('/app/bulk-messaging')}
-              borderColor="border-indigo-200"
-              isNew={true}
-            />
-            <QuickAccessCard
-              title="سجل ملاحظات الطالب"
-              description="عرض وتعديل ملاحظات السلوك"
-              icon={ClipboardList}
+              title="إحتياط المعلمين"
+              description="إدارة بدائل المعلمين الغائبين"
+              icon={UserCheck}
               color="teal"
-              onClick={() => navigate('/app/student-notes-log')}
+              onClick={() => navigate('/app/teacher-substitution')}
               isNew={true}
             />
             <QuickAccessCard
@@ -949,22 +1088,43 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
               onClick={() => navigate('/app/reports')}
             />
             <QuickAccessCard
-              title="إعدادات SMS"
-              description="إعدادات الرسائل القصيرة iBulk SMS from Omantel"
-              icon={Settings}
+              title="إدارة الحافلات"
+              description="إدارة الحافلات والسائقين والطلاب"
+              icon={Bus}
               color="indigo"
-              onClick={() => navigate('/app/sms-configuration')}
+              onClick={() => navigate('/app/buses')}
               isNew={true}
             />
             <QuickAccessCard
-            title="مميزات النظام"
-            description="عرض المميزات الجديدة في النظام"
-            icon={Sparkles}
-            color="yellow"
-            onClick={() => navigate('/app/version-features')}
-            isNew={true}
+              title="ماسح الحافلة"
+              description="مسح رموز QR للطلاب على الحافلة"
+              icon={QrCode}
+              color="green"
+              onClick={() => navigate('/app/bus-scanner')}
+              isNew={true}
             />
-           
+            <QuickAccessCard
+              title="رفع وتحديث البيانات"
+              description="رفع الملفات الجماعية للمعلمين والطلاب"
+              icon={Upload}
+              color="blue"
+              onClick={() => navigate('/app/bulk-operations')}
+            />
+            <QuickAccessCard
+              title="إرسال رسائل مخصصة"
+              description="إرسال رسائل SMS للطلاب"
+              icon={MessageCircle}
+              color="indigo"
+              onClick={() => navigate('/app/bulk-messaging')}
+             
+            />
+            <QuickAccessCard
+              title="إعدادات SMS"
+              description="إعدادات الرسائل القصيرة iBulk SMS"
+              icon={Settings}
+              color="indigo"
+              onClick={() => navigate('/app/sms-configuration')}
+            />
           </div>
         </div>
       </div>
@@ -1649,10 +1809,7 @@ const TeacherDashboard = ({ teacherAttendance, loading, selectedDate, setSelecte
     {
       enabled: !!(user?.user_id || user?.id) && user?.role === 'teacher',
       refetchInterval: 300000, // Refetch every 5 minutes
-      retry: 2,
-      onError: (error) => {
-        console.error('Error fetching teacher timetable:', error);
-      }
+      retry: 2
     }
   );
   
@@ -1663,10 +1820,7 @@ const TeacherDashboard = ({ teacherAttendance, loading, selectedDate, setSelecte
     {
       enabled: !!(user?.user_id || user?.id) && user?.role === 'teacher',
       refetchInterval: 300000, // Refetch every 5 minutes
-      retry: 2,
-      onError: (error) => {
-        console.error('Error fetching teacher substitutions:', error);
-      }
+      retry: 2
     }
   );
 
@@ -2170,13 +2324,7 @@ const DriverDashboard = () => {
     () => busAPI.getDriverBus(),
     {
       enabled: !!user?.user_id,
-      refetchInterval: 30000,
-      onSuccess: (data) => {
-        console.log('DriverDashboard - Bus data loaded:', data);
-      },
-      onError: (error) => {
-        console.error('DriverDashboard - Bus error:', error);
-      }
+      refetchInterval: 30000
     }
   );
 
@@ -2189,13 +2337,7 @@ const DriverDashboard = () => {
     () => busAPI.getCurrentStudentsOnBus(busId),
     {
       enabled: !!busId,
-      refetchInterval: 10000, // Refresh every 10 seconds
-      onSuccess: (data) => {
-        console.log('DriverDashboard - Current students data loaded:', data);
-      },
-      onError: (error) => {
-        console.error('DriverDashboard - Current students error:', error);
-      }
+      refetchInterval: 10000 // Refresh every 10 seconds
     }
   );
 
@@ -2206,13 +2348,7 @@ const DriverDashboard = () => {
     () => busAPI.getScans({ bus_id: busId, date: today, limit: 50 }),
     {
       enabled: !!busId,
-      refetchInterval: 15000, // Refresh every 15 seconds
-      onSuccess: (data) => {
-        console.log('DriverDashboard - Today scans data loaded:', data);
-      },
-      onError: (error) => {
-        console.error('DriverDashboard - Today scans error:', error);
-      }
+      refetchInterval: 15000 // Refresh every 15 seconds
     }
   );
 
@@ -2222,13 +2358,7 @@ const DriverDashboard = () => {
     () => busAPI.getBusStudents(busId),
     {
       enabled: !!busId,
-      refetchInterval: 60000, // Refresh every minute
-      onSuccess: (data) => {
-        console.log('DriverDashboard - Assigned students data loaded:', data);
-      },
-      onError: (error) => {
-        console.error('DriverDashboard - Assigned students error:', error);
-      }
+      refetchInterval: 60000 // Refresh every minute
     }
   );
 
@@ -2491,103 +2621,52 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Debug logging
-  console.log('StudentDashboard - User object:', user);
-  console.log('StudentDashboard - User ID:', user?.user_id);
-  console.log('StudentDashboard - User role:', user?.role);
-  console.log('StudentDashboard - Enabled condition for queries:', !!user?.user_id);
-
   // Fetch student attendance history (all data, no date range)
   const { data: studentAttendanceHistory, isLoading: attendanceLoading } = useQuery(
     ['studentAttendanceHistory', user?.user_id],
-    () => {
-      console.log('StudentDashboard - Query function called for attendance history');
-      return attendanceAPI.getMyAttendanceHistory();
-    },
+    () => attendanceAPI.getMyAttendanceHistory(),
     {
       enabled: !!user?.user_id,
-      refetchInterval: 30000,
-      onSuccess: (data) => {
-        console.log('StudentDashboard - Attendance history data loaded:', data);
-      },
-      onError: (error) => {
-        console.error('StudentDashboard - Attendance history error:', error);
-      }
+      refetchInterval: 30000
     }
   );
 
   // Fetch student attendance statistics
   const { data: studentAttendanceStats, isLoading: statsLoading } = useQuery(
     ['studentAttendanceStats', user?.user_id],
-    () => {
-      console.log('StudentDashboard - Query function called for stats');
-      return attendanceAPI.getMyAttendanceStats();
-    },
+    () => attendanceAPI.getMyAttendanceStats(),
     {
       enabled: !!user?.user_id,
-      refetchInterval: 30000,
-      onSuccess: (data) => {
-        console.log('StudentDashboard - Stats data loaded:', data);
-      },
-      onError: (error) => {
-        console.error('StudentDashboard - Stats error:', error);
-      }
+      refetchInterval: 30000
     }
   );
 
   // Fetch student profile data
   const { data: studentProfile, isLoading: profileLoading } = useQuery(
     ['studentProfile', user?.user_id],
-    () => {
-      console.log('StudentDashboard - Query function called for profile');
-      return attendanceAPI.getMyProfile();
-    },
+    () => attendanceAPI.getMyProfile(),
     {
-      enabled: !!user?.user_id,
-      onSuccess: (data) => {
-        console.log('StudentDashboard - Profile data loaded:', data);
-      },
-      onError: (error) => {
-        console.error('StudentDashboard - Profile error:', error);
-      }
+      enabled: !!user?.user_id
     }
   );
 
   // Fetch student bus status and details
   const { data: busStatus, isLoading: busLoading } = useQuery(
     ['studentBusStatus', user?.user_id],
-    () => {
-      console.log('StudentDashboard - Query function called for bus status');
-      return busAPI.getStudentBusStatus(user?.user_id);
-    },
+    () => busAPI.getStudentBusStatus(user?.user_id),
     {
       enabled: !!user?.user_id,
-      refetchInterval: 30000,
-      onSuccess: (data) => {
-        console.log('StudentDashboard - Bus status data loaded:', data);
-      },
-      onError: (error) => {
-        console.error('StudentDashboard - Bus status error:', error);
-      }
+      refetchInterval: 30000
     }
   );
 
   // Fetch student bus scan logs
   const { data: scanLogs, isLoading: logsLoading } = useQuery(
     ['studentScanLogs', user?.user_id],
-    () => {
-      console.log('StudentDashboard - Query function called for scan logs');
-      return busAPI.getScans({ student_id: user?.user_id, limit: 20 });
-    },
+    () => busAPI.getScans({ student_id: user?.user_id, limit: 20 }),
     {
       enabled: !!user?.user_id,
-      refetchInterval: 30000,
-      onSuccess: (data) => {
-        console.log('StudentDashboard - Scan logs data loaded:', data);
-      },
-      onError: (error) => {
-        console.error('StudentDashboard - Scan logs error:', error);
-      }
+      refetchInterval: 30000
     }
   );
 
@@ -2595,19 +2674,10 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
   const busId = busStatus?.current_bus?.id;
   const { data: busStudents, isLoading: busStudentsLoading } = useQuery(
     ['busStudents', busId],
-    () => {
-      console.log('StudentDashboard - Query function called for bus students, busId:', busId);
-      return busAPI.getBusStudents(busId);
-    },
+    () => busAPI.getBusStudents(busId),
     {
       enabled: !!busId,
-      refetchInterval: 60000, // Refresh every minute
-      onSuccess: (data) => {
-        console.log('StudentDashboard - Bus students data loaded:', data);
-      },
-      onError: (error) => {
-        console.error('StudentDashboard - Bus students error:', error);
-      }
+      refetchInterval: 60000 // Refresh every minute
     }
   );
 
@@ -2849,7 +2919,7 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
                           downloadLink.download = `${studentName.replace(/[<>:"/\\|?*]/g, '_')}_QR.png`;
                           document.body.appendChild(downloadLink);
                           downloadLink.click();
-                          document.body.removeChild(downloadLink);
+                          downloadLink.remove();
                           URL.revokeObjectURL(url);
                           toast.success('تم تحميل رمز QR بنجاح');
                         }
@@ -2951,7 +3021,7 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
       )}
 
       {/* Bus Route Tracking */}
-      {busStatus && (
+      {busStatus == [] && (
         <div className="card">
           <div className="card-header">
             <div className="flex items-center gap-2">
@@ -3253,78 +3323,70 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
         </div>
         <div className="card-body">
           {scanLogs && Array.isArray(scanLogs) && scanLogs.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {scanLogs.map((log, index) => {
                 const omanTime = formatOmanTime(log.scan_time);
                 
                 return (
-                  <div key={log.id || index} className={`p-4 rounded-lg border-2 ${
+                  <div key={log.id || index} className={`p-2 sm:p-2.5 rounded-lg border ${
                     log.scan_type === 'board' 
                       ? 'bg-green-50 border-green-200' 
                       : 'bg-red-50 border-red-200'
                   }`}>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 md:gap-3 text-xs sm:text-sm">
+                      {/* Icon */}
+                      <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                           log.scan_type === 'board' ? 'bg-green-500' : 'bg-red-500'
                         }`}>
                           {log.scan_type === 'board' ? (
-                            <ArrowRight className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                          <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                           ) : (
-                            <ArrowLeft className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                          <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                           )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            <p className={`font-bold text-base sm:text-lg ${
-                              log.scan_type === 'board' ? 'text-green-900' : 'text-red-900'
-                            }`}>
-                              {log.scan_type === 'board' ? 'صعود إلى الحافلة' : 'نزول من الحافلة'}
-                            </p>
-                            <span className={`badge text-xs ${
+                      
+                      {/* Type Badge */}
+                      <span className={`badge text-xs whitespace-nowrap ${
                               log.scan_type === 'board' ? 'badge-success' : 'badge-danger'
                             }`}>
                               {log.scan_type === 'board' ? 'صعود' : 'نزول'}
                             </span>
-                          </div>
                           
-                          {/* Time Display - Prominent */}
-                          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg mb-2 ${
+                      {/* Time */}
+                      <div className={`flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded ${
                             log.scan_type === 'board' 
                               ? 'bg-green-100 text-green-900' 
                               : 'bg-red-100 text-red-900'
                           }`}>
-                            <Clock className={`h-4 w-4 ${
+                        <Clock className={`h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0 ${
                               log.scan_type === 'board' ? 'text-green-700' : 'text-red-700'
                             }`} />
-                            <span className="font-bold text-sm sm:text-base">
+                        <span className="font-semibold text-xs whitespace-nowrap">
                               {omanTime.time || formatDate(log.scan_time, 'HH:mm', 'ar')}
                             </span>
-                            <span className="text-xs font-medium bg-white px-2 py-0.5 rounded">MCT</span>
+                        <span className="text-[10px] sm:text-xs font-medium bg-white px-1 sm:px-1.5 py-0.5 rounded whitespace-nowrap">MCT</span>
                           </div>
                           
-                          {/* Date */}
-                          <p className="text-xs sm:text-sm text-gray-600 mb-1">
-                            {omanTime.date || formatDate(log.scan_time, 'EEEE, dd MMMM yyyy', 'ar')}
-                          </p>
+                      {/* Date - Show on sm screens and up */}
+                      <span className="text-xs text-gray-600 whitespace-nowrap">
+                        {omanTime.date || formatDate(log.scan_time, 'dd/MM/yyyy', 'ar')} - 
+                      </span>
                           
-                          {/* Additional Info */}
-                          <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-600">
+                      {/* Bus Number */}
                             {log.bus_number && (
-                              <div className="flex items-center gap-1">
-                                <Bus className="h-3 w-3" />
-                                <span>الحافلة: {log.bus_number}</span>
+                        <div className="flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap">
+                          <Bus className="h-3 w-3 flex-shrink-0" />
+                          <span>{log.bus_number}</span>
                               </div>
                             )}
+                      
+                      {/* Location - Takes remaining space, wraps on mobile */}
                             {log.location && (
-                              <div className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                <span>{log.location}</span>
+                        <div className="flex items-center gap-1 text-xs text-gray-600 flex-1 min-w-[100px] sm:min-w-[150px] md:min-w-0">
+                          <MapPin className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{log.location}</span>
                               </div>
                             )}
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 );
