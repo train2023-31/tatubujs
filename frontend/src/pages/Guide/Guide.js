@@ -10,11 +10,16 @@ import {
   RefreshCw,
   GraduationCap,
   Info,
-  PlayCircle,
   Video,
   Bus,
-  User,
-  ScanLine
+  ScanLine,
+  ClipboardList,
+  Calendar,
+  UserCheck,
+  BarChart3,
+  MessageCircle,
+  QrCode,
+  Sparkles
 } from 'lucide-react';
 import Tabs from '../../components/UI/Tabs';
 
@@ -24,6 +29,7 @@ const Guide = () => {
   const tabs = [
     { id: 'setup', name: 'إعداد البيانات', icon: BookOpen },
     { id: 'refactor', name: 'إعادة هيكلة البيانات', icon: RefreshCw },
+    { id: 'features', name: 'مميزات النظام', icon: Sparkles },
   ];
 
   const StepCard = ({ number, title, description, children, warning, tip }) => (
@@ -797,6 +803,416 @@ const Guide = () => {
     </div>
   );
 
+  const SystemFeaturesGuide = () => {
+    const scrollToFeature = (id) => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+
+    const features = [
+      { id: 'attendance', name: 'إدارة الحضور', icon: ClipboardList },
+      { id: 'timetable', name: 'الجدول الدراسي', icon: Calendar },
+      { id: 'substitution', name: 'نظام الإحتياط', icon: UserCheck },
+      { id: 'buses', name: 'إدارة الحافلات', icon: Bus },
+      { id: 'reports', name: 'التقارير', icon: BarChart3 },
+      { id: 'sms', name: 'إشعارات SMS', icon: MessageCircle },
+      { id: 'qrcodes', name: 'رموز QR', icon: QrCode },
+      { id: 'bulk', name: 'العمليات الجماعية', icon: Upload },
+      { id: 'dashboard', name: 'لوحة التحكم', icon: BarChart3 },
+    ];
+
+    return (
+      <div className="space-y-6">
+        {/* Introduction */}
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6 mb-6">
+          <div className="flex items-start gap-4">
+            <Sparkles className="w-8 h-8 text-purple-600 mt-1 flex-shrink-0" />
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">مميزات النظام ودليل الاستخدام</h2>
+              <p className="text-gray-700 mb-3">
+                هذا الدليل يوضح جميع مميزات النظام وكيفية استخدامها بشكل فعال.
+              </p>
+              <p className="text-sm text-gray-600">
+                تعرف على جميع الوظائف المتاحة في النظام وكيفية الاستفادة منها.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Features Menu Bar */}
+        <div className="sticky top-0 z-20 bg-white border-b border-gray-200 shadow-sm mb-6 -mx-6 px-6 py-3">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="w-5 h-5 text-purple-600" />
+            <h3 className="text-lg font-semibold text-gray-900">القائمة السريعة:</h3>
+          </div>
+          <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {features.map((feature) => (
+              <button
+                key={feature.id}
+                onClick={() => scrollToFeature(feature.id)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-primary-100 text-gray-700 hover:text-primary-700 rounded-lg transition-all duration-200 text-sm font-medium whitespace-nowrap border border-gray-200 hover:border-primary-300"
+              >
+                <feature.icon className="w-4 h-4" />
+                <span>{feature.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Feature 1: Attendance Management */}
+        <div id="attendance">
+          <StepCard
+        number="1"
+        title="إدارة الحضور والغياب"
+        description="نظام شامل لتسجيل ومتابعة حضور الطلاب"
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <ClipboardList className="w-5 h-5 text-primary-600" />
+              المميزات الرئيسية:
+            </h4>
+            <ul className="list-disc list-inside mr-6 space-y-2 text-gray-700">
+              <li><strong>تسجيل الحضور اليومي:</strong> سجل حضور الطلاب لكل حصة بسهولة</li>
+              <li><strong>تتبع الحالات:</strong> متابعة الحاضرين، الهاربين، المتأخرين، والغائبين</li>
+              <li><strong>إضافة ملاحظات:</strong> أضف ملاحظات العذر للطلاب الغائبين</li>
+              <li><strong>التقارير التفصيلية:</strong> عرض تقارير شاملة عن الحضور</li>
+              <li><strong>التقرير اليومي:</strong> تقرير يومي شامل مع إمكانية إرسال إشعارات لأولياء الأمور</li>
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">كيفية الاستخدام:</h4>
+            <ol className="list-decimal list-inside space-y-2 text-blue-800">
+              <li>انتقل إلى <Link to="/app/attendance" className="text-primary-600 hover:underline font-medium">صفحة تسجيل الحضور</Link></li>
+              <li>اختر التاريخ والفصل والحصة</li>
+              <li>حدد حالة كل طالب (حاضر، هارب، متأخر، غائب)</li>
+              <li>أضف ملاحظات العذر للطلاب الغائبين</li>
+              <li>احفظ السجل</li>
+              <li>استخدم <Link to="/app/attendance-details" className="text-primary-600 hover:underline font-medium">صفحة تفاصيل الحضور</Link> لعرض التقارير</li>
+            </ol>
+          </div>
+        </div>
+      </StepCard>
+        </div>
+
+      {/* Feature 2: Timetable Management */}
+      <div id="timetable">
+        <StepCard
+        number="2"
+        title="إدارة الجدول الدراسي"
+        description="نظام متقدم لإدارة الجداول الدراسية"
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary-600" />
+              المميزات الرئيسية:
+            </h4>
+            <ul className="list-disc list-inside mr-6 space-y-2 text-gray-700">
+              <li><strong>رفع الجدول من XML:</strong> ارفع الجدول مباشرة من نظام aSc Timetables</li>
+              <li><strong>جداول متعددة:</strong> إدارة عدة جداول دراسية (فصل أول، فصل ثاني، إلخ)</li>
+              <li><strong>تفعيل/تعطيل الجداول:</strong> تفعيل الجدول المطلوب حسب الفصل الدراسي</li>
+              <li><strong>عرض الجدول للمعلمين:</strong> كل معلم يرى جدوله الخاص</li>
+              <li><strong>ربط المعلمين:</strong> ربط المعلمين في الجدول مع المعلمين المسجلين</li>
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">كيفية الاستخدام:</h4>
+            <ol className="list-decimal list-inside space-y-2 text-blue-800">
+              <li>انتقل إلى <Link to="/app/school-timetable" className="text-primary-600 hover:underline font-medium">صفحة الجدول الدراسي</Link></li>
+              <li>اضغط على "رفع جدول جديد" أو "رفع ملف XML"</li>
+              <li>اختر ملف XML من نظام aSc Timetables</li>
+              <li>راجع البيانات المعروضة وربط المعلمين إذا لزم الأمر</li>
+              <li>أدخل اسم للجدول واحفظه</li>
+              <li>فعّل الجدول المطلوب من قائمة الجداول</li>
+            </ol>
+          </div>
+        </div>
+      </StepCard>
+      </div>
+
+      {/* Feature 3: Substitution System */}
+      <div id="substitution">
+        <StepCard
+        number="3"
+        title="نظام الإحتياط (البدائل)"
+        description="إدارة بدائل المعلمين الغائبين"
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-primary-600" />
+              المميزات الرئيسية:
+            </h4>
+            <ul className="list-disc list-inside mr-6 space-y-2 text-gray-700">
+              <li><strong>إنشاء بدائل:</strong> إنشاء بدائل للمعلمين الغائبين</li>
+              <li><strong>تعيين المعلم البديل:</strong> تعيين معلم بديل للحصص المحددة</li>
+              <li><strong>فترات زمنية:</strong> تحديد فترة البديل (يوم واحد أو عدة أيام)</li>
+              <li><strong>عرض في الجدول:</strong> يظهر البديل في جدول المعلم الأصلي والبديل</li>
+              <li><strong>إشعارات:</strong> إشعار المعلم البديل بالتعيين</li>
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">كيفية الاستخدام:</h4>
+            <ol className="list-decimal list-inside space-y-2 text-blue-800">
+              <li>انتقل إلى <Link to="/app/teacher-substitution" className="text-primary-600 hover:underline font-medium">صفحة إدارة الإحتياط</Link></li>
+              <li>اضغط على "إضافة بديل جديد"</li>
+              <li>اختر المعلم الأصلي والمعلم البديل</li>
+              <li>حدد الحصص والفترة الزمنية</li>
+              <li>احفظ البديل</li>
+              <li>سيظهر البديل تلقائياً في جداول المعلمين</li>
+            </ol>
+          </div>
+        </div>
+      </StepCard>
+      </div>
+
+      {/* Feature 4: Bus Management */}
+      <div id="buses">
+        <StepCard
+        number="4"
+        title="إدارة الحافلات"
+        description="نظام متكامل لإدارة الحافلات والطلاب"
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Bus className="w-5 h-5 text-primary-600" />
+              المميزات الرئيسية:
+            </h4>
+            <ul className="list-disc list-inside mr-6 space-y-2 text-gray-700">
+              <li><strong>إدارة الحافلات:</strong> إضافة وتعديل معلومات الحافلات</li>
+              <li><strong>تعيين السائقين:</strong> ربط السائقين بالحافلات</li>
+              <li><strong>تعيين الطلاب:</strong> تعيين الطلاب للحافلات</li>
+              <li><strong>مسح QR Codes:</strong> مسح رموز QR للطلاب عند الصعود والنزول</li>
+              <li><strong>تتبع الموقع:</strong> تتبع موقع الحافلة والطلاب</li>
+              <li><strong>التقارير اليومية:</strong> تقارير شاملة عن الحافلات والطلاب</li>
+              <li><strong>لوحة السائق:</strong> لوحة خاصة للسائقين لمتابعة الطلاب</li>
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">كيفية الاستخدام:</h4>
+            <ol className="list-decimal list-inside space-y-2 text-blue-800">
+              <li>انتقل إلى <Link to="/app/buses" className="text-primary-600 hover:underline font-medium">صفحة إدارة الحافلات</Link></li>
+              <li>أضف حافلة جديدة مع بياناتها (رقم، اسم، سعة، سائق)</li>
+              <li>اضغط على أيقونة "تعيين طلاب" لتعيين الطلاب للحافلة</li>
+              <li>استخدم <Link to="/app/bus-scanner" className="text-primary-600 hover:underline font-medium">ماسح الحافلة</Link> لمسح رموز QR</li>
+              <li>تابع التقارير اليومية من لوحة التحكم</li>
+            </ol>
+          </div>
+        </div>
+      </StepCard>
+      </div>
+
+      {/* Feature 5: Reports and Statistics */}
+      <div id="reports">
+        <StepCard
+        number="5"
+        title="التقارير والإحصائيات"
+        description="تقارير شاملة وإحصائيات مفصلة"
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-primary-600" />
+              المميزات الرئيسية:
+            </h4>
+            <ul className="list-disc list-inside mr-6 space-y-2 text-gray-700">
+              <li><strong>التقرير اليومي:</strong> تقرير شامل عن الحضور اليومي</li>
+              <li><strong>تقرير المعلمين:</strong> تقرير عن حضور المعلمين</li>
+              <li><strong>إحصائيات الفصول:</strong> إحصائيات مفصلة لكل فصل</li>
+              <li><strong>تقارير الحضور:</strong> تقارير تفصيلية عن الحضور والغياب</li>
+              <li><strong>إحصائيات الحافلات:</strong> إحصائيات عن الحافلات والطلاب</li>
+              <li><strong>تصدير البيانات:</strong> تصدير التقارير بصيغ مختلفة</li>
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">كيفية الاستخدام:</h4>
+            <ol className="list-decimal list-inside space-y-2 text-blue-800">
+              <li>انتقل إلى <Link to="/app/daily-report" className="text-primary-600 hover:underline font-medium">التقرير اليومي</Link> لعرض التقرير اليومي</li>
+              <li>استخدم <Link to="/app/teacher-report" className="text-primary-600 hover:underline font-medium">تقرير المعلمين</Link> لمتابعة حضور المعلمين</li>
+              <li>راجع <Link to="/app/attendance-details" className="text-primary-600 hover:underline font-medium">تفاصيل الحضور</Link> للتقارير التفصيلية</li>
+              <li>استخدم <Link to="/app/reports" className="text-primary-600 hover:underline font-medium">صفحة التقارير</Link> للتقارير الشاملة</li>
+              <li>من لوحة التحكم، يمكنك عرض إحصائيات سريعة</li>
+            </ol>
+          </div>
+        </div>
+      </StepCard>
+      </div>
+
+      {/* Feature 6: SMS Notifications */}
+      <div id="sms">
+        <StepCard
+        number="6"
+        title="إشعارات SMS"
+        description="إرسال إشعارات SMS لأولياء الأمور"
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <MessageCircle className="w-5 h-5 text-primary-600" />
+              المميزات الرئيسية:
+            </h4>
+            <ul className="list-disc list-inside mr-6 space-y-2 text-gray-700">
+              <li><strong>إعدادات SMS:</strong> إعدادات متقدمة لخدمة iBulk SMS</li>
+              <li><strong>إشعارات تلقائية:</strong> إرسال إشعارات تلقائية للطلاب الغائبين</li>
+              <li><strong>رسائل مخصصة:</strong> إرسال رسائل مخصصة للطلاب</li>
+              <li><strong>متابعة الرصيد:</strong> متابعة رصيد SMS</li>
+              <li><strong>سجل الرسائل:</strong> سجل شامل للرسائل المرسلة</li>
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">كيفية الاستخدام:</h4>
+            <ol className="list-decimal list-inside space-y-2 text-blue-800">
+              <li>انتقل إلى <Link to="/app/sms-configuration" className="text-primary-600 hover:underline font-medium">إعدادات SMS</Link></li>
+              <li>أدخل بيانات iBulk SMS (اسم المستخدم، كلمة المرور، معرف المرسل)</li>
+              <li>احفظ الإعدادات</li>
+              <li>استخدم <Link to="/app/daily-report" className="text-primary-600 hover:underline font-medium">التقرير اليومي</Link> لإرسال إشعارات للطلاب الغائبين</li>
+              <li>استخدم <Link to="/app/bulk-messaging" className="text-primary-600 hover:underline font-medium">إرسال رسائل مخصصة</Link> لإرسال رسائل مخصصة</li>
+            </ol>
+          </div>
+        </div>
+      </StepCard>
+      </div>
+
+      {/* Feature 7: Student QR Codes */}
+      <div id="qrcodes">
+        <StepCard
+        number="7"
+        title="رموز QR للطلاب"
+        description="رموز QR فريدة لكل طالب"
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <QrCode className="w-5 h-5 text-primary-600" />
+              المميزات الرئيسية:
+            </h4>
+            <ul className="list-disc list-inside mr-6 space-y-2 text-gray-700">
+              <li><strong>رمز فريد:</strong> كل طالب لديه رمز QR فريد</li>
+              <li><strong>استخدام الحافلات:</strong> استخدام الرمز للصعود والنزول من الحافلة</li>
+              <li><strong>تحميل الرمز:</strong> إمكانية تحميل رمز QR كصورة</li>
+              <li><strong>طباعة:</strong> طباعة الرمز للاستخدام</li>
+              <li><strong>ماسح الحافلة:</strong> مسح الرموز بسهولة من خلال التطبيق</li>
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">كيفية الاستخدام:</h4>
+            <ol className="list-decimal list-inside space-y-2 text-blue-800">
+              <li>الطلاب يمكنهم رؤية رمز QR الخاص بهم من لوحة التحكم</li>
+              <li>يمكن تحميل الرمز كصورة PNG مع اسم الطالب</li>
+              <li>استخدم <Link to="/app/bus-scanner" className="text-primary-600 hover:underline font-medium">ماسح الحافلة</Link> لمسح الرموز</li>
+              <li>السائقون يمكنهم استخدام الماسح من لوحة التحكم الخاصة بهم</li>
+            </ol>
+          </div>
+        </div>
+      </StepCard>
+      </div>
+
+      {/* Feature 8: Bulk Operations */}
+      <div id="bulk">
+        <StepCard
+        number="8"
+        title="العمليات الجماعية"
+        description="رفع وتحديث البيانات بشكل جماعي"
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Upload className="w-5 h-5 text-primary-600" />
+              المميزات الرئيسية:
+            </h4>
+            <ul className="list-disc list-inside mr-6 space-y-2 text-gray-700">
+              <li><strong>رفع المعلمين:</strong> رفع قائمة المعلمين من ملف Excel</li>
+              <li><strong>رفع الطلاب:</strong> رفع قائمة الطلاب وتعيينهم للفصول</li>
+              <li><strong>تحديث الهواتف:</strong> تحديث أرقام الهواتف بشكل جماعي</li>
+              <li><strong>رفع السائقين:</strong> رفع قائمة السائقين</li>
+              <li><strong>معاينة البيانات:</strong> معاينة البيانات قبل الحفظ</li>
+              <li><strong>معالجة ذكية:</strong> معالجة تلقائية للبيانات المكررة</li>
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">كيفية الاستخدام:</h4>
+            <ol className="list-decimal list-inside space-y-2 text-blue-800">
+              <li>انتقل إلى <Link to="/app/bulk-operations" className="text-primary-600 hover:underline font-medium">صفحة رفع وتحديث البيانات</Link></li>
+              <li>اختر التبويب المناسب (معلمين، طلاب، هواتف، سائقين)</li>
+              <li>قم بتحميل النموذج أو استخدم ملف من نظام البوابة</li>
+              <li>املأ البيانات وارفع الملف</li>
+              <li>راجع المعاينة واضغط "معالجة البيانات"</li>
+            </ol>
+          </div>
+        </div>
+      </StepCard>
+      </div>
+
+      {/* Feature 9: Dashboard */}
+      <div id="dashboard">
+        <StepCard
+        number="9"
+        title="لوحة التحكم"
+        description="نظرة شاملة على جميع البيانات والإحصائيات"
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-primary-600" />
+              المميزات الرئيسية:
+            </h4>
+            <ul className="list-disc list-inside mr-6 space-y-2 text-gray-700">
+              <li><strong>إحصائيات سريعة:</strong> عرض إحصائيات اليوم بشكل مباشر</li>
+              <li><strong>إحصائيات الفصول:</strong> إحصائيات مفصلة لكل فصل</li>
+              <li><strong>حضور المعلمين:</strong> متابعة حضور المعلمين لهذا الأسبوع</li>
+              <li><strong>إحصائيات الحافلات:</strong> إحصائيات عن الحافلات والطلاب</li>
+              <li><strong>الوصول السريع:</strong> روابط سريعة لجميع الصفحات المهمة</li>
+              <li><strong>دليل الإعداد:</strong> دليل تفاعلي لإعداد المدرسة</li>
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">كيفية الاستخدام:</h4>
+            <ol className="list-decimal list-inside space-y-2 text-blue-800">
+              <li>افتح <Link to="/app/dashboard" className="text-primary-600 hover:underline font-medium">لوحة التحكم</Link></li>
+              <li>راجع الإحصائيات اليومية في الأعلى</li>
+              <li>استخدم "الوصول السريع" للانتقال السريع للصفحات</li>
+              <li>راجع إحصائيات الفصول في الجدول</li>
+              <li>تابع حضور المعلمين من القسم المخصص</li>
+            </ol>
+          </div>
+        </div>
+      </StepCard>
+      </div>
+
+      {/* Quick Tips */}
+      <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+        <div className="flex items-start gap-4">
+          <Info className="w-8 h-8 text-green-600 mt-1 flex-shrink-0" />
+          <div>
+            <h3 className="text-xl font-bold text-green-900 mb-3">نصائح للاستخدام الفعال</h3>
+            <ul className="list-disc list-inside space-y-2 text-green-800">
+              <li>استخدم "الوصول السريع" في لوحة التحكم للانتقال السريع</li>
+              <li>راجع التقارير بانتظام لمتابعة الأداء</li>
+              <li>استخدم نظام الإحتياط لإدارة غياب المعلمين بفعالية</li>
+              <li>احرص على تحديث أرقام الهواتف لضمان وصول الإشعارات</li>
+              <li>استخدم رموز QR للطلاب لتسهيل عملية الصعود والنزول</li>
+              <li>راجع إعدادات SMS بانتظام لضمان عمل الإشعارات</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    );
+  };
+
   return (
     <div className="space-y-6 max-w-full overflow-x-hidden">
       {/* Header */}
@@ -822,6 +1238,7 @@ const Guide = () => {
         <div className="card-body">
           {selectedTab === 'setup' && <SetupGuide />}
           {selectedTab === 'refactor' && <RefactorGuide />}
+          {selectedTab === 'features' && <SystemFeaturesGuide />}
         </div>
       </div>
     </div>

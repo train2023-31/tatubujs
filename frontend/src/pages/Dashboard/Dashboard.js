@@ -342,19 +342,18 @@ const Dashboard = () => {
   return (
     <div ref={dashboardRef} className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 truncate">
             مرحباً، {user?.fullName}
           </h1>
-          <p className="text-gray-600">
+          <p className="text-xs sm:text-sm text-gray-600 truncate">
             {getRoleDisplayName(user?.role)} - {user?.school_name}
           </p>
         </div>
-        <div className="flex items-center space-x-4">
-          <div className="text-sm text-gray-500">
+        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4">
+          <div className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
             {formatDate(new Date(), 'EEEE, dd MMMM yyyy', 'ar-OM')}
-           
           </div>
           {(user?.role === 'school_admin' || user?.role === 'data_analyst') && (
             <div className="flex items-center space-x-2">
