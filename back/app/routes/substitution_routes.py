@@ -6,6 +6,7 @@ from datetime import datetime, date, timedelta
 import json
 from flask_cors import CORS
 from app.routes.notification_routes import create_notification
+from app.services.notification_service import notify_teacher_substitution
 
 substitution_bp = Blueprint('substitution', __name__, url_prefix='/api/substitutions')
 CORS(substitution_bp)
@@ -703,25 +704,35 @@ def create_substitution():
                 action_url='/app/teacher-substitution'
             )
         
-        # Notify all substitute teachers
-        substitute_teacher_ids = set()
+        # Notify all substitute teachers with detailed substitution information
+        # Group assignments by substitute teacher
+        teacher_assignments = {}
         for assignment_data in data['assignments']:
-            if assignment_data.get('substitute_teacher_user_id'):
-                substitute_teacher_ids.add(assignment_data['substitute_teacher_user_id'])
+            teacher_id = assignment_data.get('substitute_teacher_user_id')
+            if teacher_id:
+                if teacher_id not in teacher_assignments:
+                    teacher_assignments[teacher_id] = []
+                teacher_assignments[teacher_id].append(assignment_data)
         
-        for teacher_id in substitute_teacher_ids:
-            create_notification(
-                school_id=user.school_id,
-                title="حصة احتياطية جديدة",
-                message=f"تم تعيينك كبديل للمعلم {data['absent_teacher_name']} من {start_date.strftime('%Y-%m-%d')} إلى {end_date.strftime('%Y-%m-%d')}",
-                notification_type='substitution',
-                created_by=current_user,
-                priority='high',
-                target_user_ids=[teacher_id],
-                related_entity_type='substitution',
-                related_entity_id=substitution.id,
-                action_url='/app/teacher-substitution'
-            )
+        # Send detailed notifications to each substitute teacher
+        for teacher_id, assignments in teacher_assignments.items():
+            # For each assignment, send a detailed notification
+            for assignment_data in assignments:
+                substitution_data = {
+                    'id': substitution.id,
+                    'class_name': assignment_data.get('class_name', 'غير محدد'),
+                    'subject_name': assignment_data.get('subject_name', 'غير محدد'),
+                    'absent_teacher_name': data['absent_teacher_name'],
+                    'period': assignment_data.get('period_xml_id', '-'),
+                    'date': assignment_data.get('assignment_date', start_date.strftime('%Y-%m-%d')) if assignment_data.get('assignment_date') else start_date.strftime('%Y-%m-%d')
+                }
+                
+                notify_teacher_substitution(
+                    teacher_id=teacher_id,
+                    school_id=user.school_id,
+                    substitution_data=substitution_data,
+                    created_by=current_user
+                )
         
         # Notify school admins
         create_notification(

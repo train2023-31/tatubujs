@@ -11,6 +11,7 @@ from app.config import get_oman_time
 from sqlalchemy import func , or_ ,case, and_
 from ibulk_sms_service import get_attendance_sms_service, get_ibulk_sms_service
 from app.routes.notification_routes import create_notification
+from app.services.notification_service import notify_student_attendance
 
 
 
@@ -119,56 +120,52 @@ def take_attendances():
     # Commit changes once for all records
     db.session.commit()
 
-    # Create notifications for absent and excused students
+    # Create notifications for absent, late, and excused students
     try:
         user = User.query.get(teacher_id)
         if user and user.school_id:
             absent_students = []
             excused_students = []
+            late_students = []
             
             for record in attendance_records:
                 student = Student.query.get(record['student_id'])
                 if not student:
                     continue
                 
-                # Handle absent students
-                if record.get('is_Acsent'):
-                    absent_students.append(student)
-                    
-                    # Create notification for the specific student
-                    create_notification(
+                # Get subject and teacher name for notification
+                subject = Subject.query.get(record.get('subject_id')) if record.get('subject_id') else None
+                teacher = Teacher.query.get(teacher_id)
+                
+                # Prepare attendance data for notification
+                attendance_data = {
+                    'is_absent': record.get('is_Acsent', False),
+                    'is_late': record.get('is_late', False),
+                    'is_excused': record.get('is_Excus', False),
+                    'subject_name': subject.name if subject else 'غير محدد',
+                    'class_name': class_obj.name,
+                    'teacher_name': teacher.fullName if teacher else 'غير محدد',
+                    'date': attendance_date.strftime('%Y-%m-%d'),
+                    'class_time_num': record.get('class_time_num', '-'),
+                    'excuse_note': record.get('ExcusNote', '')
+                }
+                
+                # Send detailed notification to student for any status (absent, late, excuse)
+                if record.get('is_Acsent') or record.get('is_late') or record.get('is_Excus'):
+                    notify_student_attendance(
+                        student_id=student.id,
                         school_id=user.school_id,
-                        title="غياب طالب",
-                        message=f"الطالب {student.fullName} غائب في التاريخ {attendance_date.strftime('%Y-%m-%d')}",
-                        notification_type='attendance',
-                        created_by=teacher_id,
-                        priority='normal',
-                        target_user_ids=[student.id],
-                        related_entity_type='attendance',
-                        action_url='/app/attendance-details'
+                        attendance_record=attendance_data,
+                        created_by=teacher_id
                     )
                 
-                # Handle excused students
+                # Track for admin notifications
+                if record.get('is_Acsent'):
+                    absent_students.append(student)
                 if record.get('is_Excus'):
                     excused_students.append(student)
-                    
-                    excuse_note = record.get('ExcusNote', '')
-                    message = f"الطالب {student.fullName} لديه عذر في التاريخ {attendance_date.strftime('%Y-%m-%d')}"
-                    if excuse_note and excuse_note.strip() not in ['-', '', ' ']:
-                        message += f"\nالعذر: {excuse_note}"
-                    
-                    # Create notification for the specific student
-                    create_notification(
-                        school_id=user.school_id,
-                        title="عذر طالب",
-                        message=message,
-                        notification_type='attendance',
-                        created_by=teacher_id,
-                        priority='normal',
-                        target_user_ids=[student.id],
-                        related_entity_type='attendance',
-                        action_url='/app/attendance-details'
-                    )
+                if record.get('is_late'):
+                    late_students.append(student)
             
             # If there are multiple absences, notify teachers and admins
             if len(absent_students) > 2:

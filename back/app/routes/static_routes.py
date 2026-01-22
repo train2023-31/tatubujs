@@ -17,6 +17,13 @@ import logging
 import requests
 import json
 from ibulk_sms_service import get_ibulk_sms_service, IBulkSMSService
+from app.services.notification_service import (
+    notify_students_school_news,
+    notify_teachers_school_news,
+    notify_teachers_system_news,
+    notify_driver_school_news,
+    notify_admin_system_news
+)
 
 logger = logging.getLogger(__name__)
 
@@ -487,7 +494,28 @@ def add_news():
     # log_action("إضافة ", description="إضافة خبر جديد", content=description)
     db.session.commit()
 
-
+    # Send notifications to appropriate user roles based on news type
+    try:
+        news_data = {
+            'id': new_news.id,
+            'title': title,
+            'content': description
+        }
+        
+        if news_type == 'school':
+            # School news - notify students, teachers, analysts, and drivers
+            notify_students_school_news(school_id, news_data, user.id)
+            notify_teachers_school_news(school_id, news_data, user.id)
+            notify_driver_school_news(school_id, news_data, user.id)
+        elif news_type == 'global':
+            # System news - notify teachers, analysts, and school admins across all schools
+            # For global news, we'll notify for each school separately
+            schools = School.query.all()
+            for school in schools:
+                notify_teachers_system_news(school.id, news_data, user.id)
+                notify_admin_system_news(school.id, news_data, user.id)
+    except Exception as e:
+        print(f"Error creating news notifications: {str(e)}")
 
     return jsonify(message="News created successfully.", news=new_news.to_dict()), 201
 

@@ -8,6 +8,7 @@ from app.models import (
 from datetime import datetime
 from flask_cors import CORS
 from app.routes.notification_routes import create_notification
+from app.services.notification_service import notify_teachers_timetable_change
 timetable_bp = Blueprint('timetable', __name__)
 CORS(timetable_bp)
 
@@ -131,33 +132,20 @@ def create_timetable():
         
         db.session.commit()
         
-        # Create notification for new timetable
+        # Create notification for new timetable - notify all teachers and analysts
         try:
-            create_notification(
-                school_id=current_user.school_id,
-                title="جدول دراسي جديد",
-                message=f"تم إضافة جدول دراسي جديد: {data['name']}",
-                notification_type='timetable',
-                created_by=user_id,
-                priority='high',
-                target_role='teacher',
-                related_entity_type='timetable',
-                related_entity_id=timetable.id,
-                action_url='/app/school-timetable'
-            )
+            timetable_data = {
+                'id': timetable.id,
+                'timetable_name': data['name'],
+                'change_description': f"تم رفع جدول دراسي جديد"
+            }
             
-            # Also notify school admins
-            create_notification(
+            # Notify all teachers and analysts about the new timetable
+            notify_teachers_timetable_change(
                 school_id=current_user.school_id,
-                title="جدول دراسي جديد",
-                message=f"تم إضافة جدول دراسي جديد: {data['name']}",
-                notification_type='timetable',
+                timetable_data=timetable_data,
                 created_by=user_id,
-                priority='high',
-                target_role='school_admin',
-                related_entity_type='timetable',
-                related_entity_id=timetable.id,
-                action_url='/app/school-timetable'
+                affected_teacher_ids=None  # None means notify all teachers
             )
         except Exception as e:
             print(f"Error creating timetable notification: {str(e)}")
@@ -253,6 +241,24 @@ def update_timetable(timetable_id):
                 db.session.add(schedule)
         
         db.session.commit()
+        
+        # Notify teachers about timetable update
+        try:
+            timetable_data = {
+                'id': timetable.id,
+                'timetable_name': timetable.name,
+                'change_description': 'تم تحديث الجدول الدراسي'
+            }
+            
+            notify_teachers_timetable_change(
+                school_id=current_user.school_id,
+                timetable_data=timetable_data,
+                created_by=user_id,
+                affected_teacher_ids=None
+            )
+        except Exception as e:
+            print(f"Error creating timetable update notification: {str(e)}")
+        
         return jsonify({'message': 'Timetable updated successfully'}), 200
         
     except Exception as e:

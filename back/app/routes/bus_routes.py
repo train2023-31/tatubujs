@@ -8,6 +8,11 @@ from app.logger import log_action
 from sqlalchemy import func, and_, or_
 from flask_cors import CORS
 from app.routes.notification_routes import create_notification
+from app.services.notification_service import (
+    notify_student_bus_scan,
+    notify_driver_forgot_students,
+    notify_admin_forgot_students_on_bus
+)
 
 bus_blueprint = Blueprint('bus_blueprint', __name__)
 
@@ -365,27 +370,22 @@ def scan_student():
     db.session.add(scan)
     db.session.commit()
     
-    # Create notification for bus scan
+    # Create detailed notification for bus scan (student notification)
     try:
-        if scan_type == 'board':
-            message = f"الطالب {student.fullName} صعد إلى الحافلة {bus.bus_name}"
-            title = "صعود حافلة"
-        else:
-            message = f"الطالب {student.fullName} نزل من الحافلة {bus.bus_name}"
-            title = "نزول من الحافلة"
+        scan_data = {
+            'id': scan.id,
+            'scan_type': scan_type,
+            'scan_time': oman_now,
+            'bus_number': bus.bus_number,
+            'location': location
+        }
         
-        # Notify the student
-        create_notification(
+        # Notify the student with detailed WhatsApp-style message
+        notify_student_bus_scan(
+            student_id=student.id,
             school_id=bus.school_id,
-            title=title,
-            message=message,
-            notification_type='bus',
-            created_by=user_id,
-            priority='normal',
-            target_user_ids=[student.id],
-            related_entity_type='bus_scan',
-            related_entity_id=scan.id,
-            action_url='/app/bus-reports'
+            scan_data=scan_data,
+            created_by=user_id
         )
     except Exception as e:
         print(f"Error creating bus notification: {str(e)}")
@@ -591,4 +591,131 @@ def get_daily_bus_report():
         })
     
     return jsonify(report), 200
+
+
+@bus_blueprint.route('/check-forgotten-students', methods=['POST'])
+@jwt_required()
+def check_forgotten_students():
+    """
+    Check for students who are still on buses (boarded but not exited)
+    Send notifications to drivers and school admins
+    Can be called manually or via cron job at end of school day
+    """
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify(message="User not found"), 404
+        
+        # Only school admins and system admins can trigger this check
+        if user.user_role not in ['school_admin', 'admin']:
+            return jsonify(message="Unauthorized"), 403
+        
+        # Get today's date
+        today = date.today()
+        
+        # Determine which schools to check
+        if user.user_role == 'admin':
+            # System admin can check all schools
+            schools = School.query.all()
+        else:
+            # School admin checks only their school
+            schools = [School.query.get(user.school_id)] if user.school_id else []
+        
+        notifications_sent = []
+        buses_with_students = []
+        
+        for school in schools:
+            if not school:
+                continue
+            
+            # Get all buses for this school
+            buses = Bus.query.filter_by(school_id=school.id, is_active=True).all()
+            
+            for bus in buses:
+                # Get today's scans for this bus
+                scans_today = BusScan.query.filter(
+                    BusScan.bus_id == bus.id,
+                    func.date(BusScan.scan_time) == today
+                ).order_by(BusScan.student_id, BusScan.scan_time.desc()).all()
+                
+                # Group scans by student to find who's still on the bus
+                student_scans = {}
+                for scan in scans_today:
+                    if scan.student_id not in student_scans:
+                        student_scans[scan.student_id] = []
+                    student_scans[scan.student_id].append(scan)
+                
+                # Check which students are still on the bus
+                students_on_bus = []
+                for student_id, scans in student_scans.items():
+                    # Get the most recent scan for this student
+                    last_scan = scans[0]  # Already sorted by desc
+                    
+                    if last_scan.scan_type == 'board':
+                        # Student boarded but hasn't exited
+                        student = Student.query.get(student_id)
+                        if student:
+                            students_on_bus.append(student)
+                
+                # If there are students still on the bus, send notifications
+                if students_on_bus:
+                    bus_data = {
+                        'id': bus.id,
+                        'bus_number': bus.bus_number,
+                        'bus_name': bus.bus_name,
+                        'students_count': len(students_on_bus),
+                        'student_names': [s.fullName for s in students_on_bus],
+                        'driver_name': bus.driver.fullName if bus.driver else 'غير محدد'
+                    }
+                    
+                    buses_with_students.append(bus_data)
+                    
+                    # Notify the driver
+                    if bus.driver_id:
+                        try:
+                            notify_driver_forgot_students(
+                                driver_id=bus.driver_id,
+                                school_id=school.id,
+                                bus_data=bus_data,
+                                created_by=user_id
+                            )
+                            notifications_sent.append({
+                                'type': 'driver',
+                                'recipient_id': bus.driver_id,
+                                'bus_number': bus.bus_number
+                            })
+                        except Exception as e:
+                            print(f"Error notifying driver {bus.driver_id}: {str(e)}")
+                    
+                    # Notify school admins
+                    try:
+                        notify_admin_forgot_students_on_bus(
+                            school_id=school.id,
+                            bus_data=bus_data,
+                            created_by=user_id
+                        )
+                        notifications_sent.append({
+                            'type': 'admin',
+                            'school_id': school.id,
+                            'bus_number': bus.bus_number
+                        })
+                    except Exception as e:
+                        print(f"Error notifying admins for school {school.id}: {str(e)}")
+        
+        return jsonify({
+            'message': 'Check completed successfully',
+            'buses_with_students': len(buses_with_students),
+            'notifications_sent': len(notifications_sent),
+            'details': {
+                'buses': buses_with_students,
+                'notifications': notifications_sent
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'message': f'Error checking for forgotten students: {str(e)}'
+        }), 500
 
