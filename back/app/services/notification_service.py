@@ -219,9 +219,12 @@ def notify_student_behavior_note(student_id, school_id, behavior_data, created_b
 
 def notify_students_school_news(school_id, news_data, created_by):
     """
-    Notify all students about school news
+    Notify all students about school news.
+    BEST PRACTICE: Use role-based targeting for broad announcements to students.
     """
     try:
+        from app.services.notification_utils import get_users_by_role, create_targeted_notification
+        
         title = news_data.get('title', 'خبر جديد')
         content = news_data.get('content', '')
         
@@ -235,14 +238,21 @@ def notify_students_school_news(school_id, news_data, created_by):
 {content}
 """
         
-        return create_notification(
+        # Get all active students in the school
+        student_ids = get_users_by_role('student', school_id)
+        
+        if not student_ids:
+            print(f"No students to notify in school {school_id}")
+            return None
+        
+        return create_targeted_notification(
             school_id=school_id,
             title=f"📰 {title}",
             message=message.strip(),
             notification_type='news',
             created_by=created_by,
+            target_user_ids=student_ids,
             priority='normal',
-            target_role='student',  # All students
             related_entity_type='news',
             related_entity_id=news_data.get('id'),
             action_url='/app/news',
@@ -259,11 +269,30 @@ def notify_students_school_news(school_id, news_data, created_by):
 
 def notify_teachers_timetable_change(school_id, timetable_data, created_by, affected_teacher_ids=None):
     """
-    Notify teachers about timetable changes
+    Notify teachers about timetable changes.
+    BEST PRACTICE: Only notify teachers who are actually affected by the change.
+    If no affected_teacher_ids provided, use get_affected_teachers_from_timetable_change
     """
     try:
+        from app.services.notification_utils import (
+            get_affected_teachers_from_timetable_change,
+            create_targeted_notification
+        )
+        
         change_description = timetable_data.get('change_description', 'تم تحديث الجدول الدراسي')
         timetable_name = timetable_data.get('timetable_name', 'الجدول الدراسي')
+        timetable_id = timetable_data.get('id')
+        
+        # If no specific teachers provided, get all affected teachers from timetable
+        if not affected_teacher_ids and timetable_id:
+            affected_teacher_ids = get_affected_teachers_from_timetable_change(
+                timetable_id=timetable_id,
+                school_id=school_id
+            )
+        
+        if not affected_teacher_ids:
+            print(f"No teachers to notify for timetable change in school {school_id}")
+            return None
         
         message = f"""
 📅 تحديث الجدول الدراسي
@@ -277,25 +306,17 @@ def notify_teachers_timetable_change(school_id, timetable_data, created_by, affe
         
         title = "📅 تحديث الجدول الدراسي"
         
-        # If specific teachers affected, notify them; otherwise notify all teachers
-        if affected_teacher_ids:
-            target_user_ids = affected_teacher_ids
-            target_role = None
-        else:
-            target_user_ids = None
-            target_role = 'teacher'
-        
-        return create_notification(
+        # Use targeted notification with deduplication
+        return create_targeted_notification(
             school_id=school_id,
             title=title,
             message=message.strip(),
             notification_type='timetable',
             created_by=created_by,
+            target_user_ids=affected_teacher_ids,
             priority='high',
-            target_role=target_role,
-            target_user_ids=target_user_ids,
             related_entity_type='timetable',
-            related_entity_id=timetable_data.get('id'),
+            related_entity_id=timetable_id,
             action_url='/app/school-timetable'
         )
     except Exception as e:
@@ -351,9 +372,12 @@ def notify_teacher_substitution(teacher_id, school_id, substitution_data, create
 
 def notify_teachers_school_news(school_id, news_data, created_by):
     """
-    Notify all teachers and analysts about school news
+    Notify all teachers and analysts about school news.
+    BEST PRACTICE: Combine teachers and analysts into one notification to avoid duplicates.
     """
     try:
+        from app.services.notification_utils import get_users_by_role, create_targeted_notification
+        
         title = news_data.get('title', 'خبر جديد')
         content = news_data.get('content', '')
         
@@ -367,37 +391,31 @@ def notify_teachers_school_news(school_id, news_data, created_by):
 {content}
 """
         
-        # Create notification for teachers
-        notification_teacher = create_notification(
+        # Get all teachers and analysts (combined to avoid duplicate notifications)
+        teacher_ids = get_users_by_role('teacher', school_id)
+        analyst_ids = get_users_by_role('data_analyst', school_id)
+        
+        # Combine and deduplicate
+        all_user_ids = list(set(teacher_ids + analyst_ids))
+        
+        if not all_user_ids:
+            print(f"No teachers/analysts to notify in school {school_id}")
+            return None
+        
+        # Single notification to all relevant users
+        return create_targeted_notification(
             school_id=school_id,
             title=f"📰 {title}",
             message=message.strip(),
             notification_type='news',
             created_by=created_by,
+            target_user_ids=all_user_ids,
             priority='normal',
-            target_role='teacher',
             related_entity_type='news',
             related_entity_id=news_data.get('id'),
             action_url='/app/news',
             expires_at=datetime.now() + timedelta(days=30)
         )
-        
-        # Create notification for analysts
-        notification_analyst = create_notification(
-            school_id=school_id,
-            title=f"📰 {title}",
-            message=message.strip(),
-            notification_type='news',
-            created_by=created_by,
-            priority='normal',
-            target_role='data_analyst',
-            related_entity_type='news',
-            related_entity_id=news_data.get('id'),
-            action_url='/app/news',
-            expires_at=datetime.now() + timedelta(days=30)
-        )
-        
-        return [notification_teacher, notification_analyst]
     except Exception as e:
         print(f"Error notifying teachers about school news: {str(e)}")
         return None
@@ -405,9 +423,12 @@ def notify_teachers_school_news(school_id, news_data, created_by):
 
 def notify_teachers_system_news(school_id, news_data, created_by):
     """
-    Notify all teachers and analysts about system-wide news
+    Notify teachers and analysts about system-wide news.
+    BEST PRACTICE: Single notification to all relevant users, deduplicated.
     """
     try:
+        from app.services.notification_utils import get_users_by_role, create_targeted_notification
+        
         title = news_data.get('title', 'خبر جديد من النظام')
         content = news_data.get('content', '')
         
@@ -423,37 +444,30 @@ def notify_teachers_system_news(school_id, news_data, created_by):
 {content}
 """
         
-        # Notify teachers
-        notification_teacher = create_notification(
+        # Get teachers and analysts (combined for single notification)
+        teacher_ids = get_users_by_role('teacher', school_id)
+        analyst_ids = get_users_by_role('data_analyst', school_id)
+        
+        # Combine and deduplicate
+        all_user_ids = list(set(teacher_ids + analyst_ids))
+        
+        if not all_user_ids:
+            print(f"No teachers/analysts to notify in school {school_id}")
+            return None
+        
+        return create_targeted_notification(
             school_id=school_id,
             title=f"🔔 {title}",
             message=message.strip(),
             notification_type='news',
             created_by=created_by,
+            target_user_ids=all_user_ids,
             priority='normal',
-            target_role='teacher',
             related_entity_type='news',
             related_entity_id=news_data.get('id'),
             action_url='/app/news',
             expires_at=datetime.now() + timedelta(days=30)
         )
-        
-        # Notify analysts
-        notification_analyst = create_notification(
-            school_id=school_id,
-            title=f"🔔 {title}",
-            message=message.strip(),
-            notification_type='news',
-            created_by=created_by,
-            priority='normal',
-            target_role='data_analyst',
-            related_entity_type='news',
-            related_entity_id=news_data.get('id'),
-            action_url='/app/news',
-            expires_at=datetime.now() + timedelta(days=30)
-        )
-        
-        return [notification_teacher, notification_analyst]
     except Exception as e:
         print(f"Error notifying teachers about system news: {str(e)}")
         return None
@@ -465,9 +479,12 @@ def notify_teachers_system_news(school_id, news_data, created_by):
 
 def notify_driver_school_news(school_id, news_data, created_by):
     """
-    Notify all drivers about school news
+    Notify all drivers about school news.
+    BEST PRACTICE: Target specific drivers rather than using role-based.
     """
     try:
+        from app.services.notification_utils import get_users_by_role, create_targeted_notification
+        
         title = news_data.get('title', 'خبر جديد')
         content = news_data.get('content', '')
         
@@ -481,14 +498,21 @@ def notify_driver_school_news(school_id, news_data, created_by):
 {content}
 """
         
-        return create_notification(
+        # Get all drivers in the school
+        driver_ids = get_users_by_role('driver', school_id)
+        
+        if not driver_ids:
+            print(f"No drivers to notify in school {school_id}")
+            return None
+        
+        return create_targeted_notification(
             school_id=school_id,
             title=f"📰 {title}",
             message=message.strip(),
             notification_type='news',
             created_by=created_by,
+            target_user_ids=driver_ids,
             priority='normal',
-            target_role='driver',
             related_entity_type='news',
             related_entity_id=news_data.get('id'),
             action_url='/app/news',
@@ -550,9 +574,13 @@ def notify_driver_forgot_students(driver_id, school_id, bus_data, created_by):
 
 def notify_admin_system_news(school_id, news_data, created_by):
     """
-    Notify school admins about system-wide news
+    Notify school admins about system-wide news.
+    BEST PRACTICE: Only for important system announcements directed at admins.
+    This should be used sparingly - only for admin-relevant news.
     """
     try:
+        from app.services.notification_utils import get_users_by_role, create_targeted_notification
+        
         title = news_data.get('title', 'خبر جديد من النظام')
         content = news_data.get('content', '')
         
@@ -568,14 +596,21 @@ def notify_admin_system_news(school_id, news_data, created_by):
 {content}
 """
         
-        return create_notification(
+        # Get school admins
+        admin_ids = get_users_by_role('school_admin', school_id)
+        
+        if not admin_ids:
+            print(f"No admins to notify in school {school_id}")
+            return None
+        
+        return create_targeted_notification(
             school_id=school_id,
             title=f"🔔 {title}",
             message=message.strip(),
             notification_type='news',
             created_by=created_by,
+            target_user_ids=admin_ids,
             priority='high',
-            target_role='school_admin',
             related_entity_type='news',
             related_entity_id=news_data.get('id'),
             action_url='/app/news',

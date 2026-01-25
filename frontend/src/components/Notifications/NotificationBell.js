@@ -210,8 +210,8 @@ const NotificationBell = () => {
           }}
           onTouchStart={(e) => {
             // Only close if touching directly on backdrop
+            // Don't call preventDefault() as it causes warning with passive listeners
             if (e.target === e.currentTarget) {
-              e.preventDefault();
               setIsOpen(false);
             }
           }}
@@ -456,8 +456,8 @@ const NotificationBell = () => {
         <button
           onClick={handleToggle}
           onTouchStart={(e) => {
-            // Prevent double-tap zoom on mobile
-            e.preventDefault();
+            // Handle touch event - touch-manipulation CSS already prevents double-tap zoom
+            // Don't call preventDefault() as it causes warning with passive listeners
             handleToggle();
           }}
           className="relative p-2 sm:p-2.5 text-gray-600 hover:text-gray-900 active:bg-gray-100 rounded-full transition-colors touch-manipulation"

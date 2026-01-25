@@ -143,6 +143,46 @@ self.addEventListener('fetch', (event) => {
       return;
     }
 
+    // For navigation requests (page loads), use network-first strategy
+    // Only fallback to cache if offline
+    if (request.mode === 'navigate') {
+      event.respondWith(
+        fetchWithTimeout(request)
+          .then((response) => {
+            // If network request succeeds, return it
+            if (response && response.status === 200) {
+              return response;
+            }
+            // If network fails, return cached index.html
+            return caches.match('/index.html').then((cached) => {
+              if (cached) {
+                console.log('[Service Worker] Offline: returning cached index.html');
+                return cached;
+              }
+              // If no cache, return the network response (even if error)
+              return response;
+            });
+          })
+          .catch((error) => {
+            console.log('[Service Worker] Network failed for navigation, using cache');
+            // Network completely failed, return cached index.html
+            return caches.match('/index.html').then((cached) => {
+              if (cached) {
+                return cached;
+              }
+              // If no cache at all, create a basic response
+              return new Response('Offline - No cache available', {
+                status: 503,
+                statusText: 'Service Unavailable',
+                headers: { 'Content-Type': 'text/plain' }
+              });
+            });
+          })
+      );
+      return;
+    }
+
+    // For non-navigation requests (assets, etc.), use cache-first strategy
     event.respondWith(
       caches.match(request)
         .then((cachedResponse) => {
@@ -193,18 +233,11 @@ self.addEventListener('fetch', (event) => {
               return response;
             })
             .catch((error) => {
-              console.error('[Service Worker] Fetch failed:', url.pathname, error.message);
-              
-              // Return cached index.html for navigation requests as fallback
-              if (request.mode === 'navigate') {
-                console.log('[Service Worker] Returning cached index.html for navigation');
-                return caches.match('/index.html');
-              }
-              
-              // For other requests, try to return any cached version
+              debugLog('Fetch failed:', url.pathname, error.message);
+              // For non-navigation requests, try to return any cached version
               return caches.match(request).then((cachedFallback) => {
                 if (cachedFallback) {
-                  console.log('[Service Worker] Returning stale cache as fallback');
+                  debugLog('Returning stale cache as fallback');
                   return cachedFallback;
                 }
                 // If nothing in cache, propagate the error

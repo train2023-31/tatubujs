@@ -121,12 +121,16 @@ def take_attendances():
     db.session.commit()
 
     # Create notifications for absent, late, and excused students
+    # BEST PRACTICE: Only notify affected students, not admins for every attendance issue
     try:
+        from app.services.notification_utils import should_notify_admin_for_attendance, get_users_by_role
+        
         user = User.query.get(teacher_id)
         if user and user.school_id:
             absent_students = []
             excused_students = []
             late_students = []
+            notified_student_ids = set()
             
             for record in attendance_records:
                 student = Student.query.get(record['student_id'])
@@ -151,15 +155,18 @@ def take_attendances():
                 }
                 
                 # Send detailed notification to student for any status (absent, late, excuse)
-                if record.get('is_Acsent') or record.get('is_late') or record.get('is_Excus'):
-                    notify_student_attendance(
-                        student_id=student.id,
-                        school_id=user.school_id,
-                        attendance_record=attendance_data,
-                        created_by=teacher_id
-                    )
+                # Only send once per student even if multiple records
+                if (record.get('is_Acsent') or record.get('is_late') or record.get('is_Excus')):
+                    if student.id not in notified_student_ids:
+                        notify_student_attendance(
+                            student_id=student.id,
+                            school_id=user.school_id,
+                            attendance_record=attendance_data,
+                            created_by=teacher_id
+                        )
+                        notified_student_ids.add(student.id)
                 
-                # Track for admin notifications
+                # Track for potential admin notifications (only for serious issues)
                 if record.get('is_Acsent'):
                     absent_students.append(student)
                 if record.get('is_Excus'):
@@ -167,33 +174,43 @@ def take_attendances():
                 if record.get('is_late'):
                     late_students.append(student)
             
-            # If there are multiple absences, notify teachers and admins
-            if len(absent_students) > 2:
-                create_notification(
-                    school_id=user.school_id,
-                    title="تنبيه: غياب متعدد",
-                    message=f"تم تسجيل غياب {len(absent_students)} طالب/طالبة في الصف {class_obj.name}",
-                    notification_type='attendance',
-                    created_by=teacher_id,
-                    priority='high',
-                    target_role='school_admin',
-                    related_entity_type='attendance',
-                    action_url='/app/attendance-details'
-                )
-            
-            # If there are multiple excuses, notify admins
-            if len(excused_students) > 3:
-                create_notification(
-                    school_id=user.school_id,
-                    title="تنبيه: أعذار متعددة",
-                    message=f"تم تسجيل {len(excused_students)} عذر في الصف {class_obj.name}",
-                    notification_type='attendance',
-                    created_by=teacher_id,
-                    priority='normal',
-                    target_role='school_admin',
-                    related_entity_type='attendance',
-                    action_url='/app/attendance-details'
-                )
+            # Only notify admins if there's a SERIOUS attendance issue
+            # Use the helper function to determine if admin notification is warranted
+            if should_notify_admin_for_attendance(
+                len(absent_students), 
+                len(excused_students), 
+                len(late_students)
+            ):
+                admin_ids = get_users_by_role('school_admin', user.school_id)
+                if admin_ids:
+                    message = f"""
+                        ⚠️ تنبيه حضور مهم
+
+                        🎓 الفصل: {class_obj.name}
+                        📅 التاريخ: {attendance_date.strftime('%Y-%m-%d')}
+                        🕐 الحصة: {record.get('class_time_num', '-')}
+
+                        ❌ غياب: {len(absent_students)} طالب
+                        📝 عذر: {len(excused_students)} طالب
+                        ⏰ تأخر: {len(late_students)} طالب
+
+                        يرجى المراجعة والمتابعة
+                        """
+                    create_notification(
+                        school_id=user.school_id,
+                        title="⚠️ تنبيه حضور مهم",
+                        message=message.strip(),
+                        notification_type='attendance',
+                        created_by=teacher_id,
+                        priority='high',
+                        target_user_ids=admin_ids,
+                        related_entity_type='attendance',
+                        action_url='/app/attendance-details'
+                    )
+                    print(f"✅ Admin notified about serious attendance issue: {len(absent_students)} absent, {len(late_students)} late")
+            else:
+                print(f"ℹ️ Attendance recorded ({len(absent_students)} absent, {len(late_students)} late) - not significant enough for admin notification")
+                
     except Exception as e:
         print(f"Error creating attendance notifications: {str(e)}")
 

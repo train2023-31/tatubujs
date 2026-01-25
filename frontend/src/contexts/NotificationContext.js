@@ -140,6 +140,12 @@ export const NotificationProvider = ({ children }) => {
   const subscribeToPush = useCallback(async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       console.log('Push notifications are not supported');
+      toast.error('المتصفح لا يدعم الإشعارات الفورية');
+      return false;
+    }
+
+    if (!token) {
+      toast.error('يجب تسجيل الدخول أولاً');
       return false;
     }
 
@@ -147,20 +153,26 @@ export const NotificationProvider = ({ children }) => {
       // Request permission first
       const hasPermission = await requestNotificationPermission();
       if (!hasPermission) {
-        toast.error('يجب السماح بالإشعارات أولاً');
+        toast.error('يجب السماح بالإشعارات أولاً من إعدادات المتصفح');
         return false;
       }
 
       // Get service worker registration
       const registration = await navigator.serviceWorker.ready;
 
+      // Get VAPID public key
+      const vapidPublicKey = process.env.REACT_APP_VAPID_PUBLIC_KEY || 
+        'BEl62iUYgUivxIkv69yViEuiBIa-Ib27SGeUmo6GNfhPNGa4VB91iZKqQ5SDMIpOUwfEhvJZ-8N5-P2iEzDQXCw';
+      
+      if (!vapidPublicKey) {
+        toast.error('خطأ في إعدادات الإشعارات. يرجى الاتصال بالدعم الفني.');
+        return false;
+      }
+
       // Subscribe to push notifications
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(
-          process.env.REACT_APP_VAPID_PUBLIC_KEY || 
-          'BEl62iUYgUivxIkv69yViEuiBIa-Ib27SGeUmo6GNfhPNGa4VB91iZKqQ5SDMIpOUwfEhvJZ-8N5-P2iEzDQXCw'
-        ),
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
       });
 
       setPushSubscription(subscription);
@@ -180,16 +192,32 @@ export const NotificationProvider = ({ children }) => {
       );
 
       if (response.status === 200 || response.status === 201) {
-      setIsSubscribed(true);
-      toast.success('تم الاشتراك في الإشعارات بنجاح');
-      return true;
+        setIsSubscribed(true);
+        toast.success('تم الاشتراك في الإشعارات بنجاح');
+        return true;
+      } else {
+        toast.error('فشل في حفظ الاشتراك على الخادم');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error subscribing to push notifications:', error);
+      
+      // Provide more specific error messages
+      if (error.response) {
+        // Server error
+        const message = error.response.data?.message || 'فشل في الاشتراك في الإشعارات';
+        toast.error(message);
+      } else if (error.message?.includes('permission')) {
+        toast.error('تم رفض الإذن. يرجى السماح بالإشعارات من إعدادات المتصفح');
+      } else if (error.message?.includes('service worker')) {
+        toast.error('خطأ في Service Worker. يرجى تحديث الصفحة والمحاولة مرة أخرى');
+      } else {
+        toast.error('فشل في الاشتراك في الإشعارات. يرجى المحاولة مرة أخرى');
+      }
+      
+      return false;
     }
-  } catch (error) {
-    console.error('Error subscribing to push notifications:', error);
-    toast.error('فشل في الاشتراك في الإشعارات');
-    return false;
-  }
-}, [token, getAxiosConfig, requestNotificationPermission]);
+  }, [token, getAxiosConfig, requestNotificationPermission]);
 
   // Unsubscribe from push notifications
   const unsubscribeFromPush = useCallback(async () => {

@@ -29,6 +29,16 @@ const NotificationPreferences = () => {
     fetchPreferences();
   }, []);
 
+  // Sync push_enabled with actual subscription status
+  useEffect(() => {
+    if (!loading) {
+      setPreferences((prev) => ({
+        ...prev,
+        push_enabled: isSubscribed,
+      }));
+    }
+  }, [isSubscribed, loading]);
+
   const fetchPreferences = async () => {
     try {
       setLoading(true);
@@ -38,7 +48,12 @@ const NotificationPreferences = () => {
         },
       });
 
-      setPreferences(response.data);
+      const fetchedPrefs = response.data;
+      // Sync push_enabled with actual subscription status
+      setPreferences({
+        ...fetchedPrefs,
+        push_enabled: isSubscribed || fetchedPrefs.push_enabled,
+      });
     } catch (error) {
       console.error('Error fetching preferences:', error);
       toast.error('فشل في تحميل الإعدادات');
@@ -57,27 +72,74 @@ const NotificationPreferences = () => {
   const handlePushToggle = async () => {
     const newValue = !preferences.push_enabled;
     
-    if (newValue && !isSubscribed) {
-      // Subscribe to push notifications
-      const success = await subscribeToPush();
-      if (success) {
-        setPreferences((prev) => ({ ...prev, push_enabled: true }));
+    // Optimistically update UI
+    setPreferences((prev) => ({ ...prev, push_enabled: newValue }));
+    
+    try {
+      if (newValue && !isSubscribed) {
+        // Subscribe to push notifications
+        const success = await subscribeToPush();
+        if (!success) {
+          // Revert on failure
+          setPreferences((prev) => ({ ...prev, push_enabled: false }));
+          toast.error('فشل في تفعيل الإشعارات الفورية. يرجى التحقق من إعدادات المتصفح.');
+        } else {
+          // Update preferences on server to sync push_enabled
+          try {
+            await axios.put(
+              `${API_URL}/api/notifications/preferences`,
+              { ...preferences, push_enabled: true },
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }
+            );
+          } catch (error) {
+            console.error('Error syncing push_enabled:', error);
+            // Don't show error to user, subscription succeeded
+          }
+        }
+      } else if (!newValue && isSubscribed) {
+        // Unsubscribe from push notifications
+        await unsubscribeFromPush();
+        // Update preferences on server
+        try {
+          await axios.put(
+            `${API_URL}/api/notifications/preferences`,
+            { ...preferences, push_enabled: false },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+        } catch (error) {
+          console.error('Error syncing push_enabled:', error);
+          // Don't show error to user, unsubscription succeeded
+        }
       }
-    } else if (!newValue && isSubscribed) {
-      // Unsubscribe from push notifications
-      await unsubscribeFromPush();
-      setPreferences((prev) => ({ ...prev, push_enabled: false }));
-    } else {
-      setPreferences((prev) => ({ ...prev, push_enabled: newValue }));
+    } catch (error) {
+      console.error('Error in handlePushToggle:', error);
+      // Revert on any error
+      setPreferences((prev) => ({ ...prev, push_enabled: !newValue }));
+      toast.error('حدث خطأ أثناء تحديث إعدادات الإشعارات');
     }
   };
 
   const handleSave = async () => {
     try {
       setSaving(true);
+      
+      // Ensure push_enabled is synced with actual subscription status
+      const prefsToSave = {
+        ...preferences,
+        push_enabled: isSubscribed && preferences.push_enabled,
+      };
+      
       await axios.put(
         `${API_URL}/api/notifications/preferences`,
-        preferences,
+        prefsToSave,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -85,6 +147,8 @@ const NotificationPreferences = () => {
         }
       );
 
+      // Update local state to match saved state
+      setPreferences(prefsToSave);
       toast.success('تم حفظ الإعدادات بنجاح');
     } catch (error) {
       console.error('Error saving preferences:', error);
@@ -191,18 +255,13 @@ const NotificationPreferences = () => {
               </p>
             </div>
           </div>
-          <button
-            onClick={handlePushToggle}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              preferences.push_enabled ? 'bg-indigo-600' : 'bg-gray-300'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                preferences.push_enabled ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
+           <input
+                type="checkbox"
+                checked={!!preferences.push_enabled}
+                onChange={() => handlePushToggle()}
+                className="form-checkbox h-5 w-5 text-indigo-600 transition"
+                id="pref-checkbox-push"
+              />
         </div>
       </div>
 
@@ -222,18 +281,13 @@ const NotificationPreferences = () => {
                   <p className="text-xs text-gray-600 mt-0.5">{item.description}</p>
                 </div>
               </div>
-              <button
-                onClick={() => handleToggle(item.key)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  preferences[item.key] ? 'bg-indigo-600' : 'bg-gray-300'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    preferences[item.key] ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+              <input
+                type="checkbox"
+                checked={!!preferences[item.key]}
+                onChange={() => handleToggle(item.key)}
+                className="form-checkbox h-5 w-5 text-indigo-600 transition"
+                id={`pref-checkbox-${item.key}`}
+              />
             </div>
           ))}
         </div>

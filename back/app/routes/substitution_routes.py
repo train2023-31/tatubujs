@@ -688,7 +688,13 @@ def create_substitution():
     db.session.commit()
     
     # Create notifications for substitution
+    # BEST PRACTICE: Only notify affected teachers (absent + substitutes), not admins
     try:
+        from app.services.notification_utils import deduplicate_user_ids
+        
+        # Track all notified teacher IDs to avoid duplicates
+        notified_teacher_ids = set()
+        
         # Notify the absent teacher
         if absent_teacher_user_id:
             create_notification(
@@ -703,28 +709,33 @@ def create_substitution():
                 related_entity_id=substitution.id,
                 action_url='/app/teacher-substitution'
             )
+            notified_teacher_ids.add(absent_teacher_user_id)
         
-        # Notify all substitute teachers with detailed substitution information
-        # Group assignments by substitute teacher
+        # Group assignments by substitute teacher to send one notification per teacher
+        # instead of one per assignment
         teacher_assignments = {}
         for assignment_data in data['assignments']:
             teacher_id = assignment_data.get('substitute_teacher_user_id')
-            if teacher_id:
+            if teacher_id and teacher_id not in notified_teacher_ids:
                 if teacher_id not in teacher_assignments:
                     teacher_assignments[teacher_id] = []
                 teacher_assignments[teacher_id].append(assignment_data)
         
-        # Send detailed notifications to each substitute teacher
+        # Send a single consolidated notification to each substitute teacher
         for teacher_id, assignments in teacher_assignments.items():
-            # For each assignment, send a detailed notification
-            for assignment_data in assignments:
+            # Build a summary of all their substitution assignments
+            num_assignments = len(assignments)
+            first_assignment = assignments[0]
+            
+            if num_assignments == 1:
+                # Single assignment - detailed message
                 substitution_data = {
                     'id': substitution.id,
-                    'class_name': assignment_data.get('class_name', 'غير محدد'),
-                    'subject_name': assignment_data.get('subject_name', 'غير محدد'),
+                    'class_name': first_assignment.get('class_name', 'غير محدد'),
+                    'subject_name': first_assignment.get('subject_name', 'غير محدد'),
                     'absent_teacher_name': data['absent_teacher_name'],
-                    'period': assignment_data.get('period_xml_id', '-'),
-                    'date': assignment_data.get('assignment_date', start_date.strftime('%Y-%m-%d')) if assignment_data.get('assignment_date') else start_date.strftime('%Y-%m-%d')
+                    'period': first_assignment.get('period_xml_id', '-'),
+                    'date': first_assignment.get('assignment_date', start_date.strftime('%Y-%m-%d')) if first_assignment.get('assignment_date') else start_date.strftime('%Y-%m-%d')
                 }
                 
                 notify_teacher_substitution(
@@ -733,20 +744,39 @@ def create_substitution():
                     substitution_data=substitution_data,
                     created_by=current_user
                 )
+            else:
+                # Multiple assignments - summary message
+                classes = set(a.get('class_name', 'غير محدد') for a in assignments)
+                message = f"""
+🔄 إحتياط جديد - عدة حصص
+
+👨‍🏫 بديل عن: {data['absent_teacher_name']}
+📊 عدد الحصص: {num_assignments}
+🎓 الفصول: {', '.join(list(classes)[:3])}{'...' if len(classes) > 3 else ''}
+📅 من: {start_date.strftime('%Y-%m-%d')}
+📅 إلى: {end_date.strftime('%Y-%m-%d')}
+
+⚠️ يرجى مراجعة الجدول للتفاصيل الكاملة
+"""
+                create_notification(
+                    school_id=user.school_id,
+                    title="🔄 إحتياط جديد - عدة حصص",
+                    message=message.strip(),
+                    notification_type='substitution',
+                    created_by=current_user,
+                    priority='urgent',
+                    target_user_ids=[teacher_id],
+                    related_entity_type='substitution',
+                    related_entity_id=substitution.id,
+                    action_url='/app/teacher-substitution'
+                )
+            
+            notified_teacher_ids.add(teacher_id)
         
-        # Notify school admins
-        create_notification(
-            school_id=user.school_id,
-            title="استبدال معلم جديد",
-            message=f"تم إنشاء استبدال للمعلم {data['absent_teacher_name']} بـ {len(substitute_teacher_ids)} معلم بديل",
-            notification_type='substitution',
-            created_by=current_user,
-            priority='normal',
-            target_role='school_admin',
-            related_entity_type='substitution',
-            related_entity_id=substitution.id,
-            action_url='/app/teacher-substitution'
-        )
+        # NOTE: Removed admin notification - they don't need to be notified about every substitution
+        # Admins can view substitutions in their dashboard if needed
+        print(f"✅ Substitution notifications sent to {len(notified_teacher_ids)} teachers (no admin spam)")
+        
     except Exception as e:
         print(f"Error creating substitution notifications: {str(e)}")
     
