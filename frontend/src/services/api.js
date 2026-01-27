@@ -200,6 +200,7 @@ export const classesAPI = {
   },
   removeStudents: (data) => api.post('/classes/remove-students', data),
   addNewStudent: (data) => api.post('/auth/register_single_assign_student', data),
+  deleteClass: (classId) => api.delete(`/classes/${classId}`),
 };
 
 // Attendance API

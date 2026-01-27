@@ -168,6 +168,36 @@ const Classes = () => {
     }
   );
 
+  const deleteClassMutation = useMutation(
+    (classId) => classesAPI.deleteClass(classId),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('classes');
+        toast.success('تم حذف الفصل بنجاح');
+      },
+      onError: (error) => {
+        const errorData = error.response?.data;
+        if (errorData?.message) {
+          // Handle Arabic/English message
+          const message = typeof errorData.message === 'object' 
+            ? errorData.message.ar || errorData.message.en 
+            : errorData.message;
+          toast.error(message, { duration: 6000 });
+        } else {
+          toast.error('فشل في حذف الفصل');
+        }
+      },
+    }
+  );
+
+  const handleDeleteClass = (classItem) => {
+    const confirmMessage = `هل أنت متأكد من حذف الفصل "${classItem.name}"؟\n\nملاحظة: يجب أن يكون الفصل فارغاً (لا يوجد طلاب مسجلين) وغير مرتبط بأي جداول دراسية أو سجلات حضور.`;
+    
+    if (window.confirm(confirmMessage)) {
+      deleteClassMutation.mutate(classItem.id);
+    }
+  };
+
   const tabs = [
     { id: 'classes', name: 'الفصول', count: classes?.length || 0 },
     { id: 'subjects', name: 'المواد', count: subjects?.length || 0 },
@@ -204,6 +234,15 @@ const Classes = () => {
           <div className="mr-3">
             <p className="text-sm font-medium text-gray-900">{row.name}</p>
           </div>
+        </div>
+      ),
+    },
+    {
+      key: 'students_count',
+      header: 'عدد الطلاب',
+      render: (row) => (
+        <div className="flex items-center">
+          <p className="text-sm font-medium text-gray-900">{row.students_count}</p>
         </div>
       ),
     },
@@ -280,6 +319,17 @@ const Classes = () => {
             <Edit className="h-4 w-4 ml-1" />
             تعديل
           </button>
+          {(!row.students_count || row.students_count === 0) && (
+            <button
+              onClick={() => handleDeleteClass(row)}
+              className="flex items-center text-red-600 hover:text-red-900 text-sm px-2 py-1 rounded border border-red-200 hover:bg-red-50 transition-colors"
+              title="حذف الفصل"
+              disabled={deleteClassMutation.isLoading}
+            >
+              <Trash2 className="h-4 w-4 ml-1" />
+              حذف
+            </button>
+          )}
         </div>
       ),
     },

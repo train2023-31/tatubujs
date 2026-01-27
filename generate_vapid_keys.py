@@ -1,77 +1,102 @@
 #!/usr/bin/env python3
 """
-Generate VAPID keys for Web Push Notifications
-
-Usage:
-    python generate_vapid_keys.py
-
-This will generate a private key (PEM format) and public key (base64url format)
-that you can use for web push notifications.
+Script to generate VAPID keys for Web Push Notifications
+Usage: python generate_vapid_keys.py
 """
 
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.backends import default_backend
-import base64
-import sys
-
-def generate_vapid_keys():
-    """Generate VAPID private (PEM) and public (base64url) keys."""
-    # Generate EC private key using SECP256R1 curve
-    private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
+try:
+    from py_vapid import Vapid01
+    from cryptography.hazmat.primitives import serialization
     
-    # Convert private key to PEM format
-    private_key_pem = private_key.private_bytes(
+    # Generate VAPID keys
+    vapid = Vapid01()
+    
+    # Get public key (base64 URL-safe format)
+    # py_vapid stores public key differently, we need to extract it properly
+    public_key_bytes = vapid.public_key.public_bytes(
+        encoding=serialization.Encoding.X962,
+        format=serialization.PublicFormat.UncompressedPoint
+    )
+    import base64
+    # VAPID public key is the raw bytes (skip the first byte which is 0x04)
+    public_key_b64 = base64.urlsafe_b64encode(public_key_bytes[1:]).decode('utf-8').rstrip('=')
+    
+    # Get private key (PEM format)
+    private_key_pem = vapid.private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption()
     ).decode('utf-8')
-
-    # Get public key
-    public_key = private_key.public_key()
     
-    # Get public key in uncompressed point format
-    public_key_bytes = public_key.public_bytes(
-        encoding=serialization.Encoding.X962,
-        format=serialization.PublicFormat.UncompressedPoint
-    )
+    print("=" * 70)
+    print("VAPID Keys Generated Successfully!")
+    print("=" * 70)
+    print("\n📋 PUBLIC KEY (for Frontend & Backend .env):")
+    print("-" * 70)
+    print(public_key_b64)
+    print("\n🔐 PRIVATE KEY (for Backend .env only):")
+    print("-" * 70)
+    print(private_key_pem)
+    print("\n" + "=" * 70)
+    print("✅ Copy these keys to your .env files")
+    print("=" * 70)
     
-    # Remove the first byte (0x04) which indicates uncompressed point
-    public_key_bytes = public_key_bytes[1:]
+except ImportError:
+    print("❌ Error: py_vapid is not installed")
+    print("\n📦 Install it using:")
+    print("   pip install py_vapid")
+    print("\n   or")
+    print("   pip3 install py_vapid")
     
-    # Convert to base64url (URL-safe base64 without padding)
-    public_key_b64 = base64.urlsafe_b64encode(public_key_bytes).decode('utf-8').rstrip('=')
-
-    return private_key_pem, public_key_b64
-
-if __name__ == '__main__':
+except Exception as e:
+    print(f"❌ Error generating keys: {e}")
+    print("\n🔄 Trying alternative method...")
+    
     try:
-        private, public = generate_vapid_keys()
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives import serialization
+        import base64
         
-        print("=" * 60)
-        print("VAPID Keys Generated Successfully")
-        print("=" * 60)
-        print("\n1. Private Key (PEM format):")
-        print("-" * 60)
-        print(private)
-        print("\n2. Public Key (base64url format):")
-        print("-" * 60)
-        print(public)
-        print("\n" + "=" * 60)
-        print("Environment Variables:")
-        print("=" * 60)
-        print(f"VAPID_PRIVATE_KEY={private.strip()}")
-        print(f"VAPID_PUBLIC_KEY={public}")
-        print(f"REACT_APP_VAPID_PUBLIC_KEY={public}")
-        print("=" * 60)
-        print("\n⚠️  IMPORTANT: Keep the private key secret!")
-        print("   Add these to your .env file or environment variables.")
-        print("=" * 60)
+        # Generate EC key pair
+        private_key = ec.generate_private_key(ec.SECP256R1())
+        public_key = private_key.public_key()
         
-    except ImportError as e:
-        print("Error: Missing required library.")
-        print("Install it with: pip install cryptography")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error generating keys: {str(e)}")
-        sys.exit(1)
+        # Get public key in raw format
+        public_key_raw = public_key.public_bytes(
+            encoding=serialization.Encoding.X962,
+            format=serialization.PublicFormat.UncompressedPoint
+        )
+        
+        # Convert to base64 URL-safe
+        public_key_b64 = base64.urlsafe_b64encode(public_key_raw[1:]).decode('utf-8').rstrip('=')
+        
+        # Get private key in PEM format
+        private_key_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption()
+        ).decode('utf-8')
+        
+        print("=" * 70)
+        print("VAPID Keys Generated Successfully (Alternative Method)!")
+        print("=" * 70)
+        print("\n📋 PUBLIC KEY (for Frontend & Backend .env):")
+        print("-" * 70)
+        print(public_key_b64)
+        print("\n🔐 PRIVATE KEY (for Backend .env only):")
+        print("-" * 70)
+        print(private_key_pem)
+        print("\n" + "=" * 70)
+        print("✅ Copy these keys to your .env files")
+        print("=" * 70)
+        
+    except ImportError:
+        print("❌ Error: cryptography library is not installed")
+        print("\n📦 Install it using:")
+        print("   pip install cryptography")
+        print("\n   or")
+        print("   pip3 install cryptography")
+    except Exception as e2:
+        print(f"❌ Error with alternative method: {e2}")
+        print("\n💡 Try using online generator:")
+        print("   https://web-push-codelab.glitch.me/")

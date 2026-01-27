@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.models import (
-    Notification, NotificationRead, PushSubscription, 
+    Notification, NotificationRead, NotificationDeleted, PushSubscription, 
     NotificationPreference, User, Student, Teacher, School
 )
 from app.config import get_oman_time, Config
@@ -12,9 +12,9 @@ from sqlalchemy import or_, and_
 import threading
 from flask_cors import CORS
 
-notification_routes = Blueprint('notification_routes', __name__, url_prefix='/api/notifications')
+notification_blueprint = Blueprint('notification_blueprint', __name__, url_prefix='/api/notifications')
 # CORS is handled at app level - no need for blueprint-level CORS
-CORS(notification_routes, supports_credentials=True)
+CORS(notification_blueprint, supports_credentials=True)
 
 def send_push_notification(notification):
     """
@@ -87,7 +87,7 @@ def send_push_notification(notification):
             "silent": False,
             "requireInteraction": notification.priority in ['urgent', 'high'],
             "vibrate": [200, 100, 200] if notification.priority == 'urgent' else [200, 100, 200, 100, 200],
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": get_oman_time().isoformat()
         }
         
         # Send push notification to each subscription in background thread
@@ -184,7 +184,7 @@ def create_notification(school_id, title, message, notification_type,
         return None
 
 
-@notification_routes.route('', methods=['GET'], strict_slashes=False)
+@notification_blueprint.route('', methods=['GET'], strict_slashes=False)
 @jwt_required()
 def get_notifications():
     """Get notifications for the current user"""
@@ -217,17 +217,43 @@ def get_notifications():
         )
         
         # Filter by target (role-based or specific user)
-        query = query.filter(
+        # IMPORTANT: Only show notifications where user is explicitly targeted
+        # - target_role matches user's role, OR
+        # - user ID is in target_user_ids
+        # DO NOT show notifications with target_role=None (those are invalid/broadcast)
+        
+        # Build conditions for targeting
+        conditions = []
+        
+        # Condition 1: Role-based targeting
+        if user.user_role:
+            conditions.append(Notification.target_role == user.user_role)
+        
+        # Condition 2: User-specific targeting (check if user ID is in JSON array)
+        # Handle both JSON array format [1,2,3] and string format
+        user_id = user.id
+        conditions.append(
             or_(
-                Notification.target_role == user.user_role,
-                Notification.target_role.is_(None),
-                Notification.target_user_ids.like(f'%{user.id}%')
+                Notification.target_user_ids.like(f'%[{user_id}]%'),  # [1,2,3] format
+                Notification.target_user_ids.like(f'%"{user_id}"%'),  # ["1","2","3"] format
+                Notification.target_user_ids.like(f'%{user_id}%')     # Fallback
             )
         )
+        
+        # Apply filter - user must match either role OR be in target_user_ids
+        query = query.filter(or_(*conditions))
         
         # Filter by type if specified
         if notification_type:
             query = query.filter(Notification.type == notification_type)
+        
+        # Exclude deleted notifications for this user
+        deleted_notification_ids = db.session.query(NotificationDeleted.notification_id).filter(
+            NotificationDeleted.user_id == current_user_id
+        ).all()
+        deleted_ids = [d[0] for d in deleted_notification_ids]
+        if deleted_ids:
+            query = query.filter(~Notification.id.in_(deleted_ids))
         
         # Get user's read notification IDs
         if unread_only:
@@ -260,12 +286,20 @@ def get_notifications():
         ).all()
         read_ids = set([r[0] for r in read_notification_ids])
         
-        # Prepare response
+        # Get deleted notification IDs for this user (should already be filtered, but double-check)
+        deleted_notification_ids = db.session.query(NotificationDeleted.notification_id).filter(
+            NotificationDeleted.user_id == current_user_id,
+            NotificationDeleted.notification_id.in_([n.id for n in notifications])
+        ).all()
+        deleted_ids = set([d[0] for d in deleted_notification_ids])
+        
+        # Prepare response (exclude deleted notifications)
         notification_list = []
         for notif in notifications:
-            notif_dict = notif.to_dict()
-            notif_dict['is_read'] = notif.id in read_ids
-            notification_list.append(notif_dict)
+            if notif.id not in deleted_ids:  # Double-check: don't include deleted
+                notif_dict = notif.to_dict()
+                notif_dict['is_read'] = notif.id in read_ids
+                notification_list.append(notif_dict)
         
         return jsonify({
             "notifications": notification_list,
@@ -279,7 +313,7 @@ def get_notifications():
         return jsonify({"message": f"Error fetching notifications: {str(e)}"}), 500
 
 
-@notification_routes.route('/unread-count', methods=['GET'])
+@notification_blueprint.route('/unread-count', methods=['GET'])
 @jwt_required()
 def get_unread_count():
     """Get count of unread notifications for the current user"""
@@ -290,8 +324,26 @@ def get_unread_count():
         if not user:
             return jsonify({"message": "User not found"}), 404
         
-        # Get all active notifications for the user
+        # Get all active notifications for the user (same filtering as get_notifications)
         now = get_oman_time()
+        
+        # Build conditions for targeting (same logic as get_notifications)
+        conditions = []
+        
+        # Condition 1: Role-based targeting
+        if user.user_role:
+            conditions.append(Notification.target_role == user.user_role)
+        
+        # Condition 2: User-specific targeting
+        user_id = user.id
+        conditions.append(
+            or_(
+                Notification.target_user_ids.like(f'%[{user_id}]%'),
+                Notification.target_user_ids.like(f'%"{user_id}"%'),
+                Notification.target_user_ids.like(f'%{user_id}%')
+            )
+        )
+        
         notifications_query = Notification.query.filter(
             Notification.school_id == user.school_id,
             Notification.is_active == True,
@@ -299,12 +351,16 @@ def get_unread_count():
                 Notification.expires_at.is_(None),
                 Notification.expires_at > now
             ),
-            or_(
-                Notification.target_role == user.user_role,
-                Notification.target_role.is_(None),
-                Notification.target_user_ids.like(f'%{user.id}%')
-            )
+            or_(*conditions)  # User must match either role OR be in target_user_ids
         )
+        
+        # Exclude deleted notifications for this user
+        deleted_notification_ids = db.session.query(NotificationDeleted.notification_id).filter(
+            NotificationDeleted.user_id == current_user_id
+        ).all()
+        deleted_ids = [d[0] for d in deleted_notification_ids]
+        if deleted_ids:
+            notifications_query = notifications_query.filter(~Notification.id.in_(deleted_ids))
         
         # Get read notification IDs
         read_notification_ids = db.session.query(NotificationRead.notification_id).filter(
@@ -312,7 +368,7 @@ def get_unread_count():
         ).all()
         read_ids = [r[0] for r in read_notification_ids]
         
-        # Count unread
+        # Count unread (excluding deleted and read notifications)
         if read_ids:
             unread_count = notifications_query.filter(~Notification.id.in_(read_ids)).count()
         else:
@@ -324,7 +380,7 @@ def get_unread_count():
         return jsonify({"message": f"Error fetching unread count: {str(e)}"}), 500
 
 
-@notification_routes.route('/<int:notification_id>/read', methods=['POST'])
+@notification_blueprint.route('/<int:notification_id>/read', methods=['POST'])
 @jwt_required()
 def mark_notification_read(notification_id):
     """Mark a notification as read"""
@@ -361,7 +417,7 @@ def mark_notification_read(notification_id):
         return jsonify({"message": f"Error marking notification as read: {str(e)}"}), 500
 
 
-@notification_routes.route('/mark-all-read', methods=['POST'])
+@notification_blueprint.route('/mark-all-read', methods=['POST'])
 @jwt_required()
 def mark_all_notifications_read():
     """Mark all notifications as read for the current user"""
@@ -372,8 +428,26 @@ def mark_all_notifications_read():
         if not user:
             return jsonify({"message": "User not found"}), 404
         
-        # Get all unread notifications
+        # Get all unread notifications (same filtering as get_notifications)
         now = get_oman_time()
+        
+        # Build conditions for targeting (same logic as get_notifications)
+        conditions = []
+        
+        # Condition 1: Role-based targeting
+        if user.user_role:
+            conditions.append(Notification.target_role == user.user_role)
+        
+        # Condition 2: User-specific targeting
+        user_id = user.id
+        conditions.append(
+            or_(
+                Notification.target_user_ids.like(f'%[{user_id}]%'),
+                Notification.target_user_ids.like(f'%"{user_id}"%'),
+                Notification.target_user_ids.like(f'%{user_id}%')
+            )
+        )
+        
         notifications = Notification.query.filter(
             Notification.school_id == user.school_id,
             Notification.is_active == True,
@@ -381,11 +455,7 @@ def mark_all_notifications_read():
                 Notification.expires_at.is_(None),
                 Notification.expires_at > now
             ),
-            or_(
-                Notification.target_role == user.user_role,
-                Notification.target_role.is_(None),
-                Notification.target_user_ids.like(f'%{user.id}%')
-            )
+            or_(*conditions)  # User must match either role OR be in target_user_ids
         ).all()
         
         # Get already read notification IDs
@@ -417,7 +487,76 @@ def mark_all_notifications_read():
         return jsonify({"message": f"Error marking notifications as read: {str(e)}"}), 500
 
 
-@notification_routes.route('', methods=['POST'], strict_slashes=False)
+@notification_blueprint.route('/<int:notification_id>/delete', methods=['DELETE'])
+@jwt_required()
+def delete_notification(notification_id):
+    """Delete a notification for the current user (soft delete - per user)"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        
+        if not user:
+            return jsonify({"message": "User not found"}), 404
+        
+        # Check if notification exists and user has access to it
+        notification = Notification.query.get(notification_id)
+        if not notification:
+            return jsonify({"message": "Notification not found"}), 404
+        
+        # Verify notification belongs to user's school
+        if notification.school_id != user.school_id:
+            return jsonify({"message": "Unauthorized"}), 403
+        
+        # Verify user is targeted by this notification
+        user_is_targeted = False
+        
+        # Check role-based targeting
+        if notification.target_role == user.user_role:
+            user_is_targeted = True
+        
+        # Check user-specific targeting
+        if notification.target_user_ids:
+            try:
+                target_user_ids = json.loads(notification.target_user_ids)
+                if isinstance(target_user_ids, list) and current_user_id in target_user_ids:
+                    user_is_targeted = True
+            except:
+                # Fallback: check if user ID appears in string
+                if str(current_user_id) in notification.target_user_ids:
+                    user_is_targeted = True
+        
+        if not user_is_targeted:
+            return jsonify({"message": "Notification not found or not accessible"}), 404
+        
+        # Check if already deleted
+        existing_deletion = NotificationDeleted.query.filter_by(
+            notification_id=notification_id,
+            user_id=current_user_id
+        ).first()
+        
+        if existing_deletion:
+            return jsonify({"message": "Notification already deleted"}), 200
+        
+        # Create deletion record
+        notification_deleted = NotificationDeleted(
+            notification_id=notification_id,
+            user_id=current_user_id
+        )
+        
+        db.session.add(notification_deleted)
+        db.session.commit()
+        
+        return jsonify({"message": "Notification deleted successfully"}), 200
+        
+    except Exception as e:
+        import traceback
+        db.session.rollback()
+        print(f"Error deleting notification: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({"message": f"Error deleting notification: {str(e)}"}), 500
+
+
+@notification_blueprint.route('', methods=['POST'], strict_slashes=False)
 @jwt_required()
 def create_notification_endpoint():
     """Create a new notification (admin/teacher only)"""
@@ -475,7 +614,7 @@ def create_notification_endpoint():
 
 
 # Push Subscription Routes
-@notification_routes.route('/subscribe', methods=['POST'])
+@notification_blueprint.route('/subscribe', methods=['POST'])
 @jwt_required()
 def subscribe_push():
     """Subscribe to push notifications"""
@@ -530,7 +669,7 @@ def subscribe_push():
         return jsonify({"message": f"Error subscribing to push notifications: {str(e)}"}), 500
 
 
-@notification_routes.route('/unsubscribe', methods=['POST'])
+@notification_blueprint.route('/unsubscribe', methods=['POST'])
 @jwt_required()
 def unsubscribe_push():
     """Unsubscribe from push notifications"""
@@ -560,28 +699,59 @@ def unsubscribe_push():
 
 
 # Notification Preferences Routes
-@notification_routes.route('/preferences', methods=['GET'])
+@notification_blueprint.route('/preferences', methods=['GET'])
 @jwt_required()
 def get_notification_preferences():
     """Get notification preferences for the current user"""
     try:
         current_user_id = get_jwt_identity()
         
+        if not current_user_id:
+            return jsonify({"message": "User not authenticated"}), 401
+        
+        # Check if user exists
+        user = User.query.get(current_user_id)
+        if not user:
+            return jsonify({"message": "User not found"}), 404
+        
         preferences = NotificationPreference.query.filter_by(user_id=current_user_id).first()
         
         if not preferences:
             # Create default preferences
-            preferences = NotificationPreference(user_id=current_user_id)
-            db.session.add(preferences)
-            db.session.commit()
+            try:
+                preferences = NotificationPreference(user_id=current_user_id)
+                db.session.add(preferences)
+                db.session.commit()
+            except Exception as create_error:
+                db.session.rollback()
+                import traceback
+                print(f"Error creating notification preferences: {str(create_error)}")
+                print(traceback.format_exc())
+                # Return default preferences as dict if creation fails
+                return jsonify({
+                    'id': None,
+                    'user_id': current_user_id,
+                    'attendance_enabled': True,
+                    'bus_enabled': True,
+                    'behavior_enabled': True,
+                    'timetable_enabled': True,
+                    'substitution_enabled': True,
+                    'news_enabled': True,
+                    'general_enabled': True,
+                    'push_enabled': True,
+                    'updated_at': None
+                }), 200
         
         return jsonify(preferences.to_dict()), 200
         
     except Exception as e:
+        import traceback
+        print(f"Error fetching notification preferences: {str(e)}")
+        print(traceback.format_exc())
         return jsonify({"message": f"Error fetching preferences: {str(e)}"}), 500
 
 
-@notification_routes.route('/preferences', methods=['PUT'])
+@notification_blueprint.route('/preferences', methods=['PUT'])
 @jwt_required()
 def update_notification_preferences():
     """Update notification preferences for the current user"""
@@ -622,5 +792,8 @@ def update_notification_preferences():
         }), 200
         
     except Exception as e:
+        import traceback
         db.session.rollback()
+        print(f"Error updating notification preferences: {str(e)}")
+        print(traceback.format_exc())
         return jsonify({"message": f"Error updating preferences: {str(e)}"}), 500

@@ -233,12 +233,12 @@ const Sidebar = ({ isOpen, onClose }) => {
           icon: User,
           roles: ['admin', 'school_admin', 'teacher', 'data_analyst','student'],
         },
-        {
-          name: 'ميزات الإصدارات',
-          href: '/app/version-features',
-          icon: Star,
-          roles: ['admin', 'school_admin', 'teacher', 'data_analyst'],
-        },
+        // {
+        //   name: 'ميزات الإصدارات',
+        //   href: '/app/version-features',
+        //   icon: Star,
+        //   roles: ['admin', 'school_admin', 'teacher', 'data_analyst'],
+        // },
       ]
     },
   ];

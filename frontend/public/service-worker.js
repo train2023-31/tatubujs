@@ -137,6 +137,12 @@ self.addEventListener('fetch', (event) => {
       return;
     }
 
+    // Allow requests to api.tatubu.com (external API)
+    if (url.origin === 'https://api.tatubu.com' || url.hostname === 'api.tatubu.com') {
+      debugLog('Allowing api.tatubu.com request:', url.pathname);
+      return;
+    }
+
     // Skip external requests (different origin)
     if (url.origin !== self.location.origin) {
       debugLog('Skipping external request:', url.origin);

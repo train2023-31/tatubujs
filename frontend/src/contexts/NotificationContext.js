@@ -162,17 +162,56 @@ export const NotificationProvider = ({ children }) => {
 
       // Get VAPID public key
       const vapidPublicKey = process.env.REACT_APP_VAPID_PUBLIC_KEY || 
-        'BEl62iUYgUivxIkv69yViEuiBIa-Ib27SGeUmo6GNfhPNGa4VB91iZKqQ5SDMIpOUwfEhvJZ-8N5-P2iEzDQXCw';
+        'otk5B991dGEVuaObktl3OXNPc2jVahdqGa-h_nUtNkuYBD69BL_VvdjAbl-TnK3BavbuVCqywIvUYRsnlTvccg';
       
-      if (!vapidPublicKey) {
+      if (!vapidPublicKey || vapidPublicKey.trim() === '') {
+        console.error('VAPID key is empty');
         toast.error('خطأ في إعدادات الإشعارات. يرجى الاتصال بالدعم الفني.');
         return false;
       }
 
+      // Clean the key (remove whitespace)
+      const cleanKey = vapidPublicKey.trim();
+
+      // Validate VAPID key format (should be base64 URL-safe, typically 87 characters)
+      if (cleanKey.length < 80 || cleanKey.length > 100) {
+        console.error('Invalid VAPID key length:', cleanKey.length, 'Key:', cleanKey.substring(0, 20) + '...');
+        toast.error('مفتاح VAPID غير صحيح. يرجى التحقق من الإعدادات.');
+        return false;
+      }
+
+      // Validate key contains only valid base64 URL-safe characters
+      const validChars = /^[A-Za-z0-9_-]+$/;
+      if (!validChars.test(cleanKey)) {
+        console.error('VAPID key contains invalid characters');
+        toast.error('مفتاح VAPID يحتوي على أحرف غير صحيحة.');
+        return false;
+      }
+
+      let applicationServerKey;
+      try {
+        applicationServerKey = urlBase64ToUint8Array(cleanKey);
+        
+        // Validate the converted key length (should be 65 bytes for uncompressed point)
+        if (!applicationServerKey || applicationServerKey.length !== 65) {
+          console.error('Invalid VAPID key length after conversion:', applicationServerKey?.length);
+          console.error('Expected 65 bytes, got:', applicationServerKey?.length);
+          toast.error('مفتاح VAPID غير صحيح بعد التحويل.');
+          return false;
+        }
+      } catch (error) {
+        console.error('Error converting VAPID key:', error);
+        console.error('Key used:', cleanKey.substring(0, 20) + '...');
+        toast.error('خطأ في تحويل مفتاح VAPID. يرجى التحقق من الإعدادات.');
+        return false;
+      }
+
       // Subscribe to push notifications
+      // Note: applicationServerKey must be a Uint8Array of exactly 65 bytes
+      // console.log('Subscribing with VAPID key, length:', applicationServerKey.length);
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        applicationServerKey: applicationServerKey,
       });
 
       setPushSubscription(subscription);
@@ -313,6 +352,31 @@ export const NotificationProvider = ({ children }) => {
     };
   }, [isAuthenticated, fetchNotifications, fetchUnreadCount]);
 
+  // Delete a notification for the current user
+  const deleteNotification = useCallback(async (notificationId) => {
+    if (!token) return false;
+
+    try {
+      await axios.delete(
+        `${API_URL}/api/notifications/${notificationId}/delete`,
+        getAxiosConfig()
+      );
+
+      // Remove from local state
+      setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+      
+      // Refresh unread count
+      fetchUnreadCount();
+      
+      toast.success('تم حذف الإشعار');
+      return true;
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      toast.error('فشل في حذف الإشعار');
+      return false;
+    }
+  }, [token, getAxiosConfig, fetchUnreadCount]);
+
   const value = {
     notifications,
     unreadCount,
@@ -323,6 +387,7 @@ export const NotificationProvider = ({ children }) => {
     fetchUnreadCount,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
     subscribeToPush,
     unsubscribeFromPush,
     requestNotificationPermission,
@@ -337,18 +402,59 @@ export const NotificationProvider = ({ children }) => {
 
 // Helper functions
 function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding)
+  // Remove any whitespace
+  const cleanString = base64String.trim();
+  
+  // Add padding if needed (base64 requires length to be multiple of 4)
+  const padding = '='.repeat((4 - (cleanString.length % 4)) % 4);
+  
+  // Convert URL-safe base64 to standard base64
+  const base64 = (cleanString + padding)
     .replace(/\-/g, '+')
     .replace(/_/g, '/');
 
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
+  try {
+    // Decode base64 to binary string
+    const rawData = window.atob(base64);
+    
+    // Convert binary string to Uint8Array
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    
+    // VAPID public key should be exactly 65 bytes (uncompressed EC point)
+    // First byte is 0x04 (uncompressed point indicator), followed by 64 bytes of coordinates
+    // However, some keys might be 64 bytes (compressed format) or missing the 0x04 prefix
+    
+    if (outputArray.length === 64) {
+      // Key is 64 bytes - likely missing the 0x04 prefix
+      // Create a new array with 0x04 prefix
+      const paddedArray = new Uint8Array(65);
+      paddedArray[0] = 0x04; // Add uncompressed point indicator
+      paddedArray.set(outputArray, 1); // Copy the 64 bytes after the prefix
+      console.warn('VAPID key was 64 bytes, added 0x04 prefix to make it 65 bytes');
+      return paddedArray;
+    }
+    
+    if (outputArray.length !== 65) {
+      throw new Error(`Invalid VAPID key length: expected 65 bytes (or 64 bytes), got ${outputArray.length}`);
+    }
+    
+    // Verify first byte is 0x04 (uncompressed point)
+    // If not, but length is 65, it might be a valid key with different format
+    if (outputArray[0] !== 0x04) {
+      console.warn(`VAPID key first byte is 0x${outputArray[0].toString(16)}, expected 0x04. Attempting to use as-is.`);
+      // Some valid VAPID keys might not start with 0x04, so we'll allow it but warn
+    }
+    
+    return outputArray;
+  } catch (error) {
+    console.error('Base64 decoding error:', error);
+    console.error('Input string:', cleanString.substring(0, 30) + '...');
+    console.error('Key used:', cleanString.substring(0, 20) + '...');
+    throw new Error(`Failed to decode VAPID key: ${error.message}`);
   }
-  return outputArray;
 }
 
 function arrayBufferToBase64(buffer) {

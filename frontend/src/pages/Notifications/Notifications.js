@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNotifications } from '../../hooks/useNotifications';
-import { Bell, Filter, CheckCheck, Settings } from 'lucide-react';
+import { Bell, Filter, CheckCheck, Settings, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +14,7 @@ const Notifications = () => {
     fetchNotifications,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
   } = useNotifications();
 
   const [selectedType, setSelectedType] = useState('all');
@@ -48,6 +49,14 @@ const Notifications = () => {
     // Navigate to the action URL if available
     if (notification.action_url) {
       navigate(notification.action_url);
+    }
+  };
+
+  const handleDeleteNotification = async (e, notificationId) => {
+    e.stopPropagation(); // Prevent triggering the click handler
+    if (window.confirm('هل أنت متأكد من حذف هذا الإشعار؟')) {
+      await deleteNotification(notificationId);
+      loadNotifications(); // Refresh the list
     }
   };
 
@@ -202,9 +211,19 @@ const Notifications = () => {
                         }`}>
                           {notification.title}
                         </h3>
-                        {!notification.is_read && (
-                          <span className="flex-shrink-0 w-3 h-3 bg-blue-600 rounded-full"></span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {!notification.is_read && (
+                            <span className="flex-shrink-0 w-3 h-3 bg-blue-600 rounded-full"></span>
+                          )}
+                          <button
+                            onClick={(e) => handleDeleteNotification(e, notification.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                            title="حذف الإشعار"
+                            aria-label="حذف الإشعار"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
                       <p className="text-gray-600 mb-3 whitespace-pre-wrap">

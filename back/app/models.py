@@ -740,6 +740,32 @@ class NotificationRead(db.Model):
         }
 
 
+class NotificationDeleted(db.Model):
+    """Track which users have deleted which notifications (soft delete per user)"""
+    __tablename__ = 'notification_deleted'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    notification_id = db.Column(db.Integer, db.ForeignKey('notifications.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    deleted_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
+    
+    # Relationships
+    notification = db.relationship('Notification', backref='deletions')
+    user = db.relationship('User', backref='deleted_notifications')
+    
+    __table_args__ = (
+        db.UniqueConstraint('notification_id', 'user_id', name='unique_notification_deleted'),
+    )
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'notification_id': self.notification_id,
+            'user_id': self.user_id,
+            'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None
+        }
+
+
 class PushSubscription(db.Model):
     """Store push notification subscriptions for PWA"""
     __tablename__ = 'push_subscriptions'
@@ -802,23 +828,44 @@ class NotificationPreference(db.Model):
     push_enabled = db.Column(db.Boolean, nullable=False, default=True)
     
     # Metadata
-    created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
-    updated_at = db.Column(db.DateTime, default=get_oman_time().utcnow, onupdate=get_oman_time().utcnow)
+    created_at = db.Column(db.DateTime, default=get_oman_time)
+    updated_at = db.Column(db.DateTime, default=get_oman_time, onupdate=get_oman_time)
     
     # Relationships
     user = db.relationship('User', backref='notification_preference')
     
     def to_dict(self):
-        return {
-            'id': self.id,
-            'user_id': self.user_id,
-            'attendance_enabled': self.attendance_enabled,
-            'bus_enabled': self.bus_enabled,
-            'behavior_enabled': self.behavior_enabled,
-            'timetable_enabled': self.timetable_enabled,
-            'substitution_enabled': self.substitution_enabled,
-            'news_enabled': self.news_enabled,
-            'general_enabled': self.general_enabled,
-            'push_enabled': self.push_enabled,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
+        try:
+            return {
+                'id': self.id,
+                'user_id': self.user_id,
+                'attendance_enabled': bool(self.attendance_enabled) if self.attendance_enabled is not None else True,
+                'bus_enabled': bool(self.bus_enabled) if self.bus_enabled is not None else True,
+                'behavior_enabled': bool(self.behavior_enabled) if self.behavior_enabled is not None else True,
+                'timetable_enabled': bool(self.timetable_enabled) if self.timetable_enabled is not None else True,
+                'substitution_enabled': bool(self.substitution_enabled) if self.substitution_enabled is not None else True,
+                'news_enabled': bool(self.news_enabled) if self.news_enabled is not None else True,
+                'general_enabled': bool(self.general_enabled) if self.general_enabled is not None else True,
+                'push_enabled': bool(self.push_enabled) if self.push_enabled is not None else True,
+                'created_at': self.created_at.isoformat() if self.created_at else None,
+                'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            }
+        except Exception as e:
+            import traceback
+            print(f"Error in NotificationPreference.to_dict(): {str(e)}")
+            print(traceback.format_exc())
+            # Return safe defaults
+            return {
+                'id': getattr(self, 'id', None),
+                'user_id': getattr(self, 'user_id', None),
+                'attendance_enabled': True,
+                'bus_enabled': True,
+                'behavior_enabled': True,
+                'timetable_enabled': True,
+                'substitution_enabled': True,
+                'news_enabled': True,
+                'general_enabled': True,
+                'push_enabled': True,
+                'created_at': None,
+                'updated_at': None
+            }

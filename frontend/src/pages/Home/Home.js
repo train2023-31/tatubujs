@@ -48,7 +48,11 @@ import {
   ExternalLink,
   Menu,
   X,
-  Sparkles
+  Sparkles,
+  Bus,
+  QrCode,
+  RotateCcw,
+  Route
 } from 'lucide-react';
 
 const Home = () => {
@@ -69,7 +73,9 @@ const Home = () => {
     "تقارير مفصلة وإحصائيات",
     "إدارة الفصول والمواد",
     "نظام إشعارات ذكي",
-    "تقارير يومية وأسبوعية",
+    "تتبع الحافلات المباشر",
+    "الجدول الدراسي الذكي",
+    "نظام الإحتياط التلقائي",
     "إدارة المستخدمين والصلاحيات",
   ];
 
@@ -109,7 +115,7 @@ const Home = () => {
       description: "نظام تتبع متطور يوفر إدارة شاملة للحضور والغياب مع تقارير مفصلة وإشعارات فورية",
       image: "🎓",
       color: "from-blue-600 to-purple-600",
-      backgroundImage: "/home1.png"
+      backgroundImage: "/1.png"
     },
     {
       title: "تقارير وإحصائيات متقدمة",
@@ -117,15 +123,31 @@ const Home = () => {
       description: "احصل على تقارير مفصلة وإحصائيات دقيقة تساعدك في اتخاذ القرارات الصحيحة",
       image: "📊",
       color: "from-green-600 to-teal-600",
-      backgroundImage: "/qw.jpg"
+      backgroundImage: "/5.png"
     },
     {
-      title: "إشعارات فورية للآباء",
-      subtitle: "تواصل مباشر مع أولياء الأمور",
-      description: "إرسال رسائل نصية فورية للآباء عند غياب أو تأخر أبنائهم",
-      image: "📱",
+      title: "إشعارات فورية ذكية",
+      subtitle: "نظام إشعارات مستهدف ومتقدم",
+      description: "إشعارات ذكية مستهدفة مع Push Notifications تعمل حتى عند إغلاق التطبيق",
+      image: "🔔",
       color: "from-orange-600 to-red-600",
-      backgroundImage: "/we.jpg"
+      backgroundImage: "/3.png"
+    },
+    {
+      title: "تتبع الحافلات المباشر",
+      subtitle: "نظام متقدم لتتبع الحافلات والطلاب",
+      description: "تتبع مباشر للحافلات مع مسح رموز QR للطلاب وتقارير شاملة عن الرحلات",
+      image: "🚌",
+      color: "from-indigo-600 to-purple-600",
+      backgroundImage: "/2.png"
+    },
+    {
+      title: "الجدول الدراسي الذكي",
+      subtitle: "إدارة الجداول الدراسية بذكاء",
+      description: "رفع وإدارة الجداول الدراسية مع تحديثات فورية وإشعارات للمعلمين المتأثرين فقط",
+      image: "📅",
+      color: "from-teal-600 to-cyan-600",
+      backgroundImage: "/4.png"
     }
   ];
 
@@ -188,6 +210,46 @@ const Home = () => {
       description: "رفع وتحديث البيانات بكميات كبيرة باستخدام ملفات Excel",
       color: "red",
       benefits: ["رفع Excel", "تحديث جماعي", "استيراد البيانات", "تصدير التقارير"]
+    },
+    {
+      icon: Bus,
+      title: "تتبع الحافلات المباشر",
+      description: "نظام متقدم لتتبع الحافلات مع مسح رموز QR للطلاب وتقارير شاملة",
+      color: "indigo",
+      benefits: ["مسح QR للطلاب", "تتبع مباشر", "تقارير الحافلات", "إدارة السائقين"],
+      isNew: true
+    },
+    {
+      icon: Calendar,
+      title: "الجدول الدراسي الذكي",
+      description: "إدارة الجداول الدراسية مع تحديثات فورية وإشعارات للمعلمين",
+      color: "purple",
+      benefits: ["رفع الجدول", "تحديثات فورية", "إشعارات تلقائية", "عرض تفاعلي"],
+      isNew: true
+    },
+    {
+      icon: RotateCcw,
+      title: "نظام الإحتياط التلقائي",
+      description: "إدارة الإحتياط المعلمين مع توزيع ذكي تلقائي للحصص",
+      color: "teal",
+      benefits: ["الإحتياط تلقائي", "توزيع ذكي", "إشعارات فورية", "تقارير الإحتياط "],
+      isNew: true
+    },
+    {
+      icon: Bell,
+      title: "نظام الإشعارات الذكي",
+      description: "إشعارات مستهدفة وذكية مع إمكانية الحذف والتفضيلات المتقدمة",
+      color: "orange",
+      benefits: ["إشعارات مستهدفة", "Push Notifications", "تفضيلات متقدمة", "حذف الإشعارات"],
+      isNew: true
+    },
+    {
+      icon: QrCode,
+      title: "رموز QR للطلاب",
+      description: "إنشاء وإدارة رموز QR فريدة لكل طالب لتسجيل سريع ودقيق",
+      color: "green",
+      benefits: ["رموز QR فريدة", "طباعة جماعية", "مسح سريع", "تتبع دقيق"],
+      isNew: true
     }
   ];
 
@@ -350,7 +412,7 @@ const Home = () => {
               </div>
             </div>
             
-            {/* Desktop Navigation Menu */}
+            {/* Desktop Navigation Menu */} 
             <nav className="hidden lg:flex items-center space-x-8">
               {navigationSections.map((section) => (
                 <button
@@ -769,28 +831,58 @@ const Home = () => {
               <div className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30">
                 <div className="p-4 md:p-6">
                   <div className="flex items-center mb-3 md:mb-4">
-                    <MessageSquare className="h-5 w-5 md:h-6 md:w-6 text-orange-600 mr-2 md:mr-3" />
-                    <h3 className="text-base md:text-lg font-semibold text-gray-900">الإشعارات</h3>
+                    <Bell className="h-5 w-5 md:h-6 md:w-6 text-orange-600 mr-2 md:mr-3" />
+                    <h3 className="text-base md:text-lg font-semibold text-gray-900">نظام الإشعارات الذكي</h3>
                   </div>
                   <p className="text-sm md:text-base text-gray-600 mb-3 md:mb-4 leading-relaxed">
-                    إرسال رسائل نصية فورية للآباء مع تتبع حالة الرسائل
+                    إشعارات مستهدفة وذكية مع Push Notifications وإمكانية الحذف
                   </p>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <span className="text-xs md:text-sm">إشعار الغياب</span>
-                      <span className="text-xs text-green-600">مرسل</span>
+                      <span className="text-xs md:text-sm">إشعارات الحضور</span>
+                      <span className="text-xs text-green-600">مستهدفة</span>
                     </div>
                     <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <span className="text-xs md:text-sm">إشعار هروب</span>
-                      <span className="text-xs text-green-600">مرسل</span>
+                      <span className="text-xs md:text-sm">إشعارات الحافلة</span>
+                      <span className="text-xs text-green-600">مباشرة</span>
                     </div>
                     <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <span className="text-xs md:text-sm">إشعار التأخر</span>
-                      <span className="text-xs text-green-600">مرسل</span>
+                      <span className="text-xs md:text-sm">إشعارات الجدول</span>
+                      <span className="text-xs text-green-600">للمعلمين فقط</span>
                     </div>
                     <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <span className="text-xs md:text-sm">إشعار العذر</span>
-                      <span className="text-xs text-green-600">مرسل</span>
+                      <span className="text-xs md:text-sm">Push Notifications</span>
+                      <span className="text-xs text-green-600">متاحة</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30">
+                <div className="p-4 md:p-6">
+                  <div className="flex items-center mb-3 md:mb-4">
+                    <Bus className="h-5 w-5 md:h-6 md:w-6 text-indigo-600 mr-2 md:mr-3" />
+                    <h3 className="text-base md:text-lg font-semibold text-gray-900">تتبع الحافلات</h3>
+                  </div>
+                  <p className="text-sm md:text-base text-gray-600 mb-3 md:mb-4 leading-relaxed">
+                    نظام متقدم لتتبع الحافلات مع مسح QR وتقارير شاملة
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <span className="text-xs md:text-sm">مسح QR للطلاب</span>
+                      <span className="text-xs text-green-600">مباشر</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <span className="text-xs md:text-sm">تتبع الحافلات</span>
+                      <span className="text-xs text-green-600">في الوقت الفعلي</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <span className="text-xs md:text-sm">تقارير الحافلات</span>
+                      <span className="text-xs text-green-600">شاملة</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <span className="text-xs md:text-sm">إدارة السائقين</span>
+                      <span className="text-xs text-green-600">متكاملة</span>
                     </div>
                   </div>
                 </div>
@@ -814,9 +906,7 @@ const Home = () => {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-  
-
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 md:gap-8">
             {/* School Admin */}
             <div className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30 text-center">
               <div className="p-4 md:p-6">
@@ -838,7 +928,13 @@ const Home = () => {
                     <div className="text-xs md:text-sm text-gray-700 text-right">التقارير والإحصائيات</div>
                   </div>
                   <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
-                    <div className="text-xs md:text-sm text-gray-700 text-right">إشعار ولي الأمر</div>
+                    <div className="text-xs md:text-sm text-gray-700 text-right">إدارة الحافلات</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">الجدول الدراسي</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">الإحتياط </div>
                   </div>
                 </div>
               </div>
@@ -889,10 +985,16 @@ const Home = () => {
                     <div className="text-xs md:text-sm text-gray-700 text-right">عرض تقارير الفصول</div>
                   </div>
                   <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
-                    <div className="text-xs md:text-sm text-gray-700 text-right">الملف الشخصي</div>
+                    <div className="text-xs md:text-sm text-gray-700 text-right">الجدول الدراسي</div>
                   </div>
                   <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
-                    <div className="text-xs md:text-sm text-gray-700 text-right">إدارة الطلاب</div>
+                    <div className="text-xs md:text-sm text-gray-700 text-right">الإحتياط </div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">الإشعارات</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">الملف الشخصي</div>
                   </div>
                 </div>
               </div>
@@ -916,10 +1018,43 @@ const Home = () => {
                     <div className="text-xs md:text-sm text-gray-700 text-right">إحصائيات الحضور</div>
                   </div>
                   <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">تتبع الحافلة</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">الإشعارات</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
                     <div className="text-xs md:text-sm text-gray-700 text-right">الملف الشخصي</div>
                   </div>
                   <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
                     <div className="text-xs md:text-sm text-gray-700 text-right">ملاحظات السلوك</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Driver */}
+            <div className="backdrop-blur-md bg-white/20 border border-white/30 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:bg-white/30 text-center">
+              <div className="p-4 md:p-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 bg-blue-100 text-blue-600 rounded-full mb-3 md:mb-4">
+                  <Bus className="h-6 w-6 md:h-8 md:w-8" />
+                </div>
+                <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-2 md:mb-3">السائق</h3>
+                <p className="text-sm md:text-base text-gray-600 mb-3 md:mb-4 leading-relaxed">
+                  مسح رموز QR للطلاب على الحافلة وتتبع الرحلات
+                </p>
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">مسح QR للطلاب</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">تتبع الرحلات</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">عرض الطلاب</div>
+                  </div>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-lg p-2 border border-white/20">
+                    <div className="text-xs md:text-sm text-gray-700 text-right">تقارير الحافلة</div>
                   </div>
                 </div>
               </div>
@@ -994,7 +1129,11 @@ const Home = () => {
               <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-400">
                 <li>تسجيل الحضور الذكي</li>
                 <li>التقارير والإحصائيات</li>
-                <li>إشعار ولي الأمر</li>
+                <li>نظام الإشعارات الذكي</li>
+                <li>تتبع الحافلات المباشر</li>
+                <li>الجدول الدراسي الذكي</li>
+                <li>نظام الإحتياط التلقائي</li>
+                <li>رموز QR للطلاب</li>
                 <li>إدارة المستخدمين</li>
               </ul>
             </div>

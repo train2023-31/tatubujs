@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { Plus, Search, Edit, Trash2, UserPlus, Users as UsersIcon, Eye } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, UserPlus, Users as UsersIcon, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
 import { usersAPI, authAPI, classesAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { getRoleDisplayName, getRoleColor, formatPhoneNumber } from '../../utils/helpers';
@@ -131,6 +131,22 @@ const Users = () => {
             maxWidth: '500px'
           }
         });
+      },
+    }
+  );
+
+  // Toggle user active/inactive mutation
+  const toggleUserStatusMutation = useMutation(
+    ({ userId, isActive }) => authAPI.updateUser(userId, { is_active: !isActive }),
+    {
+      onSuccess: (response) => {
+        queryClient.invalidateQueries('mySchoolUsers');
+        const message = response.data?.message || 'تم تحديث حالة المستخدم بنجاح';
+        toast.success(message);
+      },
+      onError: (error) => {
+        const errorMessage = error.response?.data?.message || 'فشل في تحديث حالة المستخدم';
+        toast.error(errorMessage);
       },
     }
   );
@@ -278,7 +294,31 @@ const Users = () => {
           >
             <Edit className="h-4 w-4 ml-2" />
           </button>
+          
+          {/* Toggle Active/Inactive Button */}
           <button
+            onClick={() => {
+              toggleUserStatusMutation.mutate({
+                userId: row.id,
+                isActive: row.is_active
+              });
+            }}
+            className={`${
+              row.is_active 
+                ? 'text-green-600 hover:text-green-900' 
+                : 'text-red-400 hover:text-red-600'
+            } transition-colors`}
+            title={row.is_active ? 'تعطيل المستخدم' : 'تفعيل المستخدم'}
+            disabled={toggleUserStatusMutation.isLoading}
+          >
+            {row.is_active ? (
+              <ToggleRight className="h-5 w-5" />
+            ) : (
+              <ToggleLeft className="h-5 w-5" />
+            )}
+          </button>
+          
+          {/* <button
             onClick={() => {
               const confirmMessage = `هل أنت متأكد من حذف المستخدم "${row.fullName}"؟\n\nملاحظة: لا يمكن حذف المستخدمين الذين لديهم سجلات مرتبطة (فصول دراسية، سجلات حضور، إلخ)`;
               if (window.confirm(confirmMessage)) {
@@ -290,7 +330,7 @@ const Users = () => {
             disabled={deleteUserMutation.isLoading}
           >
             <Trash2 className="h-4 w-4" />
-          </button>
+          </button> */}
         </div>
       ),
     },

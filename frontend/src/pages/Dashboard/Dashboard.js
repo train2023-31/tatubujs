@@ -502,6 +502,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
   const [selectedListType, setSelectedListType] = useState('');
   const [isBusStudentsModalOpen, setIsBusStudentsModalOpen] = useState(false);
   const [busStudentsType, setBusStudentsType] = useState(''); // 'board' or 'exit'
+  const [showAllQuickAccess, setShowAllQuickAccess] = useState(false);
 
 
   // Local function to safely call needsSetup
@@ -1021,112 +1022,66 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
       />
 
       {/* Quick Access Cards */}
-      <div className="card">
-        <div className="card-header">
-          <h3 className="text-lg font-medium text-gray-900">الوصول السريع</h3>
-        </div>
-        <div className="card-body">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-            <QuickAccessCard
-              title="تسجيل الحضور"
-              description="تسجيل حضور الطلاب للفصول اليوم"
-              icon={ClipboardList}
-              color="blue"
-              onClick={onNavigateToAttendance}
-            />
-            <QuickAccessCard
-              title="تقارير الحضور"
-              description="عرض تفاصيل الحضور والغياب"
-              icon={Eye}
-              color="green"
-              onClick={onNavigateToAttendancesDetails}
-            />
-            <QuickAccessCard 
-              title="التقرير اليومي"
-              description="عرض التقرير اليومي للحضور وإشعار اولياء أمور الطلاب الغائبين"
-              icon={FileText}
-              color="purple"
-              onClick={() => navigate('/app/daily-report')}
-            />
-            <QuickAccessCard
-              title="تقرير المعلمين"
-              description="عرض تقرير حضور المعلمين"
-              icon={Users}
-              color="orange"
-              onClick={() => navigate('/app/teacher-report')}
-              
-            />
-            <QuickAccessCard
-              title="جدول الحصص"
-              description="إدارة ورفع الجدول الدراسي"
-              icon={Calendar}
-              color="cyan"
-              onClick={() => navigate('/app/school-timetable')}
-              isNew={true}
-            />
-            <QuickAccessCard
-              title="إحتياط المعلمين"
-              description="إدارة بدائل المعلمين الغائبين"
-              icon={UserCheck}
-              color="teal"
-              onClick={() => navigate('/app/teacher-substitution')}
-              isNew={true}
-            />
-            <QuickAccessCard
-              title="إدارة الفصول"
-              description="إدارة الفصول والمواد الدراسية"
-              icon={BookOpen}
-              color="pink"
-              onClick={() => navigate('/app/classes')}
-            />
-            <QuickAccessCard
-              title="التقارير والإحصائيات"
-              description="عرض التقارير والإحصائيات الشاملة"
-              icon={BarChart3}
-              color="cyan"
-              onClick={() => navigate('/app/reports')}
-            />
-            <QuickAccessCard
-              title="إدارة الحافلات"
-              description="إدارة الحافلات والسائقين والطلاب"
-              icon={Bus}
-              color="indigo"
-              onClick={() => navigate('/app/buses')}
-              isNew={true}
-            />
-            <QuickAccessCard
-              title="ماسح الحافلة"
-              description="مسح رموز QR للطلاب على الحافلة"
-              icon={QrCode}
-              color="green"
-              onClick={() => navigate('/app/bus-scanner')}
-              isNew={true}
-            />
-            <QuickAccessCard
-              title="رفع وتحديث البيانات"
-              description="رفع الملفات الجماعية للمعلمين والطلاب"
-              icon={Upload}
-              color="blue"
-              onClick={() => navigate('/app/bulk-operations')}
-            />
-            <QuickAccessCard
-              title="إرسال رسائل مخصصة"
-              description="إرسال رسائل SMS للطلاب"
-              icon={MessageCircle}
-              color="indigo"
-              onClick={() => navigate('/app/bulk-messaging')}
-             
-            />
-            <QuickAccessCard
-              title="إعدادات SMS"
-              description="إعدادات الرسائل القصيرة iBulk SMS"
-              icon={Settings}
-              color="indigo"
-              onClick={() => navigate('/app/sms-configuration')}
-            />
+      {(() => {
+        const quickAccessCards = [
+          { title: "تسجيل الحضور", description: "تسجيل حضور الطلاب للفصول اليوم", icon: ClipboardList, color: "blue", onClick: onNavigateToAttendance },
+          { title: "تقارير الحضور", description: "عرض تفاصيل الحضور والغياب", icon: Eye, color: "green", onClick: onNavigateToAttendancesDetails },
+          { title: "التقرير اليومي", description: "عرض التقرير اليومي للحضور وإشعار اولياء أمور الطلاب الغائبين", icon: FileText, color: "purple", onClick: () => navigate('/app/daily-report') },
+          { title: "تقرير المعلمين", description: "عرض تقرير حضور المعلمين", icon: Users, color: "orange", onClick: () => navigate('/app/teacher-report') },
+          { title: "جدول الحصص", description: "إدارة ورفع الجدول الدراسي", icon: Calendar, color: "cyan", onClick: () => navigate('/app/school-timetable'), isNew: true },
+          { title: "إحتياط المعلمين", description: "إدارة بدائل المعلمين الغائبين", icon: UserCheck, color: "teal", onClick: () => navigate('/app/teacher-substitution'), isNew: true },
+          { title: "إدارة الفصول", description: "إدارة الفصول والمواد الدراسية", icon: BookOpen, color: "pink", onClick: () => navigate('/app/classes') },
+          { title: "التقارير والإحصائيات", description: "عرض التقارير والإحصائيات الشاملة", icon: BarChart3, color: "cyan", onClick: () => navigate('/app/reports') },
+          { title: "إدارة الحافلات", description: "إدارة الحافلات والسائقين والطلاب", icon: Bus, color: "indigo", onClick: () => navigate('/app/buses'), isNew: true },
+          { title: "ماسح الحافلة", description: "مسح رموز QR للطلاب على الحافلة", icon: QrCode, color: "green", onClick: () => navigate('/app/bus-scanner'), isNew: true },
+          { title: "رفع وتحديث البيانات", description: "رفع الملفات الجماعية للمعلمين والطلاب", icon: Upload, color: "blue", onClick: () => navigate('/app/bulk-operations') },
+          { title: "إرسال رسائل مخصصة", description: "إرسال رسائل SMS للطلاب", icon: MessageCircle, color: "indigo", onClick: () => navigate('/app/bulk-messaging') },
+          { title: "إعدادات SMS", description: "إعدادات الرسائل القصيرة iBulk SMS", icon: Settings, color: "indigo", onClick: () => navigate('/app/sms-configuration') }
+        ];
+        const displayedCards = showAllQuickAccess ? quickAccessCards : quickAccessCards.slice(0, 5);
+        const hasMore = quickAccessCards.length > 5;
+        
+        return (
+          <div className="card">
+            <div className="card-header flex items-center justify-between">
+              <h3 className="text-lg font-medium text-gray-900">الوصول السريع</h3>
+              {hasMore && (
+                <button
+                  onClick={() => setShowAllQuickAccess(!showAllQuickAccess)}
+                  className="text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors"
+                >
+                  {showAllQuickAccess ? (
+                    <>
+                      <EyeOff className="h-4 w-4" />
+                      إخفاء
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="h-4 w-4" />
+                      عرض الكل ({quickAccessCards.length})
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+            <div className="card-body">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                {displayedCards.map((card, index) => (
+                  <QuickAccessCard
+                    key={index}
+                    title={card.title}
+                    description={card.description}
+                    icon={card.icon}
+                    color={card.color}
+                    onClick={card.onClick}
+                    isNew={card.isNew}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Date Selector */}
       <div className="card">

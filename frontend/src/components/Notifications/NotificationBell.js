@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNotifications } from '../../hooks/useNotifications';
-import { Bell, X, Check, CheckCheck } from 'lucide-react';
+import { Bell, X, Check, CheckCheck, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -13,6 +13,7 @@ const NotificationBell = () => {
     fetchNotifications,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
   } = useNotifications();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -35,21 +36,29 @@ const NotificationBell = () => {
 
   // Close dropdown when clicking outside (mobile-friendly)
   useEffect(() => {
+    if (!isOpen) return;
+
+    let clickStartTime = 0;
+    let clickTarget = null;
+
     const handleClickOutside = (event) => {
-      // Check if click is outside both the button and the dropdown content
+      // On mobile, check if click is on backdrop (which handles its own close)
+      if (isMobile) {
+        // Only close if clicking directly on backdrop, not if event bubbled from dropdown
+        const isBackdrop = event.target.classList?.contains('notification-backdrop') || 
+                          (event.target === document.body || event.target === document.documentElement);
+        if (isBackdrop && dropdownContentRef.current && !dropdownContentRef.current.contains(event.target)) {
+          setIsOpen(false);
+        }
+        return;
+      }
+
+      // Desktop: check if click is outside both button and dropdown
       const isOutsideButton = dropdownRef.current && !dropdownRef.current.contains(event.target);
       const isOutsideDropdown = dropdownContentRef.current && !dropdownContentRef.current.contains(event.target);
       
-      // On mobile, dropdown is in portal, so only check dropdown content
-      // On desktop, check both button and dropdown
-      if (isMobile) {
-        if (isOutsideDropdown) {
-          setIsOpen(false);
-        }
-      } else {
-        if (isOutsideButton && isOutsideDropdown) {
-          setIsOpen(false);
-        }
+      if (isOutsideButton && isOutsideDropdown) {
+        setIsOpen(false);
       }
     };
 
@@ -59,34 +68,40 @@ const NotificationBell = () => {
       }
     };
 
-    if (isOpen) {
-      // Use a small delay to avoid immediate closure on open
-      const timeoutId = setTimeout(() => {
-        // Support both mouse and touch events for mobile
-        document.addEventListener('mousedown', handleClickOutside, true);
-        document.addEventListener('touchstart', handleClickOutside, true);
-        document.addEventListener('keydown', handleEscape);
-      }, 100);
-      
-      // Prevent body scroll when dropdown is open on mobile
-      if (isMobile) {
-        document.body.style.overflow = 'hidden';
-        document.body.style.position = 'fixed';
-        document.body.style.width = '100%';
-      }
-
-      return () => {
-        clearTimeout(timeoutId);
-        document.removeEventListener('mousedown', handleClickOutside, true);
-        document.removeEventListener('touchstart', handleClickOutside, true);
-        document.removeEventListener('keydown', handleEscape);
-        if (isMobile) {
-          document.body.style.overflow = '';
-          document.body.style.position = '';
-          document.body.style.width = '';
-        }
-      };
+    // Use a longer delay on mobile to avoid immediate closure
+    const delay = isMobile ? 300 : 100;
+    const timeoutId = setTimeout(() => {
+      // Support both mouse and touch events
+      document.addEventListener('mousedown', handleClickOutside, { passive: true });
+      document.addEventListener('touchstart', handleClickOutside, { passive: true });
+      document.addEventListener('keydown', handleEscape);
+    }, delay);
+    
+    // Prevent body scroll when dropdown is open on mobile
+    if (isMobile) {
+      const scrollY = window.scrollY;
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
     }
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+      if (isMobile) {
+        const scrollY = document.body.style.top;
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        if (scrollY) {
+          window.scrollTo(0, parseInt(scrollY || '0') * -1);
+        }
+      }
+    };
   }, [isOpen, isMobile]);
 
   const handleToggle = () => {
@@ -106,6 +121,14 @@ const NotificationBell = () => {
     if (notification.action_url) {
       window.location.href = notification.action_url;
       setIsOpen(false);
+    }
+  };
+
+  const handleDeleteNotification = async (e, notificationId) => {
+    e.stopPropagation(); // Prevent triggering the click handler
+    if (window.confirm('هل أنت متأكد من حذف هذا الإشعار؟')) {
+      await deleteNotification(notificationId);
+      fetchNotifications({ per_page: 20 }); // Refresh the list
     }
   };
 
@@ -201,17 +224,18 @@ const NotificationBell = () => {
       {/* Mobile backdrop - always on top except dropdown */}
       {isMobile && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-[9998] touch-none"
+          className="notification-backdrop fixed inset-0 bg-black bg-opacity-50 z-[9998]"
           onClick={(e) => {
             // Only close if clicking directly on backdrop, not if event bubbled from dropdown
             if (e.target === e.currentTarget) {
+              e.stopPropagation();
               setIsOpen(false);
             }
           }}
           onTouchStart={(e) => {
             // Only close if touching directly on backdrop
-            // Don't call preventDefault() as it causes warning with passive listeners
             if (e.target === e.currentTarget) {
+              e.stopPropagation();
               setIsOpen(false);
             }
           }}
@@ -223,7 +247,10 @@ const NotificationBell = () => {
           role="button"
           tabIndex={0}
           aria-label="إغلاق الإشعارات"
-          style={{ WebkitTapHighlightColor: 'transparent' }}
+          style={{ 
+            WebkitTapHighlightColor: 'transparent',
+            touchAction: 'manipulation'
+          }}
         />
       )}
       
@@ -246,21 +273,30 @@ const NotificationBell = () => {
               display: 'flex',
               flexDirection: 'column',
               WebkitTransform: 'translateZ(0)', // Hardware acceleration for mobile
-              transform: 'translateZ(0)'
+              transform: 'translateZ(0)',
+              touchAction: 'pan-y' // Allow vertical scrolling, prevent horizontal
             } : {
               maxHeight: '80vh',
               display: 'flex',
               flexDirection: 'column'
             }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
             onTouchStart={(e) => {
               e.stopPropagation();
               if (isMobile) {
                 handleTouchStart(e);
               }
             }}
-            onTouchMove={isMobile ? handleTouchMove : undefined}
-            onTouchEnd={isMobile ? handleTouchEnd : undefined}
+            onTouchMove={isMobile ? (e) => {
+              e.stopPropagation();
+              handleTouchMove(e);
+            } : undefined}
+            onTouchEnd={isMobile ? (e) => {
+              e.stopPropagation();
+              handleTouchEnd(e);
+            } : undefined}
           >
           {/* Mobile drag handle */}
           {isMobile && (
@@ -286,8 +322,8 @@ const NotificationBell = () => {
                     e.stopPropagation();
                     handleMarkAllAsRead();
                   }}
-                  onTouchStart={(e) => e.stopPropagation()}
-                  className="text-xs sm:text-sm text-indigo-600 active:text-indigo-800 flex items-center gap-1 px-2 py-1 rounded touch-manipulation"
+                  className="text-xs sm:text-sm text-indigo-600 active:text-indigo-800 flex items-center gap-1 px-2 py-1 rounded"
+                  style={{ touchAction: 'manipulation' }}
                   title="تحديد الكل كمقروء"
                 >
                   <CheckCheck className="w-4 h-4" />
@@ -299,8 +335,8 @@ const NotificationBell = () => {
                   e.stopPropagation();
                   setIsOpen(false);
                 }}
-                onTouchStart={(e) => e.stopPropagation()}
-                className="text-gray-400 active:text-gray-600 p-1 rounded touch-manipulation"
+                className="text-gray-400 active:text-gray-600 p-1 rounded"
+                style={{ touchAction: 'manipulation' }}
                 aria-label="إغلاق"
               >
                 <X className="w-5 h-5" />
@@ -331,12 +367,12 @@ const NotificationBell = () => {
                   e.stopPropagation();
                   setSelectedType(type);
                 }}
-                onTouchStart={(e) => e.stopPropagation()}
-                className={`px-3 py-1.5 sm:px-3 sm:py-1 text-xs font-medium rounded-full whitespace-nowrap transition-colors touch-manipulation active:scale-95 ${
+                className={`px-3 py-1.5 sm:px-3 sm:py-1 text-xs font-medium rounded-full whitespace-nowrap transition-colors active:scale-95 ${
                   selectedType === type
                     ? 'bg-indigo-600 text-white'
                     : 'bg-white text-gray-600 active:bg-gray-100'
                 }`}
+                style={{ touchAction: 'manipulation' }}
               >
                 {type === 'all' ? 'الكل' : getTypeLabel(type)}
               </button>
@@ -384,13 +420,10 @@ const NotificationBell = () => {
                       e.stopPropagation();
                       handleNotificationClick(notification);
                     }}
-                    onTouchStart={(e) => {
-                      // Prevent event bubbling on touch
-                      e.stopPropagation();
-                    }}
-                    className={`p-3 sm:p-4 active:bg-gray-50 cursor-pointer transition-colors touch-manipulation ${
+                    className={`p-3 sm:p-4 active:bg-gray-50 cursor-pointer transition-colors ${
                       !notification.is_read ? 'bg-blue-50' : ''
                     }`}
+                    style={{ touchAction: 'manipulation' }}
                   >
                     <div className="flex items-start gap-2 sm:gap-3">
                       {/* Icon */}
@@ -404,9 +437,21 @@ const NotificationBell = () => {
                           <h4 className={`text-sm sm:text-sm font-semibold leading-snug ${!notification.is_read ? 'text-gray-900' : 'text-gray-700'}`}>
                             {notification.title}
                           </h4>
-                          {!notification.is_read && (
-                            <span className="flex-shrink-0 w-2 h-2 bg-blue-600 rounded-full mt-1"></span>
-                          )}
+                          <div className="flex items-center gap-1">
+                            {!notification.is_read && (
+                              <span className="flex-shrink-0 w-2 h-2 bg-blue-600 rounded-full mt-1"></span>
+                            )}
+                            <button
+                              onClick={(e) => handleDeleteNotification(e, notification.id)}
+                              onTouchStart={(e) => e.stopPropagation()}
+                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 active:bg-red-100 rounded transition-colors"
+                              style={{ touchAction: 'manipulation' }}
+                              title="حذف الإشعار"
+                              aria-label="حذف الإشعار"
+                            >
+                              <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                            </button>
+                          </div>
                         </div>
                         <p className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-2 sm:line-clamp-2 leading-relaxed">
                           {notification.message}
@@ -438,8 +483,8 @@ const NotificationBell = () => {
                   window.location.href = '/app/notifications';
                   setIsOpen(false);
                 }}
-                onTouchStart={(e) => e.stopPropagation()}
-                className="w-full text-sm text-center text-indigo-600 active:text-indigo-800 font-medium py-2 rounded-lg active:bg-indigo-50 touch-manipulation"
+                className="w-full text-sm text-center text-indigo-600 active:text-indigo-800 font-medium py-2 rounded-lg active:bg-indigo-50"
+                style={{ touchAction: 'manipulation' }}
               >
                 عرض جميع الإشعارات
               </button>
@@ -454,13 +499,12 @@ const NotificationBell = () => {
       <div className="relative z-[9999]" ref={dropdownRef}>
         {/* Bell Icon Button */}
         <button
-          onClick={handleToggle}
-          onTouchStart={(e) => {
-            // Handle touch event - touch-manipulation CSS already prevents double-tap zoom
-            // Don't call preventDefault() as it causes warning with passive listeners
+          onClick={(e) => {
+            e.stopPropagation();
             handleToggle();
           }}
-          className="relative p-2 sm:p-2.5 text-gray-600 hover:text-gray-900 active:bg-gray-100 rounded-full transition-colors touch-manipulation"
+          className="relative p-2 sm:p-2.5 text-gray-600 hover:text-gray-900 active:bg-gray-100 rounded-full transition-colors"
+          style={{ touchAction: 'manipulation' }}
           aria-label="الإشعارات"
         >
           <Bell className="w-5 h-5 sm:w-6 sm:h-6" />

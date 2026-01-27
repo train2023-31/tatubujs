@@ -2,7 +2,8 @@
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app.models import Teacher, Class, Student, student_classes, School ,User,Subject
+from app.models import Teacher, Class, Student, student_classes, School, User, Subject, Attendance
+from sqlalchemy import func
 from app import db
 from app.logger import log_action
 
@@ -281,7 +282,18 @@ def get_my_classes():
     # Retrieve only classes that belong to the teacher's school
     classes = Class.query.filter_by(school_id=teacher.school_id).all()
 
-    class_list = [{"id": cls.id, "name": cls.name} for cls in classes]
+    class_list = []
+    for cls in classes:
+        # Count active students in the class
+        student_count = db.session.query(func.count(student_classes.c.student_id)).filter(
+            student_classes.c.class_id == cls.id
+        ).scalar()
+        
+        class_list.append({
+            "id": cls.id, 
+            "name": cls.name,
+            "students_count": student_count or 0
+        })
 
     return jsonify(class_list), 200
 
@@ -322,12 +334,18 @@ def get_Class():
         # Fetch the teacher's user record by teacher_id
         teacher = User.query.get(cls.teacher_id)
         teacher_name = teacher.fullName if teacher else "Unknown"  # Handle cases where the teacher might not exist
+        
+        # Count active students in the class
+        student_count = db.session.query(func.count(student_classes.c.student_id)).filter(
+            student_classes.c.class_id == cls.id
+        ).scalar()
 
         class_list.append({
             "id": cls.id,
             "name": cls.name,
             "teacher_id": cls.teacher_id,
-            "teacher_name": teacher_name
+            "teacher_name": teacher_name,
+            "students_count": student_count or 0
         })
     
     return jsonify(class_list), 200
@@ -553,6 +571,118 @@ def remove_students():
     return jsonify(response), 200
 
 
-
+@class_blueprint.route('/<int:class_id>', methods=['DELETE'])
+@jwt_required()
+@log_action("حذف", description="حذف فصل دراسي")
+def delete_class(class_id):
+    """Delete a class with validation checks"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        
+        if not user:
+            return jsonify({
+                "message": {"en": "User not found", "ar": "المستخدم غير موجود"},
+                "flag": 1
+            }), 404
+        
+        # Get the class
+        class_obj = Class.query.get(class_id)
+        if not class_obj:
+            return jsonify({
+                "message": {"en": "Class not found", "ar": "الفصل غير موجود"},
+                "flag": 2
+            }), 404
+        
+        # Verify user has permission (school admin or teacher of the class)
+        if user.user_role not in ['school_admin', 'admin']:
+            if class_obj.teacher_id != current_user_id:
+                return jsonify({
+                    "message": {"en": "Unauthorized", "ar": "غير مصرح لك بحذف هذا الفصل"},
+                    "flag": 3
+                }), 403
+        
+        # Verify class belongs to user's school
+        if user.school_id != class_obj.school_id:
+            return jsonify({
+                "message": {"en": "Unauthorized", "ar": "غير مصرح لك بحذف هذا الفصل"},
+                "flag": 4
+            }), 403
+        
+        # Check 1: No students assigned to the class
+        student_count = db.session.query(func.count(student_classes.c.student_id)).filter(
+            student_classes.c.class_id == class_id
+        ).scalar()
+        
+        if student_count > 0:
+            return jsonify({
+                "message": {
+                    "en": f"Cannot delete class. There are {student_count} students assigned to this class. Please remove all students first.",
+                    "ar": f"لا يمكن حذف الفصل. يوجد {student_count} طالب مسجل في هذا الفصل. يرجى نقل جميع الطلاب أولاً."
+                },
+                "flag": 5,
+                "conflict_type": "students",
+                "conflict_count": student_count
+            }), 400
+        
+        # Check 2: No attendance records for this class
+        attendance_count = Attendance.query.filter_by(class_id=class_id).count()
+        
+        if attendance_count > 0:
+            return jsonify({
+                "message": {
+                    "en": f"Cannot delete class. There are {attendance_count} attendance records linked to this class. Please contact administrator.",
+                    "ar": f"لا يمكن حذف الفصل. يوجد {attendance_count} سجل حضور مرتبط بهذا الفصل. يرجى الاتصال بالمدير."
+                },
+                "flag": 6,
+                "conflict_type": "attendance",
+                "conflict_count": attendance_count
+            }), 400
+        
+        # Check 3: No timetable schedules linked to this class (by class name)
+        try:
+            from app.models import TimetableSchedule
+            timetable_schedule_count = TimetableSchedule.query.filter_by(
+                class_name=class_obj.name
+            ).count()
+            
+            if timetable_schedule_count > 0:
+                return jsonify({
+                    "message": {
+                        "en": f"Cannot delete class. This class is linked to {timetable_schedule_count} timetable schedule(s). Please remove from timetable first.",
+                        "ar": f"لا يمكن حذف الفصل. هذا الفصل مرتبط بـ {timetable_schedule_count} جدول دراسي. يرجى إزالته من الجدول أولاً."
+                    },
+                    "flag": 7,
+                    "conflict_type": "timetable",
+                    "conflict_count": timetable_schedule_count
+                }), 400
+        except ImportError:
+            # If TimetableSchedule is not imported, skip this check
+            pass
+        
+        # All checks passed - delete the class
+        db.session.delete(class_obj)
+        db.session.commit()
+        
+        return jsonify({
+            "message": {
+                "en": "Class deleted successfully",
+                "ar": "تم حذف الفصل بنجاح"
+            },
+            "flag": 0
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        print(f"Error deleting class: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({
+            "message": {
+                "en": f"Error deleting class: {str(e)}",
+                "ar": f"حدث خطأ أثناء حذف الفصل: {str(e)}"
+            },
+            "flag": 8
+        }), 500
 
 

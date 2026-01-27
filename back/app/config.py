@@ -38,7 +38,7 @@ class Config:
     # 1. pip install py_vapid && python -c "from py_vapid import Vapid01; v = Vapid01(); print('Private:', v.private_key.pem); print('Public:', v.public_key.pem)"
     # 2. Use online generator: https://web-push-codelab.glitch.me/
     # 3. Use the generate_vapid_keys() function (see BACKGROUND_NOTIFICATIONS_GUIDE.md)
-    VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', 'BEl62iUYgUivxIkv69yViEuiBIa-Ib27SGeUmo6GNfhPNGa4VB91iZKqQ5SDMIpOUwfEhvJZ-8N5-P2iEzDQXCw')
+    VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', 'otk5B991dGEVuaObktl3OXNPc2jVahdqGa-h_nUtNkuYBD69BL_VvdjAbl-TnK3BavbuVCqywIvUYRsnlTvccg')
     VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
     VAPID_CLAIM_EMAIL = os.environ.get('VAPID_CLAIM_EMAIL', 'admin@tatubu.com')
      

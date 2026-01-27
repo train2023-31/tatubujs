@@ -3,7 +3,7 @@
 from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from app.models import User, Student, Teacher, School ,Class , Subject , student_classes ,Attendance ,News ,ActionLog, Driver, Bus, BusScan, bus_students, Timetable, TimetableDay, TimetablePeriod, TimetableSchedule, TimetableTeacherMapping, TeacherSubstitution, SubstitutionAssignment, Notification, NotificationRead
+from app.models import User, Student, Teacher, School ,Class , Subject , student_classes ,Attendance ,News ,ActionLog, Driver, Bus, BusScan, bus_students, Timetable, TimetableDay, TimetablePeriod, TimetableSchedule, TimetableTeacherMapping, TeacherSubstitution, SubstitutionAssignment, Notification, NotificationRead, NotificationDeleted
 from app import db ,limiter
 import csv
 from flask import send_file, Response
@@ -1972,7 +1972,11 @@ def delete_school_data():
             # Get all notification IDs for this school
             notification_ids = [n.id for n in Notification.query.filter_by(school_id=school_id).all()]
             if notification_ids:
-                # Delete notification reads first
+                # Delete notification deletions first (NotificationDeleted)
+                db.session.query(NotificationDeleted).filter(
+                    NotificationDeleted.notification_id.in_(notification_ids)
+                ).delete(synchronize_session=False)
+                # Delete notification reads
                 db.session.query(NotificationRead).filter(
                     NotificationRead.notification_id.in_(notification_ids)
                 ).delete(synchronize_session=False)

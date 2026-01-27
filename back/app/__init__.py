@@ -130,7 +130,7 @@ def create_app():
     from app.routes.bus_routes import bus_blueprint
     from app.routes.timetable_routes import timetable_bp
     from app.routes.substitution_routes import substitution_bp
-    from app.routes.notification_routes import notification_routes
+    from app.routes.notification_routes import notification_blueprint
 
 
 
@@ -142,7 +142,7 @@ def create_app():
     app.register_blueprint(bus_blueprint, url_prefix='/api/bus')
     app.register_blueprint(timetable_bp, url_prefix='/api/timetable')
     app.register_blueprint(substitution_bp, url_prefix='/api/substitutions')
-    app.register_blueprint(notification_routes, url_prefix='/api/notifications')
+    app.register_blueprint(notification_blueprint, url_prefix='/api/notifications')  # url_prefix already defined in blueprint
     
 
     # --- Security Headers ---

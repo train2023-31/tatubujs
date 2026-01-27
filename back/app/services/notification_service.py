@@ -91,7 +91,7 @@ def notify_student_attendance(student_id, school_id, attendance_record, created_
 📚 المادة: {attendance_record.get('subject_name', 'غير محدد')}
 🎓 الفصل: {attendance_record.get('class_name', 'غير محدد')}
 👨‍🏫 المعلم: {attendance_record.get('teacher_name', 'غير محدد')}
-📅 التاريخ: {attendance_record.get('date', datetime.now().strftime('%Y-%m-%d'))}
+📅 التاريخ: {attendance_record.get('date', get_oman_time().strftime('%Y-%m-%d'))}
 🕐 الحصة: {attendance_record.get('class_time_num', '-')}
 """
         
@@ -127,7 +127,7 @@ def notify_student_bus_scan(student_id, school_id, scan_data, created_by):
             return None
         
         scan_type = scan_data.get('scan_type')
-        scan_time = scan_data.get('scan_time', datetime.now())
+        scan_time = scan_data.get('scan_time', get_oman_time())
         bus_number = scan_data.get('bus_number', 'غير محدد')
         location = scan_data.get('location', '')
         
@@ -191,11 +191,10 @@ def notify_student_behavior_note(student_id, school_id, behavior_data, created_b
         teacher_name = behavior_data.get('teacher_name', 'المعلم')
         
         message = f"""
-📝 ملاحظة سلوك جديدة
 
 👨‍🏫 من المعلم: {teacher_name}
 📋 الملاحظة: {note}
-📅 التاريخ: {datetime.now().strftime('%Y-%m-%d')}
+📅 التاريخ: {get_oman_time().strftime('%Y-%m-%d')}
 """
         
         title = "📝 ملاحظة سلوك جديدة"
@@ -256,7 +255,7 @@ def notify_students_school_news(school_id, news_data, created_by):
             related_entity_type='news',
             related_entity_id=news_data.get('id'),
             action_url='/app/news',
-            expires_at=datetime.now() + timedelta(days=30)
+            expires_at=get_oman_time() + timedelta(days=30)
         )
     except Exception as e:
         print(f"Error notifying students about school news: {str(e)}")
@@ -295,11 +294,10 @@ def notify_teachers_timetable_change(school_id, timetable_data, created_by, affe
             return None
         
         message = f"""
-📅 تحديث الجدول الدراسي
 
 📚 الجدول: {timetable_name}
 📝 التغيير: {change_description}
-📅 التاريخ: {datetime.now().strftime('%Y-%m-%d')}
+📅 التاريخ: {get_oman_time().strftime('%Y-%m-%d')}
 
 ⚠️ يرجى مراجعة جدولك الدراسي المحدث
 """
@@ -337,10 +335,9 @@ def notify_teacher_substitution(teacher_id, school_id, substitution_data, create
         subject_name = substitution_data.get('subject_name', 'غير محدد')
         absent_teacher = substitution_data.get('absent_teacher_name', 'غير محدد')
         period = substitution_data.get('period', '-')
-        date = substitution_data.get('date', datetime.now().strftime('%Y-%m-%d'))
+        date = substitution_data.get('date', get_oman_time().strftime('%Y-%m-%d'))
         
         message = f"""
-🔄 إحتياط جديد
 
 👨‍🏫 بديل عن: {absent_teacher}
 🎓 الفصل: {class_name}
@@ -414,7 +411,7 @@ def notify_teachers_school_news(school_id, news_data, created_by):
             related_entity_type='news',
             related_entity_id=news_data.get('id'),
             action_url='/app/news',
-            expires_at=datetime.now() + timedelta(days=30)
+            expires_at=get_oman_time() + timedelta(days=30)
         )
     except Exception as e:
         print(f"Error notifying teachers about school news: {str(e)}")
@@ -466,7 +463,7 @@ def notify_teachers_system_news(school_id, news_data, created_by):
             related_entity_type='news',
             related_entity_id=news_data.get('id'),
             action_url='/app/news',
-            expires_at=datetime.now() + timedelta(days=30)
+            expires_at=get_oman_time() + timedelta(days=30)
         )
     except Exception as e:
         print(f"Error notifying teachers about system news: {str(e)}")
@@ -516,7 +513,7 @@ def notify_driver_school_news(school_id, news_data, created_by):
             related_entity_type='news',
             related_entity_id=news_data.get('id'),
             action_url='/app/news',
-            expires_at=datetime.now() + timedelta(days=30)
+            expires_at=get_oman_time() + timedelta(days=30)
         )
     except Exception as e:
         print(f"Error notifying drivers about school news: {str(e)}")
@@ -533,7 +530,6 @@ def notify_driver_forgot_students(driver_id, school_id, bus_data, created_by):
         student_names = bus_data.get('student_names', [])
         
         message = f"""
-⚠️ تحذير: طلاب على الحافلة
 
 🚍 الحافلة: {bus_number}
 👥 عدد الطلاب: {students_count}
@@ -614,7 +610,7 @@ def notify_admin_system_news(school_id, news_data, created_by):
             related_entity_type='news',
             related_entity_id=news_data.get('id'),
             action_url='/app/news',
-            expires_at=datetime.now() + timedelta(days=30)
+            expires_at=get_oman_time() + timedelta(days=30)
         )
     except Exception as e:
         print(f"Error notifying admins about system news: {str(e)}")
@@ -632,8 +628,6 @@ def notify_admin_forgot_students_on_bus(school_id, bus_data, created_by):
         student_names = bus_data.get('student_names', [])
         
         message = f"""
-⚠️ تنبيه: طلاب على الحافلة
-
 🚍 الحافلة: {bus_number}
 👤 السائق: {driver_name}
 👥 عدد الطلاب: {students_count}
