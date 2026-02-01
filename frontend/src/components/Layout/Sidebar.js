@@ -46,6 +46,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     {
       id: 'main',
       title: 'الرئيسية',
+      icon: Home,
       defaultExpanded: true,
 
       items: [
@@ -60,7 +61,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     {
       id: 'school',
       title: 'المدرسة',
-      
+      icon: Building,
       defaultExpanded: false,
       items: [
         {
@@ -117,6 +118,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     {
       id: 'students',
       title: 'الطلاب',
+      icon: GraduationCap,
       defaultExpanded: false,
       items: [
         {
@@ -149,6 +151,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     {
       id: 'teachers',
       title: 'المعلمين',
+      icon: UserCheck,
       defaultExpanded: false,
       items: [
         
@@ -182,6 +185,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     {
       id: 'bus',
       title: 'الحافلات',
+      icon: Bus,
       defaultExpanded: false,
       items: [
         {
@@ -213,6 +217,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     {
       id: 'system',
       title: 'النظام',
+      icon: Settings,
       defaultExpanded: false,
       items: [
         {
@@ -361,6 +366,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 location.pathname === item.href && hasRole(user, item.roles)
               );
               
+              const GroupIcon = group.icon;
               return (
                 <div key={group.id} className="space-y-1">
                   {/* Category Header - Clickable */}
@@ -370,7 +376,12 @@ const Sidebar = ({ isOpen, onClose }) => {
                       hasActiveItem ? 'bg-primary-50 text-primary-700' : ''
                     }`}
                   >
-                    <span>{group.title}</span>
+                    <span className="flex items-center gap-2">
+                      {GroupIcon && (
+                        <GroupIcon className={`h-5 w-5 flex-shrink-0 ${hasActiveItem ? 'text-primary-500' : 'text-gray-500'}`} />
+                      )}
+                      {group.title}
+                    </span>
                     {isExpanded ? (
                       <ChevronUp className="h-4 w-4 text-gray-500" />
                     ) : (

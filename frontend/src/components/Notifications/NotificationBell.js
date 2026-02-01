@@ -475,7 +475,7 @@ const NotificationBell = () => {
           </div>
 
           {/* Footer */}
-          {notifications.length > 0 && (
+          { (
             <div className="p-3 sm:p-4 border-t border-gray-200 bg-gray-50 sticky bottom-0">
               <button
                 onClick={(e) => {
@@ -486,7 +486,7 @@ const NotificationBell = () => {
                 className="w-full text-sm text-center text-indigo-600 active:text-indigo-800 font-medium py-2 rounded-lg active:bg-indigo-50"
                 style={{ touchAction: 'manipulation' }}
               >
-                عرض جميع الإشعارات
+                عرض جميع الإشعارات / الإعدادات
               </button>
             </div>
           )}

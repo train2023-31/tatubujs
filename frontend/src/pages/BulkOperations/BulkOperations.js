@@ -35,6 +35,10 @@ const BulkOperations = () => {
   const [showVideoGuide, setShowVideoGuide] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(false);
+  // Chunked student upload: { currentChunk, totalChunks, processedCount, totalCount }
+  const [uploadProgress, setUploadProgress] = useState(null);
+
+  const STUDENT_CHUNK_SIZE = 100;
 
   // Handle URL parameters on component mount
   useEffect(() => {
@@ -281,18 +285,75 @@ const BulkOperations = () => {
       await createClassesMutation.mutateAsync(classesToCreate);
       
       toast.dismiss('creating-classes');
+
+      // Step 2: Register and assign students (chunked to avoid load errors)
+      const chunks = [];
+      for (let i = 0; i < processedData.length; i += STUDENT_CHUNK_SIZE) {
+        chunks.push(processedData.slice(i, i + STUDENT_CHUNK_SIZE));
+      }
+
+      if (chunks.length <= 1) {
+        // Single chunk: use existing mutation
+        setProcessingStage('جاري تسجيل وتعيين الطلاب...');
+        toast.loading('جاري تسجيل وتعيين الطلاب...', { id: 'registering-students' });
+        bulkRegisterAndAssignMutation.mutate({ students: processedData });
+        return;
+      }
+
+      // Multiple chunks: upload sequentially and show progress
       setProcessingStage('جاري تسجيل وتعيين الطلاب...');
-      toast.loading('جاري تسجيل وتعيين الطلاب...', { id: 'registering-students' });
-      
-      // Step 2: Register and assign students
-      bulkRegisterAndAssignMutation.mutate({ students: processedData });
-      
+      setUploadProgress({
+        currentChunk: 0,
+        totalChunks: chunks.length,
+        processedCount: 0,
+        totalCount: processedData.length
+      });
+      toast.loading(`جاري رفع الدفعة 1 من ${chunks.length}...`, { id: 'registering-students' });
+
+      const allResults = [];
+      for (let i = 0; i < chunks.length; i++) {
+        setUploadProgress(prev => ({
+          ...prev,
+          currentChunk: i + 1,
+          processedCount: i * STUDENT_CHUNK_SIZE
+        }));
+        toast.loading(
+          `جاري رفع الدفعة ${i + 1} من ${chunks.length} (${i * STUDENT_CHUNK_SIZE}/${processedData.length} سجل)`,
+          { id: 'registering-students' }
+        );
+        try {
+          const res = await authAPI.registerAndAssignStudents({ students: chunks[i] });
+          const chunkResults = res.data || [];
+          allResults.push(...chunkResults);
+          setUploadProgress(prev => ({
+            ...prev,
+            processedCount: Math.min((i + 1) * STUDENT_CHUNK_SIZE, processedData.length)
+          }));
+        } catch (err) {
+          toast.dismiss('registering-students');
+          toast.error(err.response?.data?.message?.ar || 'فشل في معالجة البيانات');
+          setUploadProgress(null);
+          setIsProcessing(false);
+          setProcessingStage('');
+          return;
+        }
+      }
+
+      toast.dismiss('registering-students');
+      setResults(allResults);
+      setUploadProgress(null);
+      setIsProcessing(false);
+      setProcessingStage('');
+      queryClient.invalidateQueries('students');
+      queryClient.invalidateQueries('classes');
+      toast.success('تم معالجة البيانات بنجاح');
     } catch (error) {
       toast.dismiss('creating-classes');
       toast.dismiss('registering-students');
       toast.error('فشل في عملية تسجيل وتعيين الطلاب');
       setIsProcessing(false);
       setProcessingStage('');
+      setUploadProgress(null);
     }
   };
 
@@ -660,7 +721,7 @@ const BulkOperations = () => {
                         <td className="px-3 py-2 border border-gray-300 text-gray-800">أحمد محمد علي</td>
                         <td className="px-3 py-2 border border-gray-300 text-gray-800">9999##99</td>
                         <td className="px-3 py-2 border border-gray-300 text-gray-800">حاسب آلي</td>
-                        <td className="px-3 py-2 border border-gray-300 text-gray-800">20</td>
+                        <td className="px-3 py-2 border border-gray-300 text-gray-800">20 <p className="text-xs text-red-500 mt-1">لا يقبل القيمة (0)</p> <p className="text-xs text-red-500 mt-1">لا تتركه فارغا</p></td>
                       </tr>
                     </tbody>
                   </table>
@@ -727,11 +788,62 @@ const BulkOperations = () => {
                   <>
                     <li>• سيتم إنشاء الفصول تلقائياً من (اسم الصف + الشعبة)</li>
                     <li>• ثم سيتم تسجيل وتعيين الطلاب للفصول </li>
-                    <li className="text-red-500">• <strong>دعم التسجيل المتعدد:</strong> يمكن للطالب أن يظهر في عدة صفوف بفصول مختلفة (مثل: أحمد في فصل 12، وفي فصل الفيزياء 1، وفي فصل الكيمياء 2) لهذا الإجراء قم بتحميل نموذج الطلاب من الزر <strong>"تحميل نموذج الطلبة"</strong></li>
+                    <li className="text-red-500">• <strong>دعم الفصول الإحتيارية:</strong> يمكن للطالب أن يظهر في عدة صفوف بفصول مختلفة (مثل: أحمد في فصل 12، وفي فصل الفيزياء 1، وفي فصل الكيمياء 2) لهذا الإجراء قم بتحميل نموذج الطلاب من الزر <strong>"تحميل نموذج الطلبة"</strong></li>
+                     {/* Example Table for Each Tab */}
+                <div className="mt-3">
+                  <h4 className="text-sm font-medium text-red-500 mb-2">مثال على البيانات المطلوبة:</h4>
+                  <table className="min-w-full border border-red-500 bg-white rounded">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        {getExpectedHeaders().map((header, idx) => (
+                          <th
+                            key={idx}
+                            className="px-3 py-2 text-right border border-gray-300 font-medium text-red-500"
+                          >
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedTab === 'teachers' && (
+                        <tr>
+                          <td className="px-3 py-2 border border-gray-300 text-gray-800">محمد أحمد سالم</td>
+                          <td className="px-3 py-2 border border-gray-300 text-gray-800">99992233</td>
+                          <td className="px-3 py-2 border border-gray-300 text-gray-800">معلم رياضيات</td>
+                          <td className="px-3 py-2 border border-gray-300 text-gray-800">18</td>
+                        </tr>
+                      )}
+                      {selectedTab === 'drivers' && (
+                        <tr>
+                          <td className="px-3 py-2 border border-gray-300 text-gray-800">سعيد علي عبد الله</td>
+                          <td className="px-3 py-2 border border-gray-300 text-gray-800">99887766</td>
+                          <td className="px-3 py-2 border border-gray-300 text-gray-800">54321</td>
+                        </tr>
+                      )}
+                      {selectedTab === 'assign' && (
+                        <tr>
+                          <td className="px-3 py-2 border border-gray-300 text-gray-800">20231234</td>
+                          <td className="px-3 py-2 border border-gray-300 text-gray-800">هشام صالح سالم</td>
+                          <td className="px-3 py-2 border border-gray-300 text-gray-800">1</td>
+                          <td className="px-3 py-2 border border-gray-300 text-gray-800">الفيزياء</td>
+                        </tr>
+                      )}
+                      {selectedTab === 'phones' && (
+                        <tr>
+                          <td className="px-3 py-2 border border-gray-300 text-gray-800">20236789</td>
+                          <td className="px-3 py-2 border border-gray-300 text-gray-800">95551234</td>
+                          <td className="px-3 py-2 border border-gray-300 text-gray-800">الخوض السادسة</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
                     <li>• إذا كان الطالب مسجلاً مسبقاً، سيتم تعيينه للفصل الجديد فقط (بدون إعادة التسجيل)</li>
                   </>
                 )}
               </ul>
+               
             </div>
           </div>
         </div>
@@ -789,16 +901,25 @@ const BulkOperations = () => {
           <div className="card-body">
             <div className="flex items-center justify-center space-x-4 py-8">
               <LoadingSpinner size="lg" />
-              <div className="text-center">
+              <div className="text-center w-full max-w-md">
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
                   {processingStage || 'جاري معالجة البيانات'}
                 </h3>
                 <p className="text-sm text-gray-600">
-                  يرجى الانتظار بينما نقوم بمعالجة {uploadedData.length} سجل...
+                  {uploadProgress
+                    ? `جاري رفع الدفعة ${uploadProgress.currentChunk} من ${uploadProgress.totalChunks} (تم معالجة ${uploadProgress.processedCount} من ${uploadProgress.totalCount} سجل)`
+                    : `يرجى الانتظار بينما نقوم بمعالجة ${uploadedData.length} سجل...`}
                 </p>
                 <div className="mt-4">
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-primary-500 h-2 rounded-full animate-pulse" style={{width: '100%'}}></div>
+                    <div
+                      className={`bg-primary-500 h-2 rounded-full ${uploadProgress ? 'transition-all duration-300' : 'animate-pulse'}`}
+                      style={{
+                        width: uploadProgress
+                          ? `${(uploadProgress.processedCount / uploadProgress.totalCount) * 100}%`
+                          : '100%'
+                      }}
+                    />
                   </div>
                 </div>
                 <div className="mt-2">

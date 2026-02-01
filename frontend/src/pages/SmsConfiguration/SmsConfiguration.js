@@ -625,7 +625,7 @@ const SmsConfiguration = () => {
             {/* API URL */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                رابط API
+                رابط API 
               </label>
               <input
                 type="url"
@@ -634,6 +634,7 @@ const SmsConfiguration = () => {
                 className="input w-full"
                 placeholder="https://ismartsms.net/RestApi/api/SMS/PostSMS"
               />
+              <p className="text-xs text-gray-500 mt-1">https://ismartsms.net/RestApi/api/SMS/PostSMS</p>
             </div>
 
             {/* Balance Threshold */}
