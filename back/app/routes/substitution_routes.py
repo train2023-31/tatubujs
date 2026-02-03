@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
-from app.models import TeacherSubstitution, SubstitutionAssignment, TimetableSchedule, Timetable, TimetableTeacherMapping, TimetableDay, User
+from app.models import TeacherSubstitution, SubstitutionAssignment, TimetableSchedule, Timetable, TimetableTeacherMapping, TimetableDay, TimetablePeriod, User
 from datetime import datetime, date, timedelta
 import json
 from flask_cors import CORS
@@ -11,7 +11,7 @@ from app.services.notification_service import notify_teacher_substitution
 substitution_bp = Blueprint('substitution', __name__, url_prefix='/api/substitutions')
 CORS(substitution_bp)
 
-def calculate_substitute_teachers(timetable_id, absent_teacher_xml_id, school_id, criteria, start_date=None, end_date=None):
+def calculate_substitute_teachers(timetable_id, absent_teacher_xml_id, school_id, criteria, start_date=None, end_date=None, max_classes_same_day_n=3):
     """
     Calculate the best substitute teachers for an absent teacher's classes.
     
@@ -20,14 +20,22 @@ def calculate_substitute_teachers(timetable_id, absent_teacher_xml_id, school_id
     - fewest_classes: Prioritize teachers with fewer weekly classes
     - fewest_substitutions: Prioritize teachers with fewer existing substitutions
     - no_conflict: Must not have schedule conflicts
+    - max_classes_same_day: Only consider teachers who have fewer than max_classes_same_day_n classes on that day (timetable + substitutions)
+    - free_before_period: Only consider teachers who have no class in any period before the current slot on that day (timetable + substitutions)
     
     Args:
         start_date: Optional start date for checking existing assignments in the same period
         end_date: Optional end date for checking existing assignments in the same period
+        max_classes_same_day_n: Max classes allowed on same day when criteria max_classes_same_day is used (default 3)
     
     Returns: List of schedules with suggested substitute teachers
     """
-    
+    from collections import defaultdict
+
+    # Period order: period_xml_id -> period_number (for "free before period" check)
+    period_rows = TimetablePeriod.query.filter_by(timetable_id=timetable_id).order_by(TimetablePeriod.period_number).all()
+    period_xml_id_to_number = {p.period_id: p.period_number for p in period_rows}
+
     # Get all schedules for the absent teacher
     absent_schedules = TimetableSchedule.query.filter_by(
         timetable_id=timetable_id,
@@ -116,7 +124,7 @@ def calculate_substitute_teachers(timetable_id, absent_teacher_xml_id, school_id
         ).distinct().all()
         teacher_subjects = [s[0] for s in teacher_subjects]
         
-        # Get teacher's schedule (day_xml_id, period_xml_id combinations)
+        # Get teacher's schedule (day_xml_id, period_xml_id combinations) from timetable
         teacher_schedule = db.session.query(
             TimetableSchedule.day_xml_id,
             TimetableSchedule.period_xml_id
@@ -124,13 +132,55 @@ def calculate_substitute_teachers(timetable_id, absent_teacher_xml_id, school_id
             TimetableSchedule.timetable_id == timetable_id,
             TimetableSchedule.teacher_xml_id == teacher_xml_id
         ).all()
-        
+        teacher_schedule_set = set(teacher_schedule)
+
+        # Classes per day and slots per day: include timetable + all substitution assignments (from any substitution)
+        # With selected dates: only assignments overlapping [start_date, end_date]; otherwise all active substitutions
+        classes_on_day = defaultdict(int)
+        slots_on_day = defaultdict(set)
+        for (day_xml_id, period_xml_id) in teacher_schedule_set:
+            classes_on_day[day_xml_id] += 1
+            slots_on_day[day_xml_id].add(period_xml_id)
+        if user_id:
+            sub_assignments_query = SubstitutionAssignment.query.filter_by(
+                substitute_teacher_user_id=user_id
+            ).join(TeacherSubstitution).filter(
+                TeacherSubstitution.is_active == True,
+                TeacherSubstitution.school_id == school_id,
+                TeacherSubstitution.end_date >= date.today()
+            )
+            if start_date and end_date:
+                try:
+                    start = datetime.strptime(start_date, '%Y-%m-%d').date()
+                    end = datetime.strptime(end_date, '%Y-%m-%d').date()
+                    sub_assignments_query = sub_assignments_query.filter(
+                        db.or_(
+                            db.and_(
+                                TeacherSubstitution.start_date <= end,
+                                TeacherSubstitution.end_date >= start
+                            ),
+                            db.and_(
+                                SubstitutionAssignment.assignment_date.isnot(None),
+                                SubstitutionAssignment.assignment_date >= start,
+                                SubstitutionAssignment.assignment_date <= end
+                            )
+                        )
+                    )
+                except ValueError:
+                    pass
+            sub_assignments = sub_assignments_query.all()
+            for sa in sub_assignments:
+                classes_on_day[sa.day_xml_id] += 1
+                slots_on_day[sa.day_xml_id].add(sa.period_xml_id)
+
         teacher_stats[teacher_xml_id] = {
             'weekly_classes': weekly_classes,
             'substitution_count': substitution_count,
             'subjects': teacher_subjects,
-            'schedule': set(teacher_schedule),  # Set of (day, period) tuples
-            'user_id': user_id
+            'schedule': teacher_schedule_set,
+            'user_id': user_id,
+            'classes_on_day': classes_on_day,
+            'slots_on_day': slots_on_day,
         }
     
     # Now assign substitute teachers for each absent schedule
@@ -154,42 +204,62 @@ def calculate_substitute_teachers(timetable_id, absent_teacher_xml_id, school_id
                 if schedule_slot in stats['schedule']:
                     continue  # Skip this teacher, they have a conflict
                 
-                # Also check if teacher already has a substitution assignment at this time slot
-                # in the same period (if dates are provided)
+                # Also check if teacher already has a substitution assignment at this time slot (from any substitution)
+                # With selected dates: only assignments overlapping [start_date, end_date]; otherwise any active substitution
                 user_id = stats.get('user_id')
-                if start_date and end_date and user_id:
-                    try:
-                        start = datetime.strptime(start_date, '%Y-%m-%d').date()
-                        end = datetime.strptime(end_date, '%Y-%m-%d').date()
-                        
-                        # Check for existing substitution assignments at this day/period
-                        existing_assignment = SubstitutionAssignment.query.filter_by(
-                            substitute_teacher_user_id=user_id,
-                            day_xml_id=schedule.day_xml_id,
-                            period_xml_id=schedule.period_xml_id
-                        ).join(TeacherSubstitution).filter(
-                            TeacherSubstitution.is_active == True,
-                            db.or_(
-                                # Substitution date range overlaps
-                                db.and_(
-                                    TeacherSubstitution.start_date <= end,
-                                    TeacherSubstitution.end_date >= start
-                                ),
-                                # Assignment has specific date within range
-                                db.and_(
-                                    SubstitutionAssignment.assignment_date.isnot(None),
-                                    SubstitutionAssignment.assignment_date >= start,
-                                    SubstitutionAssignment.assignment_date <= end
+                if user_id:
+                    existing_query = SubstitutionAssignment.query.filter_by(
+                        substitute_teacher_user_id=user_id,
+                        day_xml_id=schedule.day_xml_id,
+                        period_xml_id=schedule.period_xml_id
+                    ).join(TeacherSubstitution).filter(
+                        TeacherSubstitution.is_active == True,
+                        TeacherSubstitution.school_id == school_id,
+                        TeacherSubstitution.end_date >= date.today()
+                    )
+                    if start_date and end_date:
+                        try:
+                            start = datetime.strptime(start_date, '%Y-%m-%d').date()
+                            end = datetime.strptime(end_date, '%Y-%m-%d').date()
+                            existing_query = existing_query.filter(
+                                db.or_(
+                                    db.and_(
+                                        TeacherSubstitution.start_date <= end,
+                                        TeacherSubstitution.end_date >= start
+                                    ),
+                                    db.and_(
+                                        SubstitutionAssignment.assignment_date.isnot(None),
+                                        SubstitutionAssignment.assignment_date >= start,
+                                        SubstitutionAssignment.assignment_date <= end
+                                    )
                                 )
                             )
-                        ).first()
-                        
-                        if existing_assignment:
-                            continue  # Skip this teacher, they already have an assignment at this time
-                    except ValueError:
-                        # Invalid date format, skip this check
-                        pass
-            
+                        except ValueError:
+                            pass
+                    if existing_query.first():
+                        continue  # Skip this teacher, they already have an assignment at this time
+
+            # max_classes_same_day: only teachers with fewer than n classes on this day (timetable + substitutions + already-assigned in this run)
+            if 'max_classes_same_day' in criteria:
+                day_xml_id = schedule.day_xml_id
+                count_this_day = stats['classes_on_day'].get(day_xml_id, 0)
+                if count_this_day >= max_classes_same_day_n:
+                    continue
+
+            # free_before_period: only teachers who have no class in any period before this slot on this day
+            if 'free_before_period' in criteria:
+                day_xml_id = schedule.day_xml_id
+                period_xml_id = schedule.period_xml_id
+                current_period_number = period_xml_id_to_number.get(period_xml_id)
+                if current_period_number is not None:
+                    busy_periods_that_day = stats['slots_on_day'].get(day_xml_id, set())
+                    has_class_before = any(
+                        period_xml_id_to_number.get(pid, -1) < current_period_number
+                        for pid in busy_periods_that_day
+                    )
+                    if has_class_before:
+                        continue
+
             # Calculate score based on criteria with detailed breakdown
             points_breakdown = {
                 'same_subject': 0,
@@ -258,12 +328,17 @@ def calculate_substitute_teachers(timetable_id, absent_teacher_xml_id, school_id
             assignments.append({
                 'schedule': schedule.to_dict(),
                 'substitute_teacher': best,
-                'all_candidates': candidates[:5]  # Return top 5 for frontend selection
+                'all_candidates': candidates[:10]  # Return top 5 for frontend selection
             })
-            
-            # Update teacher stats to reflect this assignment
-            teacher_stats[best['teacher_xml_id']]['weekly_classes'] += 1
-            teacher_stats[best['teacher_xml_id']]['substitution_count'] += 1
+
+            # Update teacher stats so next slots count this assignment (for max_classes_same_day / free_before_period)
+            best_stats = teacher_stats[best['teacher_xml_id']]
+            best_stats['weekly_classes'] += 1
+            best_stats['substitution_count'] += 1
+            day_xml_id = schedule.day_xml_id
+            period_xml_id = schedule.period_xml_id
+            best_stats['classes_on_day'][day_xml_id] += 1
+            best_stats['slots_on_day'][day_xml_id].add(period_xml_id)
         else:
             # No suitable substitute found
             assignments.append({
@@ -340,15 +415,18 @@ def calculate_substitution():
     criteria = data.get('criteria', [])
     start_date = data.get('start_date')
     end_date = data.get('end_date')
-    
+    max_classes_same_day_n = data.get('max_classes_same_day_n', 3)
+    if not isinstance(max_classes_same_day_n, int) or max_classes_same_day_n < 1:
+        max_classes_same_day_n = 3
+
     if not timetable_id or not absent_teacher_xml_id:
         return jsonify({'error': 'Missing required fields'}), 400
-    
+
     # Verify timetable belongs to user's school
     timetable = Timetable.query.get(timetable_id)
     if not timetable or timetable.school_id != user.school_id:
         return jsonify({'error': 'Timetable not found'}), 404
-    
+
     # Calculate assignments for each schedule
     base_assignments = calculate_substitute_teachers(
         timetable_id,
@@ -356,7 +434,8 @@ def calculate_substitution():
         user.school_id,
         criteria,
         start_date=start_date,
-        end_date=end_date
+        end_date=end_date,
+        max_classes_same_day_n=max_classes_same_day_n
     )
     
     # Debug: Log base assignments count and details

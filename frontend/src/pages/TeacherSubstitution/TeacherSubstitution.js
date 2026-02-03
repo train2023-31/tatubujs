@@ -20,6 +20,7 @@ const TeacherSubstitution = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [criteria, setCriteria] = useState(['same_subject', 'fewest_classes', 'fewest_substitutions', 'no_conflict']);
+  const [maxClassesSameDayN, setMaxClassesSameDayN] = useState(3);
   const [sameTeacherForAllWeeks, setSameTeacherForAllWeeks] = useState(true);
   
   // Calculated substitutions
@@ -57,31 +58,29 @@ const TeacherSubstitution = () => {
     }
   }, [selectedTimetable, showActiveOnly]);
   
-  // Auto-calculate when criteria changes (if all required fields are filled)
+  // Auto-calculate when criteria or maxClassesSameDayN changes (if all required fields are filled)
   const isInitialMount = useRef(true);
   const prevCriteriaRef = useRef(criteria);
-  
+  const prevMaxNRef = useRef(maxClassesSameDayN);
+
   useEffect(() => {
     // Skip on initial mount
     if (isInitialMount.current) {
       isInitialMount.current = false;
       prevCriteriaRef.current = criteria;
+      prevMaxNRef.current = maxClassesSameDayN;
       return;
     }
-    
-    // Check if criteria actually changed
+
     const criteriaChanged = JSON.stringify(prevCriteriaRef.current) !== JSON.stringify(criteria);
+    const maxNChanged = prevMaxNRef.current !== maxClassesSameDayN;
     prevCriteriaRef.current = criteria;
-    
-    // Auto-calculate if all required fields are filled and criteria changed
-    if (criteriaChanged && selectedAbsentTeacher && startDate && endDate) {
-      // Only auto-calculate if we're in the create modal
-      if (showCreateModal) {
-        // Use silent mode to avoid showing toast on every criteria change
-        handleCalculateSubstitution(true);
-      }
+    prevMaxNRef.current = maxClassesSameDayN;
+
+    if ((criteriaChanged || maxNChanged) && selectedAbsentTeacher && startDate && endDate && showCreateModal) {
+      handleCalculateSubstitution(true);
     }
-  }, [criteria, selectedAbsentTeacher, startDate, endDate, showCreateModal]);
+  }, [criteria, selectedAbsentTeacher, startDate, endDate, showCreateModal, maxClassesSameDayN]);
   
   const loadTimetables = async () => {
     try {
@@ -260,7 +259,8 @@ const TeacherSubstitution = () => {
         absent_teacher_xml_id: selectedAbsentTeacher,
         criteria: criteria,
         start_date: startDate,
-        end_date: endDate
+        end_date: endDate,
+        max_classes_same_day_n: maxClassesSameDayN
       });
       
       setCalculatedAssignments(response.assignments || []);
@@ -691,7 +691,9 @@ const TeacherSubstitution = () => {
     { key: 'same_subject', label: 'نفس المادة', description: 'إعطاء الأولوية للمعلمين الذين يدرسون نفس المادة', points: 100 },
     { key: 'fewest_classes', label: 'أقل عدد حصص', description: 'إعطاء الأولوية للمعلمين الذين لديهم أقل عدد حصص أسبوعية', points: 50 },
     { key: 'fewest_substitutions', label: 'أقل حصص إحتياط', description: 'إعطاء الأولوية للمعلمين الذين لديهم أقل عدد حصص إحتياط سابقة', points: 30 },
-    { key: 'no_conflict', label: 'عدم التعارض', description: 'استبعاد المعلمين الذين لديهم حصة في نفس الوقت (إلزامي)', points: 0 }
+    { key: 'no_conflict', label: 'عدم التعارض', description: 'استبعاد المعلمين الذين لديهم حصة في نفس الوقت (إلزامي)', points: 0 },
+    { key: 'max_classes_same_day', label: 'أقل من ن حصة في نفس اليوم', description: 'استبعاد المعلمين الذين لديهم ن حصص أو أكثر في نفس اليوم (جدول + إحتياط)', points: 0 },
+    { key: 'free_before_period', label: 'خالٍ قبل الحصة', description: 'استبعاد المعلمين الذين لديهم حصة قبل هذه الحصة في نفس اليوم (جدول + إحتياط)', points: 0 }
   ];
   
   const getDayName = (dayXmlId) => {
@@ -1532,6 +1534,7 @@ const TeacherSubstitution = () => {
           }}
           title="تسجيل غياب معلم وتوزيع الإحتياط"
           size='full'
+          
         >
           <div className="space-y-6">
             {/* Form Section */}
@@ -1647,8 +1650,20 @@ const TeacherSubstitution = () => {
                         className="mt-1 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                       />
                       <div className="flex-1 flex flex-col gap-1">
-                        <div className="font-medium text-gray-900">{option.label} <span className="text-sm text-gray-600">({option.description})</span> <span className="text-sm text-gray-600 font-bold">({option.points} نقطة)</span></div>
-                      
+                        <div className="font-medium text-gray-900">{option.label} <span className="text-sm text-gray-600">({option.description})</span> {option.points > 0 && <span className="text-sm text-gray-600 font-bold">({option.points} نقطة)</span>}</div>
+                        {option.key === 'max_classes_same_day' && criteria.includes('max_classes_same_day') && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <label className="text-sm text-gray-600">الحد الأقصى لعدد الحصص في نفس اليوم:</label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={20}
+                              value={maxClassesSameDayN}
+                              onChange={(e) => setMaxClassesSameDayN(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                              className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                            />
+                          </div>
+                        )}
                       </div>
                     </label>
                   ))}
@@ -1728,7 +1743,22 @@ const TeacherSubstitution = () => {
                     </span>
                   </div>
                 </div>
-                
+
+                {/* Warning: count of slots with no substitute */}
+                {(() => {
+                  const noSubstituteCount = calculatedAssignments.filter(a => !a.substitute_teacher).length;
+                  return noSubstituteCount > 0 ? (
+                    <div className="mb-4 flex items-center gap-2 p-3 bg-red-100 border border-red-200 rounded-lg text-red-800">
+                      <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                      <span className="font-medium">
+                        لا يوجد بديل: <strong>{noSubstituteCount}</strong> حصة
+                      </span>
+                    </div>
+                  ) : null;
+
+                  
+                })()}
+
                 {/* Timetable Grid */}
                 <div className="bg-white rounded-lg shadow-sm overflow-hidden">
                   {/* Top scrollbar */}

@@ -876,7 +876,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
                 </p>
                 {!bulkOpsStatus?.step_status?.step6_substitutions?.completed && (
                   <button 
-                    onClick={() => navigate('/app/school-timetable')}
+                    onClick={() => navigate('/app/teacher-substitution')}
                     className="btn btn-sm btn-primary w-full"
                   >
                     <UserCheck className="h-4 w-4 mr-1 ml-1" />
