@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, BookOpen, Users, Edit, Trash2, UserPlus, Eye, UserMinus, UserCheck } from 'lucide-react';
 import { classesAPI } from '../../services/api';
+import { sortClassesByName } from '../../utils/helpers';
 import { useAuth } from '../../hooks/useAuth';
 import DataTable from '../../components/UI/DataTable';
 import Modal from '../../components/UI/Modal';
@@ -208,7 +209,7 @@ const Classes = () => {
       case 'subjects':
         return subjects?.sort((a, b) => a.id - b.id) || [];
       default:
-        return classes?.sort((a, b) => a.id - b.id) || [];
+        return sortClassesByName(classes) || [];
     }
   };
 

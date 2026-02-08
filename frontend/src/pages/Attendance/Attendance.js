@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { classesAPI, attendanceAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
-import { formatDate, getTodayAPI, getClassTimeOptions } from '../../utils/helpers';
+import { formatDate, getTodayAPI, getClassTimeOptions, sortClassesByName } from '../../utils/helpers';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import toast from 'react-hot-toast';
 
@@ -139,6 +139,51 @@ const Attendance = () => {
       refetchOnMount: true,
       refetchOnReconnect: true,
       onSuccess: (data) => {
+        // Build set of student IDs that have excuse in period 1, 2, or 3 on this date (for defaulting later periods)
+        const earlyPeriodNums = [1, 2, 3];
+        const studentIdsWithExcuseInEarlyPeriods = new Set();
+        const excuseNoteByStudent = {};
+        earlyPeriodNums.forEach((periodNum) => {
+          const periodData = data.class_time_data?.[periodNum];
+          if (periodData && periodData.attendance) {
+            periodData.attendance.forEach((att) => {
+              if (att.is_excused) {
+                studentIdsWithExcuseInEarlyPeriods.add(att.student_id);
+                if (att.ExcusNote && !excuseNoteByStudent[att.student_id]) {
+                  excuseNoteByStudent[att.student_id] = att.ExcusNote;
+                }
+              }
+            });
+          }
+        });
+
+        const applyDefaultForPeriod = (records) =>
+          records.map((record) => {
+            const hasExcuseInEarlyPeriods = studentIdsWithExcuseInEarlyPeriods.has(record.student_id);
+            if (hasExcuseInEarlyPeriods) {
+              return {
+                ...record,
+                subject_id: parseInt(selectedSubject),
+                class_time_num: selectedTime,
+                is_present: false,
+                is_Acsent: false,
+                is_Excus: true,
+                is_late: false,
+                ExcusNote: excuseNoteByStudent[record.student_id] || '',
+              };
+            }
+            return {
+              ...record,
+              subject_id: parseInt(selectedSubject),
+              class_time_num: selectedTime,
+              is_present: true,
+              is_Acsent: false,
+              is_Excus: false,
+              is_late: false,
+              ExcusNote: '',
+            };
+          });
+
         if (data.class_time_data && data.class_time_data[selectedTime]) {
           const existingRecords = data.class_time_data[selectedTime].attendance || [];
           if (existingRecords.length > 0) {
@@ -165,31 +210,13 @@ const Attendance = () => {
             });
             setAttendanceRecords(updatedRecords);
           } else {
-            // No existing data for this class time - set all students as present
-            const updatedRecords = attendanceRecords.map(record => ({
-              ...record,
-              subject_id: parseInt(selectedSubject),
-              class_time_num: selectedTime,
-              is_present: true,
-              is_Acsent: false,
-              is_Excus: false,
-              is_late: false,
-              ExcusNote: '',
-            }));
+            // No existing data for this class time - default present; students with excuse in periods 1–3 → excuse
+            const updatedRecords = applyDefaultForPeriod(attendanceRecords);
             setAttendanceRecords(updatedRecords);
           }
         } else {
-          // No class time data at all - set all students as present
-          const updatedRecords = attendanceRecords.map(record => ({
-            ...record,
-            subject_id: parseInt(selectedSubject),
-            class_time_num: selectedTime,
-            is_present: true,
-            is_Acsent: false,
-            is_Excus: false,
-            is_late: false,
-            ExcusNote: '',
-          }));
+          // No class time data at all - default present; students with excuse in periods 1–3 → excuse
+          const updatedRecords = applyDefaultForPeriod(attendanceRecords);
           setAttendanceRecords(updatedRecords);
         }
       }
@@ -366,7 +393,7 @@ const Attendance = () => {
                 disabled={classesLoading}
               >
                 <option value="">اختر الفصل</option>
-                {classes?.sort((a, b) => a.id - b.id).map((cls) => (
+                {sortClassesByName(classes)?.map((cls) => (
                   <option key={cls.id} value={cls.id}>
                     {cls.name}
                   </option>
@@ -426,6 +453,13 @@ const Attendance = () => {
                 )}
               </button>
             </div>
+          </div>
+          {/* Note for teachers: default excuse from early periods */}
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800" role="note">
+            <p className="font-medium mb-1">ملاحظة للمعلم:</p>
+            <p className="text-gray-700">
+              إذا كان الطالب قد سُجّل له <strong>«غائب»</strong> في الحصة الأولى أو الثانية أو الثالثة لنفس اليوم، سيظهر تلقائياً كـ <strong>«غائب»</strong> في هذه الحصة. يمكنك تعديل الحالة قبل الحفظ إذا لزم الأمر.
+            </p>
           </div>
         </div>
       </div>

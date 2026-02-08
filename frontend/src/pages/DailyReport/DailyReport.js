@@ -1338,7 +1338,7 @@ ${attendanceStatus}
                        }
                       
                       return (
-                        <tr key={record.student_id || index} className={rowColorClass}>
+                        <tr key={`${record.student_id ?? 'noid'}-${index}`} className={rowColorClass}>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             <input
                               type="checkbox"
@@ -2212,7 +2212,7 @@ const ReportContent = ({ data, filteredData, selectedDate, schoolName, filters, 
                         rowColorClass = "student-row bg-green-50 text-green-800";
                       }
                       return (
-                        <tr key={record.student_id} className={`${rowColorClass} border-b border-gray-100`}>
+                        <tr key={`${className}-${record.student_id ?? 'noid'}-${index}`} className={`${rowColorClass} border-b border-gray-100`}>
                           <td className="px-1 py-0.5 text-right student-name text-[9px]">
                             {record.student_name}
                           </td>

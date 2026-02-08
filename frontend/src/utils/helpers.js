@@ -494,5 +494,63 @@ export const getRelativeTime = (date, locale = 'ar') => {
   return `منذ ${Math.floor(diffInSeconds / 31536000)} سنة`;
 };
 
+/**
+ * Arabic grade order for class names: الأول، الثاني، ... الثاني عشر، then the rest
+ */
+const CLASS_GRADE_ORDER = [
+  'الأول',
+  'الثاني',
+  'الثالث',
+  'الرابع',
+  'الخامس',
+  'السادس',
+  'السابع',
+  'الثامن',
+  'التاسع',
+  'العاشر',
+  'الحادي عشر',
+  'الثاني عشر',
+];
+
+/**
+ * Get sort key for a class name (grade index + number within grade)
+ * @param {string} name - Class name (e.g. "الأول 1", "الثاني عشر 5")
+ * @returns {{ gradeIndex: number, num: number, raw: string }}
+ */
+export const getClassSortKey = (name) => {
+  if (!name || typeof name !== 'string') return { gradeIndex: CLASS_GRADE_ORDER.length, num: 0, raw: name || '' };
+  const trimmed = name.trim();
+  const toTry = ['الثاني عشر', 'الحادي عشر'].concat(
+    CLASS_GRADE_ORDER.filter((g) => g !== 'الثاني عشر' && g !== 'الحادي عشر')
+  );
+  for (let i = 0; i < toTry.length; i++) {
+    const grade = toTry[i];
+    const gradeIndex = CLASS_GRADE_ORDER.indexOf(grade);
+    if (gradeIndex === -1) continue;
+    if (trimmed === grade || trimmed.startsWith(grade + ' ') || trimmed.startsWith(grade + '-')) {
+      const rest = trimmed.slice(grade.length).trim().replace(/^[-ـ\s]+/, '');
+      const numMatch = rest.match(/^(\d+)/);
+      const num = numMatch ? parseInt(numMatch[1], 10) : 0;
+      return { gradeIndex, num, raw: trimmed };
+    }
+  }
+  return { gradeIndex: CLASS_GRADE_ORDER.length, num: 0, raw: trimmed };
+};
+
+/**
+ * Sort classes by name: الأول 1..20, الثاني 1..20, ... الثاني عشر 1..20, then the rest
+ * @param {Array<{ name: string, [key: string]: any }>} classList - List of class objects with .name
+ * @returns {Array} New sorted array
+ */
+export const sortClassesByName = (classList) => {
+  if (!classList || !classList.length) return classList || [];
+  return [...classList].sort((a, b) => {
+    const keyA = getClassSortKey(a.name);
+    const keyB = getClassSortKey(b.name);
+    if (keyA.gradeIndex !== keyB.gradeIndex) return keyA.gradeIndex - keyB.gradeIndex;
+    if (keyA.num !== keyB.num) return keyA.num - keyB.num;
+    return (keyA.raw || '').localeCompare(keyB.raw || '', 'ar');
+  });
+};
 
 
