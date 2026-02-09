@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNotifications } from '../../hooks/useNotifications';
+import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { Bell, Filter, CheckCheck, Settings, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
+   
 
 const Notifications = () => {
   const navigate = useNavigate();
@@ -16,6 +18,16 @@ const Notifications = () => {
     markAllAsRead,
     deleteNotification,
   } = useNotifications();
+
+  const {
+    subscribe,
+    isSubscribed,
+    sendTestNotification,
+    isLoading: pushLoading,
+    isSupported: pushSupported,
+    pushStatusBackend,
+    fetchPushStatus,
+  } = usePushNotifications();
 
   const [selectedType, setSelectedType] = useState('all');
   const [page, setPage] = useState(1);
@@ -101,6 +113,12 @@ const Notifications = () => {
     return labels[type] || 'عام';
   };
 
+
+           
+
+
+
+
   return (
     <div className="container mx-auto px-4 py-6 max-w-6xl">
       {/* Header */}
@@ -141,6 +159,51 @@ const Notifications = () => {
           </div>
         </div>
       </div>
+
+      {/* Push Notifications - Subscribe & Test */}
+      {pushSupported && (
+        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={subscribe}
+              disabled={pushLoading}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                isSubscribed
+                  ? 'bg-green-100 text-green-800 cursor-default'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              {isSubscribed ? '✓ مشترك في الإشعارات الفورية' : 'تفعيل الإشعارات الفورية'}
+            </button>
+            {isSubscribed && (
+              <>
+                <button
+                  onClick={sendTestNotification}
+                  disabled={pushLoading}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+                >
+                  إرسال إشعار تجريبي
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fetchPushStatus()}
+                  disabled={pushLoading}
+                  className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50"
+                >
+                  تحديث الحالة
+                </button>
+              </>
+            )}
+          </div>
+          {isSubscribed && pushStatusBackend && (
+            <p className={`mt-3 text-sm ${pushStatusBackend.subscription_count > 0 ? 'text-green-700' : 'text-amber-700'}`}>
+              {pushStatusBackend.subscription_count > 0
+                ? `✓ السيرفر: ${pushStatusBackend.message}`
+                : '⚠ السيرفر لا يرى اشتراكك — جرّب «تحديث الحالة» أو أعد الاشتراك بعد ثوانٍ'}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">

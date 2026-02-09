@@ -181,7 +181,8 @@ def create_app():
     
         # Security headers
         response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['X-Frame-Options'] = 'DENY'
+        # SAMEORIGIN: allow framing only by same origin (e.g. tatubu.com). Use DENY to block all framing.
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         response.headers['Referrer-Policy'] = 'origin-when-cross-origin'

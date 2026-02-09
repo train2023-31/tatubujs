@@ -34,12 +34,26 @@ const api = axios.create({
   },
 });
 
+// Validate JWT format (must have 3 segments: header.payload.signature)
+const isValidJwt = (token) => {
+  if (!token || typeof token !== 'string') return false;
+  const trimmed = token.trim();
+  if (trimmed.length < 20) return false; // JWT is always longer
+  const parts = trimmed.split('.');
+  if (parts.length !== 3) return false;
+  return parts.every((p) => p.length > 0);
+};
+
 // Request interceptor to add auth token and cache busting for mobile
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    if (token) {
+    if (token && isValidJwt(token)) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else if (token && !isValidJwt(token)) {
+      // Invalid token (e.g. "null", truncated, or corrupted) - remove it to avoid "Not enough segments"
+      console.warn('Invalid token in localStorage, removing');
+      localStorage.removeItem('token');
     }
     
     // Ensure proper headers for mobile browsers (helps with CORS)
@@ -92,6 +106,20 @@ api.interceptors.response.use(
       // If it's a network error (offline), return a more user-friendly error
       if (error.message === 'Network Error') {
         error.message = 'خطأ في الاتصال بالشبكة. يرجى التحقق من اتصال الإنترنت الخاص بك.';
+      }
+    }
+
+    // Handle invalid JWT errors (e.g. "Not enough segments", malformed token)
+    const msg = String(error.response?.data?.msg || error.response?.data?.message || '');
+    const isInvalidToken =
+      msg.includes('Not enough segments') ||
+      msg.includes('Invalid token') ||
+      msg.includes('Signature expired') ||
+      msg.includes('Token has expired');
+    if (isInvalidToken) {
+      localStorage.removeItem('token');
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
       }
     }
 

@@ -19,10 +19,10 @@ const CONFIG = {
   cacheableExtensions: ['.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2', '.ttf'],
   
   // What NOT to cache
-  skipCachePaths: ['/api/', '/socket.io/'],
+  skipCachePaths: ['/api/', '/socket.io/', '/hot-update', '/sockjs-node', '/__webpack'],
   
   // Enable debug logging
-  debug: false
+  debug: true  // Changed to true for debugging
 };
 
 // Helper: Log debug messages
@@ -35,6 +35,9 @@ const debugLog = (...args) => {
 // Install event - cache resources
 self.addEventListener('install', (event) => {
   console.log('[Service Worker] Installing...');
+  // Skip waiting to activate immediately
+  self.skipWaiting();
+  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -44,7 +47,6 @@ self.addEventListener('install', (event) => {
           urlsToCache.map(url => {
             return cache.add(url).catch((err) => {
               console.warn('[Service Worker] Failed to cache:', url, err);
-              // Don't fail the entire installation if one file fails
               return Promise.resolve();
             });
           })
@@ -52,12 +54,9 @@ self.addEventListener('install', (event) => {
       })
       .catch((error) => {
         console.error('[Service Worker] Cache installation failed:', error);
-        // Still allow the service worker to install
         return Promise.resolve();
       })
   );
-  // Immediately activate the new service worker
-  self.skipWaiting();
 });
 
 // Activate event - clean up old caches

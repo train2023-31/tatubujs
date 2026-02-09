@@ -29,8 +29,12 @@ def send_push_notification(notification):
     
     try:
         # Get VAPID keys from config
-        vapid_private_key = current_app.config.get('VAPID_PRIVATE_KEY') or Config.VAPID_PRIVATE_KEY
+        vapid_private_key = (current_app.config.get('VAPID_PRIVATE_KEY') or Config.VAPID_PRIVATE_KEY or '').strip()
         vapid_claim_email = current_app.config.get('VAPID_CLAIM_EMAIL') or Config.VAPID_CLAIM_EMAIL
+        if vapid_claim_email and not str(vapid_claim_email).strip().startswith('mailto:'):
+            vapid_claim_email = 'mailto:' + str(vapid_claim_email).strip()
+        else:
+            vapid_claim_email = (vapid_claim_email or '').strip() or 'mailto:admin@tatubu.com'
         
         if not vapid_private_key:
             print("Warning: VAPID_PRIVATE_KEY not configured. Push notifications will not be sent.")
@@ -61,13 +65,16 @@ def send_push_notification(notification):
                 query = query.filter(PushSubscription.user_id.in_(user_ids))
         
         subscriptions = query.all()
+        target_user_ids_flat = list(set(s.user_id for s in subscriptions))
         
         if not subscriptions:
+            print("Push: No active subscriptions for this notification target (notification_id=%s)." % (notification.id,))
             return
         
-        vapid_claims = {
-            "sub": f"mailto:{vapid_claim_email}"
-        }
+        print("Push: Sending to %s subscription(s) for notification id=%s (user_ids=%s)" % (
+            len(subscriptions), notification.id, target_user_ids_flat))
+        
+        vapid_claims = {"sub": vapid_claim_email or "mailto:admin@tatubu.com"}
         
         # Prepare notification payload for background push
         payload = {
@@ -129,14 +136,18 @@ def send_push_notification(notification):
                 print(f"✅ Push notification sent to user {subscription.user_id}")
             except WebPushException as e:
                 # Handle expired/invalid subscriptions
-                if e.response and e.response.status_code in [410, 404]:
-                    print(f"⚠️ Subscription expired for user {subscription.user_id}, marking as inactive")
+                status = e.response.status_code if e.response else None
+                body = (e.response.text or "")[:200] if e.response else ""
+                if status in [410, 404]:
+                    print("⚠️ Subscription expired for user %s (HTTP %s), marking inactive" % (subscription.user_id, status))
                     subscription.is_active = False
                     db.session.commit()
                 else:
-                    print(f"❌ Error sending push to user {subscription.user_id}: {str(e)}")
+                    print("❌ Push failed user %s: HTTP %s %s" % (subscription.user_id, status, body or str(e)))
             except Exception as e:
-                print(f"❌ Unexpected error sending push to user {subscription.user_id}: {str(e)}")
+                import traceback
+                print("❌ Push error user %s: %s" % (subscription.user_id, str(e)))
+                traceback.print_exc()
         
         # Send notifications in background thread to avoid blocking
         thread = threading.Thread(target=lambda: [send_to_subscription(sub) for sub in subscriptions])
@@ -585,6 +596,11 @@ def create_notification_endpoint():
             except:
                 pass
         
+        # Test notifications: send only to the current user
+        target_user_ids = data.get('target_user_ids')
+        if data.get('is_test'):
+            target_user_ids = [current_user_id]
+        
         notification = create_notification(
             school_id=user.school_id,
             title=data['title'],
@@ -593,7 +609,7 @@ def create_notification_endpoint():
             created_by=current_user_id,
             priority=data.get('priority', 'normal'),
             target_role=data.get('target_role'),
-            target_user_ids=data.get('target_user_ids'),
+            target_user_ids=target_user_ids,
             target_class_ids=data.get('target_class_ids'),
             related_entity_type=data.get('related_entity_type'),
             related_entity_id=data.get('related_entity_id'),
@@ -611,6 +627,23 @@ def create_notification_endpoint():
         
     except Exception as e:
         return jsonify({"message": f"Error creating notification: {str(e)}"}), 500
+
+
+# Push status (for debugging: does the backend see this user's subscription?)
+@notification_blueprint.route('/push-status', methods=['GET'])
+@jwt_required()
+def push_status():
+    """Return whether the current user has active push subscription(s). Use for debugging."""
+    try:
+        current_user_id = get_jwt_identity()
+        count = PushSubscription.query.filter_by(user_id=current_user_id, is_active=True).count()
+        return jsonify({
+            "subscribed": count > 0,
+            "subscription_count": count,
+            "message": "جهاز واحد مسجل" if count == 1 else ("%s أجهزة مسجلة" % count) if count > 1 else "لا يوجد جهاز مسجل للدفع"
+        }), 200
+    except Exception as e:
+        return jsonify({"subscribed": False, "subscription_count": 0, "message": str(e)}), 500
 
 
 # Push Subscription Routes
@@ -659,6 +692,9 @@ def subscribe_push():
         db.session.add(subscription)
         db.session.commit()
         
+        print("Push: Subscription saved for user_id=%s endpoint=%s..." % (
+            current_user_id, (subscription.endpoint or "")[:60]))
+        
         return jsonify({
             "message": "Subscribed successfully",
             "subscription": subscription.to_dict()
@@ -666,6 +702,7 @@ def subscribe_push():
         
     except Exception as e:
         db.session.rollback()
+        print("Push: Subscribe failed: %s" % str(e))
         return jsonify({"message": f"Error subscribing to push notifications: {str(e)}"}), 500
 
 

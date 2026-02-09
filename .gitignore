@@ -16,6 +16,14 @@ dist/
 .env.test.local
 .env.production.local
 
+# VAPID Keys (NEVER commit private keys!)
+vapid_private_key.txt
+vapid_public_key.txt
+vapid_keys.json
+back/.env
+back/vapid*.txt
+back/vapid*.json
+
 # SSL certificates (local development only)
 localhost.crt
 localhost.key

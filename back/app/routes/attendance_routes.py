@@ -190,8 +190,8 @@ def take_attendances():
                         📅 التاريخ: {attendance_date.strftime('%Y-%m-%d')}
                         🕐 الحصة: {record.get('class_time_num', '-')}
 
-                        ❌ غياب: {len(absent_students)} طالب
-                        📝 عذر: {len(excused_students)} طالب
+                        ❌ هروب: {len(absent_students)} طالب
+                        📝 غياب: {len(excused_students)} طالب
                         ⏰ تأخر: {len(late_students)} طالب
 
                         يرجى المراجعة والمتابعة
