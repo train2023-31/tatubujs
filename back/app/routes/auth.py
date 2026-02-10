@@ -670,7 +670,8 @@ def register_single_assign_student():
     if User.query.filter_by(username=username).first():
         return jsonify(message="Username already exists."), 409
 
-    hashed_password = generate_password_hash('12345678')
+    default_password = f"{username}@tatubu"
+    hashed_password = generate_password_hash(default_password)
 
     # ✅ إنشاء الطالب
     new_student = Student(
@@ -954,7 +955,8 @@ def register_and_assign_students():
             continue
 
         # Hash the default password
-        hashed_password = generate_password_hash('12345678')
+        default_password = f"{username}@tatubu"
+        hashed_password = generate_password_hash(default_password)
 
         # Register the student
         new_student = Student(
@@ -1136,8 +1138,9 @@ def register_and_assign_students_v2():
                 continue
 
         # Student doesn't exist - create new student and enroll to class
-        # Hash the default password
-        hashed_password = generate_password_hash('12345678')
+        # Construct default password using username
+        default_password = f"{username}@tatubu"
+        hashed_password = generate_password_hash(default_password)
 
         # Register the student
         new_student = Student(
@@ -1266,7 +1269,7 @@ def register_and_assign_students_v2():
 @jwt_required()
 def get_user_details():
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+    user = User.query.get(int(user_id))
 
     if not user:
         return jsonify(message="User not found"), 404

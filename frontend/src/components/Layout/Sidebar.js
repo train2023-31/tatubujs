@@ -15,6 +15,7 @@ import {
   Upload,
   FileText,
   Trash2,
+  Truck,
   Star,
   MessageCircle,
   Settings,
@@ -143,6 +144,12 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'سجل ملاحظات الطالب',
           href: '/app/student-notes-log',
           icon: StickyNote,
+          roles: ['school_admin', 'data_analyst'],
+        },
+        {
+          name: 'طلبات الاستلام',
+          href: '/app/pickup-display',
+          icon: Truck,
           roles: ['school_admin', 'data_analyst'],
         },
         

@@ -38,6 +38,7 @@ import SchoolTimetable from './pages/SchoolTimetable/SchoolTimetable';
 import TeacherSubstitution from './pages/TeacherSubstitution/TeacherSubstitution';
 import Notifications from './pages/Notifications/Notifications';
 import NotificationSettings from './pages/NotificationSettings/NotificationSettings';
+import PickupDisplay from './pages/PickupDisplay/PickupDisplay';
 import LoadingSpinner from './components/UI/LoadingSpinner';
 import cacheManager from './utils/cacheManager';
 
@@ -235,7 +236,7 @@ function App() {
                   </PublicRoute>
                 } 
               />
-
+              
               {/* Protected Routes */}
               <Route 
                 path="/app" 
@@ -247,6 +248,7 @@ function App() {
               >
                 <Route index element={<Navigate to="/app/dashboard" replace />} />
                 <Route path="dashboard" element={<Dashboard />} />
+                <Route path="pickup-display" element={<PickupDisplay />} />
                 
                 {/* User Management - Admin, School Admin, and Data Analyst */}
                 <Route 

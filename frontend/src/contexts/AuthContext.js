@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (credentials) => {
+  const login = async (credentials, isParentMode = false) => {
     try {
      
       
@@ -44,7 +44,15 @@ export const AuthProvider = ({ children }) => {
       
       while (retries > 0) {
         try {
-          response = await authAPI.login(credentials);
+          // Use parent login endpoint if in parent mode
+          if (isParentMode) {
+            response = await authAPI.parentLogin({
+              student_username: credentials.username,
+              parent_phone: credentials.password
+            });
+          } else {
+            response = await authAPI.login(credentials);
+          }
           break; // Success, exit retry loop
         } catch (error) {
           lastError = error;
@@ -72,6 +80,13 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('token', access_token);
       setToken(access_token);
       
+      // Store parent mode flag
+      if (isParentMode) {
+        localStorage.setItem('isParentMode', 'true');
+      } else {
+        localStorage.removeItem('isParentMode');
+      }
+      
       // Get user data with retry logic
       let userData;
       let userRetries = 3;
@@ -91,7 +106,7 @@ export const AuthProvider = ({ children }) => {
       
       setUser(userData);
       
-      toast.success('تم تسجيل الدخول بنجاح');
+      toast.success(isParentMode ? 'مرحباً بولي الأمر' : 'تم تسجيل الدخول بنجاح');
       return { success: true, user: userData };
     } catch (error) {
       console.error('Login error:', error);
@@ -99,6 +114,7 @@ export const AuthProvider = ({ children }) => {
       
       // Clear any stored token on error
       localStorage.removeItem('token');
+      localStorage.removeItem('isParentMode');
       setToken(null);
       setUser(null);
       

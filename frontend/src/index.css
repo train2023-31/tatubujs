@@ -415,3 +415,49 @@
 .animate-float-reverse {
   animation: float-reverse 8s ease-in-out infinite;
 }
+
+/* Animated lines background for PickupDisplay */
+@keyframes pickup-lines-move {
+  0% { background-position: 0 0, 0 0; }
+  100% { background-position: 48px 0, -56px 0; }
+}
+
+.pickup-display-bg-lines {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pickup-display-bg-lines::before,
+.pickup-display-bg-lines::after {
+  content: '';
+  position: absolute;
+  inset: -100%;
+  opacity: 0.07;
+  background-repeat: repeat;
+  background-image: repeating-linear-gradient(
+    105deg,
+    currentColor 0,
+    currentColor 1px,
+    transparent 1px,
+    transparent 48px
+  );
+  background-size: 48px 48px;
+  animation: pickup-lines-move 20s linear infinite;
+}
+
+.pickup-display-bg-lines::after {
+  opacity: 0.05;
+  background-image: repeating-linear-gradient(
+    75deg,
+    currentColor 0,
+    currentColor 1px,
+    transparent 1px,
+    transparent 56px
+  );
+  background-size: 56px 56px;
+  animation-duration: 28s;
+  animation-direction: reverse;
+}

@@ -157,6 +157,7 @@ api.interceptors.response.use(
 // Auth API
 export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
+  parentLogin: (credentials) => api.post('/parent-pickup/parent-login', credentials),
   getUser: () => api.get('/auth/user').then(res => res.data),
   updateUser: (userId, userData) => api.post(`/auth/update_user/${userId}`, userData),
   changePassword: (passwordData) => api.put('/auth/change_password', passwordData),
@@ -334,6 +335,18 @@ export const substitutionAPI = {
   
   // Get teacher's substitutions
   getTeacherSubstitutions: (teacherUserId) => api.get(`/substitutions/teacher/${teacherUserId}`).then(res => res.data),
+};
+
+// Parent Pickup API
+export const parentPickupAPI = {
+  requestPickup: () => api.post('/parent-pickup/request-pickup'),
+  confirmPickup: () => api.post('/parent-pickup/confirm-pickup'),
+  completePickup: () => api.post('/parent-pickup/complete-pickup'),
+  getMyPickupStatus: () => api.get('/parent-pickup/my-pickup-status').then(res => res.data),
+  getConfirmedPickups: (schoolId) => api.get('/parent-pickup/confirmed-pickups', { params: { school_id: schoolId } }).then(res => res.data),
+  getDisplayPickups: () => api.get('/parent-pickup/display-pickups').then(res => res.data),
+  getAllPickups: (params) => api.get('/parent-pickup/all-pickups', { params }).then(res => res.data),
+  cancelPickup: (pickupId) => api.post('/parent-pickup/cancel-pickup', { pickup_id: pickupId }),
 };
 
 export default api;

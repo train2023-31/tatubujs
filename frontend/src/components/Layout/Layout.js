@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import Footer from './Footer';
@@ -7,6 +7,16 @@ import AddToHomeScreen from '../AddToHomeScreen/AddToHomeScreen';
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+  const isPickupDisplay = location.pathname.includes('pickup-display');
+
+  if (isPickupDisplay) {
+    return (
+      <div className="h-screen overflow-hidden" dir="rtl">
+        <Outlet />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden" dir="rtl">

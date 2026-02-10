@@ -35,7 +35,7 @@ import {
   Upload
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { reportsAPI, attendanceAPI, authAPI, busAPI, timetableAPI, substitutionAPI } from '../../services/api';
+import { reportsAPI, attendanceAPI, authAPI, busAPI, timetableAPI, substitutionAPI, parentPickupAPI } from '../../services/api';
 import { formatDate, getTodayAPI, getRoleDisplayName } from '../../utils/helpers';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import Modal from '../../components/UI/Modal';
@@ -2577,6 +2577,10 @@ const DriverDashboard = () => {
 const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [pickupLoading, setPickupLoading] = useState(false);
+  
+  // Check if user is in parent mode
+  const isParentMode = localStorage.getItem('isParentMode') === 'true';
 
   // Fetch student attendance history (all data, no date range)
   const { data: studentAttendanceHistory, isLoading: attendanceLoading } = useQuery(
@@ -2587,6 +2591,78 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
       refetchInterval: 30000
     }
   );
+
+  // Fetch parent pickup status
+  const { data: pickupStatus, isLoading: pickupStatusLoading, refetch: refetchPickupStatus } = useQuery(
+    ['pickupStatus', user?.user_id],
+    () => parentPickupAPI.getMyPickupStatus(),
+    {
+      enabled: !!user?.user_id && isParentMode,
+      refetchInterval: 15000 // Refresh every 15 seconds for real-time updates
+    }
+  );
+
+  // Handle pickup request
+  const handleRequestPickup = async () => {
+    setPickupLoading(true);
+    try {
+      await parentPickupAPI.requestPickup();
+      toast.success('تم إرسال طلب الاستلام بنجاح');
+      refetchPickupStatus();
+    } catch (error) {
+      const message = error.response?.data?.message || 'حدث خطأ أثناء إرسال الطلب';
+      toast.error(message);
+    } finally {
+      setPickupLoading(false);
+    }
+  };
+
+  // Handle confirm arrival
+  const handleConfirmPickup = async () => {
+    setPickupLoading(true);
+    try {
+      await parentPickupAPI.confirmPickup();
+      toast.success('تم تأكيد وصولك للمدرسة');
+      refetchPickupStatus();
+    } catch (error) {
+      const message = error.response?.data?.message || 'حدث خطأ أثناء التأكيد';
+      toast.error(message);
+    } finally {
+      setPickupLoading(false);
+    }
+  };
+
+  // Handle complete pickup
+  const handleCompletePickup = async () => {
+    setPickupLoading(true);
+    try {
+      await parentPickupAPI.completePickup();
+      toast.success('تم تأكيد استلام الطالب بنجاح');
+      refetchPickupStatus();
+    } catch (error) {
+      const message = error.response?.data?.message || 'حدث خطأ أثناء إتمام الاستلام';
+      toast.error(message);
+    } finally {
+      setPickupLoading(false);
+    }
+  };
+
+  // Handle cancel pickup
+  const handleCancelPickup = async () => {
+    if (!pickupStatus?.pickup?.id) return;
+    
+    setPickupLoading(true);
+    try {
+      await parentPickupAPI.cancelPickup(pickupStatus.pickup.id);
+      toast.success('تم إلغاء طلب الاستلام');
+      refetchPickupStatus();
+    } catch (error) {
+      const message = error.response?.data?.message || 'حدث خطأ أثناء الإلغاء';
+      toast.error(message);
+    } finally {
+      setPickupLoading(false);
+    }
+  };
 
   // Fetch student attendance statistics
   const { data: studentAttendanceStats, isLoading: statsLoading } = useQuery(
@@ -2721,6 +2797,213 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
           color="purple"
         />
       </div>
+
+      {/* Parent Pickup Section */}
+      {isParentMode && (
+        <div className="card bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200">
+          <div className="card-header bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              <h3 className="card-title text-white">استلام الطالب - ولي الأمر</h3>
+            </div>
+          </div>
+          <div className="card-body">
+            {pickupStatusLoading ? (
+              <div className="flex justify-center py-8">
+                <LoadingSpinner />
+              </div>
+            ) : !pickupStatus?.pickup ? (
+              // No pickup request yet today
+              (() => {
+                const completedCount = pickupStatus?.today_completed_count ?? 0;
+                const maxPerDay = 3;
+                const limitReached = completedCount >= maxPerDay;
+                return (
+                  <div className="text-center py-8">
+                    <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h4 className="text-lg font-semibold text-gray-700 mb-2">
+                      {limitReached ? 'تم استخدام الحد الأقصى لطلبات الاستلام اليوم' : 'لم يتم إرسال طلب استلام'}
+                    </h4>
+                    <p className="text-gray-600 mb-2">
+                      {limitReached
+                        ? `الحد الأقصى ${maxPerDay} طلبات استلام في اليوم. يمكنك الطلب مجدداً غداً.`
+                        : 'قم بإرسال طلب استلام لإعلام المدرسة برغبتك في استلام الطالب'}
+                    </p>
+                    <p className="text-sm text-gray-500 mb-6">
+                      استلامات اليوم: {completedCount} من {maxPerDay}
+                    </p>
+                    {!limitReached && (
+                      <button
+                        onClick={handleRequestPickup}
+                        disabled={pickupLoading}
+                        className="btn-primary btn-lg inline-flex items-center gap-2"
+                      >
+                        {pickupLoading ? (
+                          <>
+                            <LoadingSpinner />
+                            <span>جاري الإرسال...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-5 w-5" />
+                            <span>إرسال طلب استلام</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()
+            ) : pickupStatus.pickup.status === 'pending' ? (
+              // Pending - waiting for parent to confirm arrival
+              <div className="text-center py-8">
+                <Clock className="h-16 w-16 text-yellow-500 mx-auto mb-4 animate-pulse" />
+                <h4 className="text-lg font-semibold text-gray-700 mb-2">
+                  تم إرسال طلب الاستلام
+                </h4>
+                <p className="text-gray-600 mb-2">
+                  تم إرسال الطلب للمدرسة بنجاح
+                </p>
+                <div className="bg-white rounded-lg p-4 mb-6 inline-block">
+                  <p className="text-sm text-gray-500">وقت الطلب</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {new Date(pickupStatus.pickup.request_time).toLocaleTimeString('ar-SA', { 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={handleConfirmPickup}
+                    disabled={pickupLoading}
+                    className="btn-lg bg-green-500 text-white hover:bg-green-600 inline-flex items-center gap-2"
+                  >
+                    {pickupLoading ? (
+                      <>
+                        <LoadingSpinner />
+                        <span>جاري التأكيد...</span>
+                      </>
+                    ) : (
+                      <>
+                        <MapPin className="h-5 w-5" />
+                        <span>وصلت للمدرسة</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleCancelPickup}
+                    disabled={pickupLoading}
+                    className="btn-outline btn-lg inline-flex items-center gap-2"
+                  >
+                    إلغاء الطلب
+                  </button>
+                </div>
+              </div>
+            ) : pickupStatus.pickup.status === 'confirmed' ? (
+              // Confirmed - parent is at school, waiting to complete pickup
+              <div className="text-center py-8">
+                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4 animate-bounce" />
+                <h4 className="text-lg font-semibold text-gray-700 mb-2">
+                  تم تأكيد وصولك للمدرسة
+                </h4>
+                <p className="text-gray-600 mb-2">
+                  يرجى انتظار الطالب عند المدخل
+                </p>
+                <div className="bg-white rounded-lg p-4 mb-6 inline-block">
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div>
+                      <p className="text-sm text-gray-500">وقت الطلب</p>
+                      <p className="text-md font-semibold text-gray-900">
+                        {new Date(pickupStatus.pickup.request_time).toLocaleTimeString('ar-SA', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">وقت الوصول</p>
+                      <p className="text-md font-semibold text-gray-900">
+                        {new Date(pickupStatus.pickup.confirmation_time).toLocaleTimeString('ar-SA', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4 mb-6">
+                  <p className="text-yellow-800 font-medium flex items-center gap-2 justify-center">
+                    <AlertCircle className="h-5 w-5" />
+                    اسم الطالب سيظهر على شاشة العرض في ساحة المدرسة
+                  </p>
+                </div>
+                <button
+                  onClick={handleCompletePickup}
+                  disabled={pickupLoading}
+                  className="btn-lg bg-green-500 text-white hover:bg-green-600 inline-flex items-center gap-2"
+                >
+                  {pickupLoading ? (
+                    <>
+                      <LoadingSpinner />
+                      <span>جاري التأكيد...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-5 w-5" />
+                      <span>تأكيد استلام الطالب</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : pickupStatus.pickup.status === 'completed' ? (
+              // Completed — allow new request (hide previous), max 3 per day
+              (() => {
+                const completedCount = pickupStatus?.today_completed_count ?? 1;
+                const maxPerDay = 3;
+                const canRequestMore = completedCount < maxPerDay;
+                return (
+                  <div className="text-center py-8">
+                    <Star className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                    <h4 className="text-lg font-semibold text-gray-700 mb-2">
+                      تم استلام الطالب بنجاح
+                    </h4>
+                    <p className="text-gray-600 mb-2">
+                      شكراً لاستخدامكم النظام
+                    </p>
+                    <p className="text-sm text-gray-500 mb-6">
+                      استلامات اليوم: {completedCount} من {maxPerDay}
+                    </p>
+                    {canRequestMore ? (
+                      <button
+                        onClick={handleRequestPickup}
+                        disabled={pickupLoading}
+                        className="btn-primary btn-lg inline-flex items-center gap-2"
+                      >
+                        {pickupLoading ? (
+                          <>
+                            <LoadingSpinner />
+                            <span>جاري الإرسال...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-5 w-5" />
+                            <span>طلب استلام جديد</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <p className="text-amber-700 font-medium">
+                        تم الوصول للحد الأقصى (3 طلبات في اليوم)
+                      </p>
+                    )}
+                  </div>
+                );
+              })()
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {/* Behavior Note */}
       {behaviorNote && (

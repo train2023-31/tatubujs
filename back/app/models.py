@@ -114,6 +114,40 @@ class Driver(User):
         return data
 
 
+
+class ParentPickup(db.Model):
+    __tablename__ = 'parent_pickups'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('students.id'), nullable=False)
+    school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=False)
+    parent_phone = db.Column(db.String(20), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='pending')  # pending, confirmed, completed
+    request_time = db.Column(db.DateTime(timezone=True), nullable=False)
+    confirmation_time = db.Column(db.DateTime(timezone=True), nullable=True)
+    completed_time = db.Column(db.DateTime(timezone=True), nullable=True)
+    pickup_date = db.Column(db.Date, nullable=False)  # Date of pickup for filtering
+    
+    # Relationships
+    student = db.relationship('Student', backref='pickup_requests')
+    school = db.relationship('School', backref='pickup_requests')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'student_id': self.student_id,
+            'student_name': self.student.fullName if self.student else None,
+            'student_username': self.student.username if self.student else None,
+            'parent_phone': self.parent_phone,
+            'status': self.status,
+            'request_time': self.request_time.isoformat() if self.request_time else None,
+            'confirmation_time': self.confirmation_time.isoformat() if self.confirmation_time else None,
+            'completed_time': self.completed_time.isoformat() if self.completed_time else None,
+            'pickup_date': self.pickup_date.isoformat() if self.pickup_date else None
+        }
+  
+
+  
 class School(db.Model):
     __tablename__ = 'schools'  # Changed from 'school' to 'schools'
     id = db.Column(db.Integer, primary_key=True)

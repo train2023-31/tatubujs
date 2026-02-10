@@ -131,6 +131,7 @@ def create_app():
     from app.routes.timetable_routes import timetable_bp
     from app.routes.substitution_routes import substitution_bp
     from app.routes.notification_routes import notification_blueprint
+    from app.routes.parent_pickup_routes import parent_pickup_bp
 
 
 
@@ -143,6 +144,7 @@ def create_app():
     app.register_blueprint(timetable_bp, url_prefix='/api/timetable')
     app.register_blueprint(substitution_bp, url_prefix='/api/substitutions')
     app.register_blueprint(notification_blueprint, url_prefix='/api/notifications')  # url_prefix already defined in blueprint
+    app.register_blueprint(parent_pickup_bp, url_prefix='/api/parent-pickup')
     
 
     # --- Security Headers ---

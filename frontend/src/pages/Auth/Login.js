@@ -1,21 +1,69 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { useAuth } from '../../hooks/useAuth';
-import { Eye, EyeOff, Lock, User, School, Users, BookOpen, ClipboardList, BarChart3, Smartphone, Shield, Clock, CheckCircle, Star, Zap, Home, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, School, Users, BookOpen, ClipboardList, BarChart3, Smartphone, Shield, Clock, CheckCircle, Star, Zap, Home, ArrowRight, QrCode, Scan } from 'lucide-react';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
+import Modal from '../../components/UI/Modal';
 
 const Login = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isParentMode, setIsParentMode] = useState(false);
+  const [showScanModal, setShowScanModal] = useState(false);
+  const scannerRef = useRef(null);
   const { login, loading } = useAuth();
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm();
+
+  // Start/stop QR scanner when modal opens/closes
+  useEffect(() => {
+    if (showScanModal) {
+      const scanner = new Html5QrcodeScanner(
+        'login-qr-reader',
+        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+        false
+      );
+      scanner.render(onScanSuccess, onScanError);
+      scannerRef.current = scanner;
+    }
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(() => {});
+        scannerRef.current = null;
+      }
+    };
+  }, [showScanModal]);
+
+  const onScanSuccess = (decodedText) => {
+    if (!decodedText || !decodedText.trim()) return;
+    setValue('username', decodedText.trim(), { shouldValidate: true });
+    if (loginError) setLoginError('');
+    if (scannerRef.current) {
+      scannerRef.current.clear().catch(() => {});
+      scannerRef.current = null;
+    }
+    setShowScanModal(false);
+  };
+
+  const onScanError = () => {
+    // Ignore scan errors (no QR in frame)
+  };
+
+  const openScanModal = () => {
+    setShowScanModal(true);
+  };
+
+  const closeScanModal = () => {
+    setShowScanModal(false);
+  };
 
   const onSubmit = async (data, event) => {
     event?.preventDefault(); // Prevent form refresh
@@ -23,18 +71,23 @@ const Login = () => {
     setIsSubmitting(true);
     
     try {
-      const result = await login(data);
+      const result = await login(data, isParentMode);
       
       if (result && result.success) {
-        // Login successful - navigate based on role
-        const userRole = result.user?.role;
-        
-        if (userRole === 'driver') {
-          // Redirect drivers directly to scanner
-          navigate('/app/bus-scanner');
-        } else {
-          // Other roles go to dashboard
+        // Login successful - navigate based on role or parent mode
+        if (isParentMode) {
+          // Parent mode - go to dashboard for student pickup
           navigate('/app/dashboard');
+        } else {
+          const userRole = result.user?.role;
+          
+          if (userRole === 'driver') {
+            // Redirect drivers directly to scanner
+            navigate('/app/bus-scanner');
+          } else {
+            // Other roles go to dashboard
+            navigate('/app/dashboard');
+          }
         }
       } else {
         // Login failed - show error message
@@ -89,6 +142,24 @@ const Login = () => {
               </div>
             </div>
           )}
+
+          {/* Parent Mode Toggle */}
+          <div className="mb-6 flex items-center justify-center space-x-2 space-x-reverse">
+            <button
+              type="button"
+              onClick={() => setIsParentMode(!isParentMode)}
+              className={`flex items-center space-x-2 space-x-reverse px-4 py-2 rounded-lg transition-all ${
+                isParentMode 
+                  ? 'bg-blue-600 text-white shadow-lg' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <QrCode className="h-5 w-5" />
+              <span className="text-sm font-medium">
+                {isParentMode ? 'تسجيل دخول ولي أمر' : 'تسجيل دخول عادي'}
+              </span>
+            </button>
+          </div>
           
           <form 
             className="space-y-6" 
@@ -100,30 +171,47 @@ const Login = () => {
             {/* Username Field */}
             <div>
               <label htmlFor="username" className="label">
-                اسم المستخدم أو البريد الإلكتروني
+                {isParentMode ? 'اسم المستخدم للطالب' : 'اسم المستخدم أو البريد الإلكتروني'}
               </label>
-              <div className="relative text-right">
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-gray-400" />
+              <div className={isParentMode ? 'flex gap-2' : ''}>
+                <div className="relative text-right flex-1">
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <User className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    {...register('username', {
+                      required: 'اسم المستخدم مطلوب',
+                      minLength: {
+                        value: 3,
+                        message: 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل',
+                      },
+                    })}
+                    type="text"
+                    className={`input pr-10 ${errors.username ? 'input-error' : ''} text-right w-full`}
+                    placeholder={isParentMode ? 'امسح QR الطالب أو أدخل اسم المستخدم' : 'أدخل اسم المستخدم أو البريد الإلكتروني'}
+                    dir="ltr"
+                    onChange={(e) => {
+                      if (loginError) setLoginError('');
+                      register('username').onChange(e);
+                    }}
+                  />
                 </div>
-                <input
-                  {...register('username', {
-                    required: 'اسم المستخدم مطلوب',
-                    minLength: {
-                      value: 3,
-                      message: 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل',
-                    },
-                  })}
-                  type="text"
-                  className={`input pr-10 ${errors.username ? 'input-error' : ''} text-right`}
-                  placeholder="أدخل اسم المستخدم أو البريد الإلكتروني"
-                  dir="ltr"
-                  onChange={(e) => {
-                    if (loginError) setLoginError('');
-                    register('username').onChange(e);
-                  }}
-                />
+                {isParentMode && (
+                  <button
+                    type="button"
+                    onClick={openScanModal}
+                    className="flex-shrink-0 inline-flex items-center justify-center w-12 h-12 rounded-lg border-2 border-blue-300 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:border-blue-400 transition-colors"
+                    title="امسح QR الطالب"
+                  >
+                    <Scan className="h-6 w-6" />
+                  </button>
+                )}
               </div>
+              {isParentMode && (
+                <p className="mt-1.5 text-xs text-gray-500">
+                  أو استخدم زر المسح لملء الحقل من QR الطالب
+                </p>
+              )}
               {errors.username && (
                 <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
               )}
@@ -132,40 +220,46 @@ const Login = () => {
             {/* Password Field */}
             <div>
               <label htmlFor="password" className="label">
-                كلمة المرور
+                {isParentMode ? 'رقم الهاتف (ولي الأمر)' : 'كلمة المرور'}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
+                  {isParentMode ? (
+                    <Smartphone className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <Lock className="h-5 w-5 text-gray-400" />
+                  )}
                 </div>
                 <input
                   {...register('password', {
-                    required: 'كلمة المرور مطلوبة',
+                    required: isParentMode ? 'رقم الهاتف مطلوب' : 'كلمة المرور مطلوبة',
                     minLength: {
-                      value: 6,
-                      message: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل',
+                      value: isParentMode ? 8 : 6,
+                      message: isParentMode ? 'رقم الهاتف يجب أن يكون 8 أرقام على الأقل' : 'كلمة المرور يجب أن تكون 6 أحرف على الأقل',
                     },
                   })}
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword || isParentMode ? 'text' : 'password'}
                   className={`input pr-10 pl-10 ${errors.password ? 'input-error' : ''} text-right`}
-                  placeholder="أدخل كلمة المرور"
+                  placeholder={isParentMode ? 'أدخل رقم الهاتف' : 'أدخل كلمة المرور'}
                   dir="ltr"
                   onChange={(e) => {
                     if (loginError) setLoginError('');
                     register('password').onChange(e);
                   }}
                 />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 left-0 pl-3 flex items-center"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-                  )}
-                </button>
+                {!isParentMode && (
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 left-0 pl-3 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    )}
+                  </button>
+                )}
               </div>
               {errors.password && (
                 <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
@@ -238,6 +332,30 @@ const Login = () => {
           </p>
         </div>
       </div>
+
+      {/* QR Scan Modal */}
+      <Modal
+        isOpen={showScanModal}
+        onClose={closeScanModal}
+        title="مسح رمز QR"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 text-center">
+            وجّه الكاميرا نحو رمز QR الخاص بالطالب لملء اسم المستخدم تلقائياً
+          </p>
+          <div id="login-qr-reader" className="w-full rounded-lg overflow-hidden bg-gray-100 min-h-[250px]" />
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={closeScanModal}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg"
+            >
+              إلغاء
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
