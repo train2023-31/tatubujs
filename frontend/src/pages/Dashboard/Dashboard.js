@@ -37,6 +37,7 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import { reportsAPI, attendanceAPI, authAPI, busAPI, timetableAPI, substitutionAPI, parentPickupAPI } from '../../services/api';
 import { formatDate, getTodayAPI, getRoleDisplayName } from '../../utils/helpers';
+import { encodeStudentQRPayload } from '../../utils/qrPayload';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import Modal from '../../components/UI/Modal';
 import NewsWidget from '../../components/UI/NewsWidget';
@@ -3091,14 +3092,17 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
               <div className="p-4 bg-white rounded-lg border-2 border-gray-200 shadow-sm mb-4">
                 <QRCodeCanvas
                   id={`student-qr-${user?.user_id}`}
-                  value={user?.username || ''}
+                  value={encodeStudentQRPayload(user?.username) || ''}
                   size={200}
                   level="H"
                   includeMargin={true}
                 />
               </div>
-              <p className="text-xs text-gray-500 text-center mb-4">
+              <p className="text-xs text-gray-500 text-center mb-2">
                 استخدم هذا الرمز للصعود والنزول من الحافلة
+              </p>
+              <p className="text-xs text-gray-400 text-center mb-4">
+                رمز الطالب — للاستخدام في التطبيق فقط
               </p>
               <button
                 onClick={() => {
@@ -3127,8 +3131,8 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
                       ctx.fillText(user.school_name, 200, 40);
                     }
                     
-                    // Student name
-                    const studentName = studentProfile?.fullName || user?.username || 'الطالب';
+                    // Student name (do not use username — keep secure)
+                    const studentName = studentProfile?.fullName || user?.fullName || 'الطالب';
                     ctx.fillStyle = '#111827';
                     ctx.font = 'bold 24px Amiri';
                     ctx.textAlign = 'center';

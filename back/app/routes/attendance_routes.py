@@ -1033,6 +1033,139 @@ def get_attendance_details_by_students():
     }), 200
 
 
+def _parse_date(s):
+    if not s:
+        return None
+    try:
+        return datetime.strptime(s, '%Y-%m-%d').date()
+    except ValueError:
+        return None
+
+
+@attendance_blueprint.route('/repeated_absence', methods=['GET'])
+@jwt_required()
+def get_repeated_absence():
+    """
+    Students marked absent on more than (min_days) days in the given date range.
+    Optional start_date, end_date (YYYY-MM-DD). If not provided, uses current week (Sunday to today).
+    """
+    teacher_id = get_jwt_identity()
+    user = User.query.get(teacher_id)
+    if user.user_role not in ['admin', 'school_admin', 'teacher', 'data_analyst']:
+        return jsonify(message="Unauthorized access."), 403
+
+    min_days_arg = request.args.get('min_days', 2, type=int)
+    min_days = max(1, min(60, min_days_arg))
+    all_days = request.args.get('all_days', '').lower() == 'true'
+    if all_days:
+        min_days = None
+
+    if user.user_role == 'teacher':
+        class_ids = [c.id for c in Class.query.filter_by(teacher_id=teacher_id).all()]
+    else:
+        school_id = user.school_id if user.user_role != 'admin' else request.args.get('school_id')
+        if not school_id:
+            return jsonify(message="School ID required."), 400
+        class_ids = [c.id for c in Class.query.filter_by(school_id=school_id).all()]
+
+    if not class_ids:
+        return jsonify(week_start=None, week_end=None, min_days=min_days, students=[]), 200
+
+    try:
+        today = get_oman_time().date()
+    except Exception:
+        today = date.today()
+
+    start_date = _parse_date(request.args.get('start_date'))
+    end_date = _parse_date(request.args.get('end_date'))
+
+    if start_date and end_date:
+        if start_date > end_date:
+            start_date, end_date = end_date, start_date
+        # Limit range to 60 days
+        if (end_date - start_date).days > 60:
+            end_date = start_date + timedelta(days=60)
+        week_dates = [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
+        range_start, range_end = start_date, end_date
+    else:
+        # Default: current week (Sunday to today)
+        days_since_sunday = (today.weekday() + 1) % 7
+        start_of_week = today - timedelta(days=days_since_sunday)
+        week_dates = [start_of_week + timedelta(days=i) for i in range(7) if start_of_week + timedelta(days=i) <= today]
+        range_start, range_end = start_of_week, today
+
+    if not week_dates:
+        return jsonify(week_start=range_start.isoformat(), week_end=range_end.isoformat(), min_days=min_days, students=[]), 200
+
+    # Distinct (student_id, date) where is_Acsent
+    absent_per_student = defaultdict(set)
+    q = (
+        db.session.query(Attendance.student_id, Attendance.date)
+        .filter(
+            Attendance.class_id.in_(class_ids),
+            Attendance.date.in_(week_dates),
+            Attendance.is_Acsent == True,
+        )
+        .distinct()
+    )
+    for student_id, d in q.all():
+        absent_per_student[student_id].add(d)
+
+    num_days_in_range = len(week_dates)
+    if all_days:
+        student_ids = [sid for sid, dates in absent_per_student.items() if len(dates) == num_days_in_range]
+    else:
+        student_ids = [sid for sid, dates in absent_per_student.items() if len(dates) >= min_days]
+    if not student_ids:
+        return jsonify(
+            week_start=range_start.isoformat(),
+            week_end=range_end.isoformat(),
+            min_days=min_days,
+            all_days=all_days,
+            students=[],
+        ), 200
+
+    students = Student.query.filter(Student.id.in_(student_ids)).all()
+    student_map = {s.id: s for s in students}
+    class_map = {c.id: c for c in Class.query.filter(Class.id.in_(class_ids)).all()}
+    # Student may be in one class; get first class from attendance for that student
+    student_class = {}
+    for rec in db.session.query(Attendance.student_id, Attendance.class_id).filter(
+        Attendance.student_id.in_(student_ids),
+        Attendance.class_id.in_(class_ids),
+    ).distinct().all():
+        if rec.student_id not in student_class:
+            student_class[rec.student_id] = rec.class_id
+
+    result = []
+    for sid in student_ids:
+        s = student_map.get(sid)
+        if not s:
+            continue
+        dates = sorted(absent_per_student[sid])
+        cid = student_class.get(sid)
+        c = class_map.get(cid) if cid else None
+        result.append({
+            "student_id": sid,
+            "student_name": s.fullName,
+            "phone_number": getattr(s, 'phone_number', None) or None,
+            "class_name": c.name if c else None,
+            "class_id": cid,
+            "absent_days_count": len(dates),
+            "absent_dates": [d.isoformat() for d in dates],
+        })
+
+    result.sort(key=lambda x: (-x["absent_days_count"], x["student_name"] or ""))
+
+    return jsonify(
+        week_start=range_start.isoformat(),
+        week_end=range_end.isoformat(),
+        min_days=min_days,
+        all_days=all_days,
+        students=result,
+    ), 200
+
+
 @attendance_blueprint.route('/students_with_excused_attendance', methods=['GET'])
 @jwt_required()
 def get_students_with_excused_attendance():

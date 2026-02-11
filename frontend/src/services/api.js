@@ -240,6 +240,7 @@ export const attendanceAPI = {
   getAttendanceSummary: (params) => api.get('/attendance/attendanceSummary', { params }).then(res => res.data),
   getAttendanceDetailsByStudent: (params) => api.get('/attendance/attendanceDetailsByStudent', { params }).then(res => res.data),
   getAttendanceDetailsByStudents: (params) => api.get('/attendance/attendanceDetailsByStudents', { params }).then(res => res.data),
+  getRepeatedAbsence: (params) => api.get('/attendance/repeated_absence', { params }).then(res => res.data),
   getStudentsWithExcusedAttendance: (params) => api.get('/attendance/students_with_excused_attendance', { params }).then(res => res.data),
   updateExcuseNote: (data) => api.put('/attendance/update_excuse_note', data),
   getStudentAttendanceLog: (params) => api.get('/attendance/student_attendance_log', { params }).then(res => res.data),

@@ -14,6 +14,7 @@ const Login = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isParentMode, setIsParentMode] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
+  const [hasScannedQR, setHasScannedQR] = useState(false);
   const scannerRef = useRef(null);
   const { login, loading } = useAuth();
   const {
@@ -45,12 +46,18 @@ const Login = () => {
   const onScanSuccess = (decodedText) => {
     if (!decodedText || !decodedText.trim()) return;
     setValue('username', decodedText.trim(), { shouldValidate: true });
+    setHasScannedQR(true);
     if (loginError) setLoginError('');
     if (scannerRef.current) {
       scannerRef.current.clear().catch(() => {});
       scannerRef.current = null;
     }
     setShowScanModal(false);
+  };
+
+  const clearScannedQR = () => {
+    setValue('username', '', { shouldValidate: true });
+    setHasScannedQR(false);
   };
 
   const onScanError = () => {
@@ -147,7 +154,13 @@ const Login = () => {
           <div className="mb-6 flex items-center justify-center space-x-2 space-x-reverse">
             <button
               type="button"
-              onClick={() => setIsParentMode(!isParentMode)}
+              onClick={() => {
+                setIsParentMode(!isParentMode);
+                if (isParentMode) {
+                  setHasScannedQR(false);
+                  setValue('username', '');
+                }
+              }}
               className={`flex items-center space-x-2 space-x-reverse px-4 py-2 rounded-lg transition-all ${
                 isParentMode 
                   ? 'bg-blue-600 text-white shadow-lg' 
@@ -168,27 +181,59 @@ const Login = () => {
               handleSubmit(onSubmit)(e);
             }}
           >
-            {/* Username Field */}
-            <div>
-              <label htmlFor="username" className="label">
-                {isParentMode ? 'اسم المستخدم للطالب' : 'اسم المستخدم أو البريد الإلكتروني'}
-              </label>
-              <div className={isParentMode ? 'flex gap-2' : ''}>
-                <div className="relative text-right flex-1">
+            {/* Username Field — in parent mode: only scan QR (no username shown); otherwise normal input */}
+            {isParentMode ? (
+              <div>
+                <label className="label">رمز الطالب</label>
+                <input
+                  {...register('username', {
+                    required: isParentMode ? 'يرجى مسح رمز QR الخاص بالطالب' : 'اسم المستخدم مطلوب',
+                    minLength: isParentMode ? undefined : { value: 3, message: 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل' },
+                  })}
+                  type="hidden"
+                />
+                {hasScannedQR ? (
+                  <div className="flex items-center gap-2 p-4 rounded-lg border-2 border-green-200 bg-green-50">
+                    <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+                    <span className="text-sm font-medium text-green-800">تم مسح رمز الطالب</span>
+                    <button
+                      type="button"
+                      onClick={clearScannedQR}
+                      className="mr-auto text-xs text-green-700 hover:text-green-900 underline"
+                    >
+                      مسح وإعادة المسح
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={openScanModal}
+                    className="w-full flex items-center justify-center gap-2 py-4 rounded-lg border-2 border-dashed border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition-colors"
+                  >
+                    <Scan className="h-6 w-6" />
+                    <span className="font-medium">امسح رمز QR الخاص بالطالب</span>
+                  </button>
+                )}
+                {errors.username && (
+                  <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <label htmlFor="username" className="label">اسم المستخدم أو البريد الإلكتروني</label>
+                <div className="relative text-right">
                   <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                     <User className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     {...register('username', {
                       required: 'اسم المستخدم مطلوب',
-                      minLength: {
-                        value: 3,
-                        message: 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل',
-                      },
+                      minLength: { value: 3, message: 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل' },
                     })}
                     type="text"
+                    id="username"
                     className={`input pr-10 ${errors.username ? 'input-error' : ''} text-right w-full`}
-                    placeholder={isParentMode ? 'امسح QR الطالب أو أدخل اسم المستخدم' : 'أدخل اسم المستخدم أو البريد الإلكتروني'}
+                    placeholder="أدخل اسم المستخدم أو البريد الإلكتروني"
                     dir="ltr"
                     onChange={(e) => {
                       if (loginError) setLoginError('');
@@ -196,26 +241,11 @@ const Login = () => {
                     }}
                   />
                 </div>
-                {isParentMode && (
-                  <button
-                    type="button"
-                    onClick={openScanModal}
-                    className="flex-shrink-0 inline-flex items-center justify-center w-12 h-12 rounded-lg border-2 border-blue-300 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:border-blue-400 transition-colors"
-                    title="امسح QR الطالب"
-                  >
-                    <Scan className="h-6 w-6" />
-                  </button>
+                {errors.username && (
+                  <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
                 )}
               </div>
-              {isParentMode && (
-                <p className="mt-1.5 text-xs text-gray-500">
-                  أو استخدم زر المسح لملء الحقل من QR الطالب
-                </p>
-              )}
-              {errors.username && (
-                <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
-              )}
-            </div>
+            )}
 
             {/* Password Field */}
             <div>
@@ -342,7 +372,7 @@ const Login = () => {
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-600 text-center">
-            وجّه الكاميرا نحو رمز QR الخاص بالطالب لملء اسم المستخدم تلقائياً
+            وجّه الكاميرا نحو رمز QR الخاص بالطالب. بعد المسح أدخل رقم الهاتف فقط
           </p>
           <div id="login-qr-reader" className="w-full rounded-lg overflow-hidden bg-gray-100 min-h-[250px]" />
           <div className="flex justify-center">

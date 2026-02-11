@@ -1,19 +1,24 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from 'react-query';
-import { Printer, Download, Search, Filter, X, FileText } from 'lucide-react';
-import JSZip from 'jszip';
-import jsPDF from 'jspdf';
+import { Download, Search, X } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { usersAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import StudentQRCode from '../../components/StudentQRCode/StudentQRCode';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import toast from 'react-hot-toast';
 
+const MAX_SELECTABLE = 50;
+
 const StudentQRCodes = () => {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterClass, setFilterClass] = useState('');
   const [filterActive, setFilterActive] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const cardRefsMap = useRef(new Map());
+  const itemsPerPage = window.innerWidth <= 768 ? 20 : 100;
   
   const { data: students, isLoading } = useQuery(
     'allStudents',
@@ -63,386 +68,79 @@ const StudentQRCodes = () => {
     });
   }, [uniqueStudents, searchTerm, filterClass, filterActive]);
   
-  const printAll = () => {
-    window.print();
-  };
-
-  const downloadPDF = async () => { 
-    if (!filteredStudents || filteredStudents.length === 0) {
-      toast.error('لا توجد طلاب للتحميل');
-      return;
-    }
-
-    toast.loading('جاري إنشاء ملف PDF...', { id: 'pdf-download' });
-
-    try {
-      // Wait for QR codes to render
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // PDF page dimensions (A4: 210mm x 297mm)
-      const pageWidth = 210; // mm
-      const pageHeight = 297; // mm
-      const margin = 5; // mm
-
-      // For 9 cards per page: 3 columns x 3 rows
-      const numRows = 3;
-      const numCols = 3;
-      const cardsPerPage = numRows * numCols; // 9
-
-      // Card size calculation
-      const headerHeight = 15; // mm for class header
-      const totalColMargins = margin * (numCols + 1);
-      const totalRowMargins = margin * (numRows + 1);
-      const availableHeight = pageHeight - headerHeight; // Subtract header space
-      // Card aspect ratio: 400:500 = 0.8 (width:height)
-      const cardAspectRatio = 400 / 500; // 0.8
-      const cardWidth = (pageWidth - totalColMargins) / numCols;
-      // Calculate height based on width to maintain aspect ratio, but fit within available space
-      const calculatedHeight = cardWidth / cardAspectRatio;
-      const maxHeight = (availableHeight - totalRowMargins) / numRows;
-      const cardHeight = Math.min(calculatedHeight, maxHeight);
-
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      // Group students by class
-      const studentsByClass = {};
-      filteredStudents.forEach(student => {
-        const className = student.class_name || 'بدون فصل';
-        if (!studentsByClass[className]) {
-          studentsByClass[className] = [];
-        }
-        studentsByClass[className].push(student);
-      });
-
-      // Sort classes alphabetically
-      const sortedClasses = Object.keys(studentsByClass).sort();
-
-      let cardIndex = 0;
-      let currentClass = null;
-
-      // Process each class group
-      for (const className of sortedClasses) {
-        const classStudents = studentsByClass[className];
-
-        // Start new page for new class (unless it's the first class and first card)
-        if (currentClass !== null || cardIndex > 0) {
-          pdf.addPage();
-          cardIndex = 0; // Reset card index for new class
-        }
-        currentClass = className;
-
-        // Add class header as image (to support Arabic text)
-        const headerCanvas = document.createElement('canvas');
-        headerCanvas.width = 600;
-        headerCanvas.height = 50;
-        const headerCtx = headerCanvas.getContext('2d');
-        headerCtx.fillStyle = '#FFFFFF';
-        headerCtx.fillRect(0, 0, 600, 50);
-        headerCtx.fillStyle = '#1F2937';
-        headerCtx.font = 'bold 24px Amiri';
-        headerCtx.textAlign = 'center';
-        headerCtx.fillText(className || 'بدون فصل', 300, 35);
-        const headerImageData = headerCanvas.toDataURL('image/jpeg', 0.95);
-        pdf.addImage(headerImageData, 'JPEG', (pageWidth - 60) / 2, 5, 60, 5);
-
-        // Process each student in the class
-        for (let i = 0; i < classStudents.length; i++) {
-          const student = classStudents[i];
-
-          // Add new page if current page is full (every 9 cards)
-          if (cardIndex % cardsPerPage === 0 && cardIndex > 0) {
-            pdf.addPage();
-            // Add class header on new page too (as image for Arabic support)
-            const headerCanvas = document.createElement('canvas');
-            headerCanvas.width = 600;
-            headerCanvas.height = 50;
-            const headerCtx = headerCanvas.getContext('2d');
-            headerCtx.fillStyle = '#FFFFFF';
-            headerCtx.fillRect(0, 0, 600, 50);
-            headerCtx.fillStyle = '#1F2937';
-            headerCtx.font = 'bold 24px Amiri';
-            headerCtx.textAlign = 'center';
-            headerCtx.fillText(className || 'بدون فصل', 300, 35); 
-            const headerImageData = headerCanvas.toDataURL('image/jpeg', 0.95);
-            pdf.addImage(headerImageData, 'JPEG', (pageWidth - 60) / 2, 5, 60, 5);
-          }
-
-          // Calculate row/col on current page
-          const localIndex = cardIndex % cardsPerPage;
-          const row = Math.floor(localIndex / numCols);
-          const col = localIndex % numCols;
-
-          // x and y based on margin and card size (adjust y for header)
-          const x = margin + (col * (cardWidth + margin));
-          const y = headerHeight + margin + (row * (cardHeight + margin));
-
-          // Get QR code canvas
-          let canvas = document.getElementById(`qr-${student.id}`);
-          if (!canvas || canvas.tagName !== 'CANVAS') {
-            // Try again after a short delay
-            await new Promise(resolve => setTimeout(resolve, 200));
-            canvas = document.getElementById(`qr-${student.id}`);
-            if (!canvas || canvas.tagName !== 'CANVAS') {
-              cardIndex++;
-              continue;
-            }
-          }
-
-          // Use JPEG compression for QR code to reduce data URL size
-          const qrImageData = canvas.toDataURL('image/jpeg', 0.95);
-
-          // Create card canvas
-          const cardCanvas = document.createElement('canvas');
-          cardCanvas.width = 400;
-          cardCanvas.height = 500;
-          const ctx = cardCanvas.getContext('2d');
-
-          // White background
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, 400, 500);
-          // img background
-          
-          // Border
-          ctx.strokeStyle = '#E5E7EB';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(10, 10, 380, 480);
-
-          // School name at top
-          const schoolName = user?.school_name || student.school_name || 'المدرسة';
-          ctx.fillStyle = '#1F2937';
-          ctx.font = 'bold 20px Amiri';
-          ctx.textAlign = 'center';
-          ctx.fillText(schoolName, 200, 40);
-
-          // Student name
-          ctx.fillStyle = '#111827';
-          ctx.font = 'bold 24px Amiri';
-          ctx.textAlign = 'center';
-          ctx.fillText(student.fullName || '', 200, 80);
-
-          // QR Code (centered)
-          const qrImg = new Image();
-          await new Promise((resolve, reject) => {
-            qrImg.onload = () => {
-              const qrSize = 250;
-              const qrX = (400 - qrSize) / 2;
-              const qrY = 110;
-              ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
-
-              // Note about QR code usage
-              ctx.fillStyle = '#6B7280';
-              ctx.font = '14px Amiri';
-              ctx.textAlign = 'center';
-              ctx.fillText('هذا الرمز للصعود والنزول من الحافلة QR', 200, 390);
-
-              // Class name if available
-              if (student.class_name) {
-                ctx.fillStyle = '#6B7280';
-                ctx.font = '16px Amiri';
-                ctx.fillText(`الفصل: ${student.class_name}`, 200, 415);
-              }
-
-              // Convert card canvas to image with compression and add to PDF
-              // Use JPEG with quality 0.95 for higher quality images
-              const cardImageData = cardCanvas.toDataURL('image/jpeg', 0.95);
-              pdf.addImage(cardImageData, 'JPEG', x, y, cardWidth, cardHeight);
-
-              resolve();
-            };
-            qrImg.onerror = () => {
-              resolve(); // Continue even if one fails
-            };
-            qrImg.src = qrImageData;
-          });
-
-          cardIndex++;
-        }
-      }
-
-      // Save PDF
-      const fileName = `QR_Codes_${new Date().toISOString().split('T')[0]}.pdf`;
-      pdf.save(fileName);
-
-      toast.success(`تم تحميل ${filteredStudents.length} بطاقة QR في ملف PDF`, { id: 'pdf-download' });
-    } catch (error) {
-      toast.error('حدث خطأ أثناء إنشاء ملف PDF', { id: 'pdf-download' });
-    }
-  };
-
-  const downloadBulkQRs = async () => {
-    if (!filteredStudents || filteredStudents.length === 0) {
-      toast.error('لا توجد طلاب للتحميل');
-      return;
-    }
-    
-    toast.loading('جاري إنشاء ملف ZIP...', { id: 'bulk-download' });
-    
-    try {
-      // Wait a bit for QR codes to render
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const zip = new JSZip();
-      
-      // Create a canvas for each student and add to ZIP
-      const downloadPromises = filteredStudents.map((student, index) => {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            const canvas = document.getElementById(`qr-${student.id}`);
-            if (canvas && canvas.tagName === 'CANVAS') {
-              const pngUrl = canvas.toDataURL("image/png");
-              
-              // Create a new canvas for the card
-              const cardCanvas = document.createElement('canvas');
-              cardCanvas.width = 400;
-              cardCanvas.height = 500;
-              const ctx = cardCanvas.getContext('2d');
-              
-              // White background
-              ctx.fillStyle = '#FFFFFF';
-              ctx.fillRect(0, 0, 400, 500);
-              
-              // Border
-              ctx.strokeStyle = '#E5E7EB';
-              ctx.lineWidth = 2;
-              ctx.strokeRect(10, 10, 380, 480);
-              
-              // School name at top
-              ctx.fillStyle = '#1F2937';
-              ctx.font = 'bold 20px Arial';
-              ctx.textAlign = 'center';
-              const schoolName = user?.school_name || student.school_name || 'المدرسة';
-              ctx.fillText(schoolName, 200, 40);
-              
-              // Student name
-              ctx.fillStyle = '#111827';
-              ctx.font = 'bold 24px Arial';
-              ctx.textAlign = 'center';
-              const nameY = 80;
-              ctx.fillText(student.fullName || '', 200, nameY);
-              
-              // QR Code (centered)
-              const qrImg = new Image();
-              qrImg.crossOrigin = 'anonymous';
-              qrImg.onload = () => {
-                const qrSize = 250;
-                const qrX = (400 - qrSize) / 2;
-                const qrY = 110;
-                ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
-                
-                // Note about QR code usage
-                ctx.fillStyle = '#6B7280';
-                ctx.font = '14px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('هذا الرمز QR للصعود والنزول من الحافلة', 200, 390);
-                
-                // Class name if available
-                if (student.class_name) {
-                  ctx.fillStyle = '#6B7280';
-                  ctx.font = '16px Arial';
-                  ctx.fillText(`الفصل: ${student.class_name}`, 200, 415);
-                }
-                
-                // Convert canvas to blob and add to ZIP
-                cardCanvas.toBlob((blob) => {
-                  if (blob) {
-                    // Use student name as filename (sanitize for filesystem)
-                    const fileName = `${student.fullName || student.username}.png`.replace(/[<>:"/\\|?*]/g, '_');
-                    zip.file(fileName, blob);
-                  }
-                  resolve();
-                }, 'image/png');
-              };
-              qrImg.onerror = () => {
-                resolve();
-              };
-              qrImg.src = pngUrl;
-            } else {
-              // If canvas not found, wait a bit and try again
-              setTimeout(() => {
-                const retryCanvas = document.getElementById(`qr-${student.id}`);
-                if (retryCanvas && retryCanvas.tagName === 'CANVAS') {
-                  const pngUrl = retryCanvas.toDataURL("image/png");
-                  const cardCanvas = document.createElement('canvas');
-                  cardCanvas.width = 400;
-                  cardCanvas.height = 500;
-                  const ctx = cardCanvas.getContext('2d');
-                  
-                  ctx.fillStyle = '#FFFFFF';
-                  ctx.fillRect(0, 0, 400, 500);
-                  ctx.strokeStyle = '#E5E7EB';
-                  ctx.lineWidth = 2;
-                  ctx.strokeRect(10, 10, 380, 480);
-                  
-                  const schoolName = user?.school_name || student.school_name || 'المدرسة';
-                  ctx.fillStyle = '#1F2937';
-                  ctx.font = 'bold 20px Arial';
-                  ctx.textAlign = 'center';
-                  ctx.fillText(schoolName, 200, 40);
-                  
-                  ctx.fillStyle = '#111827';
-                  ctx.font = 'bold 24px Arial';
-                  ctx.fillText(student.fullName || '', 200, 80);
-                  
-                  const qrImg = new Image();
-                  qrImg.onload = () => {
-                    ctx.drawImage(qrImg, 75, 110, 250, 250);
-                    
-                    // Note about QR code usage
-                    ctx.fillStyle = '#6B7280';
-                    ctx.font = '14px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('هذا الرمز QR للصعود والنزول من الحافلة', 200, 390);
-                    
-                    // Class name if available
-                    if (student.class_name) {
-                      ctx.fillStyle = '#6B7280';
-                      ctx.font = '16px Arial';
-                      ctx.fillText(`الفصل: ${student.class_name}`, 200, 415);
-                    }
-                    
-                    cardCanvas.toBlob((blob) => {
-                      if (blob) {
-                        const fileName = `${student.fullName || student.username}.png`.replace(/[<>:"/\\|?*]/g, '_');
-                        zip.file(fileName, blob);
-                      }
-                      resolve();
-                    }, 'image/png');
-                  };
-                  qrImg.src = pngUrl;
-                } else {
-                  resolve();
-                }
-              }, 200);
-            }
-          }, index * 100); // Stagger processing to avoid blocking
-        });
-      });
-      
-      await Promise.all(downloadPromises);
-      
-      // Generate ZIP file
-      toast.loading('جاري ضغط الملفات...', { id: 'bulk-download' });
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      
-      // Download the ZIP file
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(zipBlob);
-      link.download = `QR_Codes_${new Date().toISOString().split('T')[0]}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(link.href);
-      
-      toast.success(`تم تحميل ${filteredStudents.length} بطاقة QR في ملف ZIP`, { id: 'bulk-download' });
-    } catch (error) {
-      toast.error('حدث خطأ أثناء التحميل', { id: 'bulk-download' });
-    }
-  };
+  // Pagination
+  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
+  const paginatedStudents = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredStudents.slice(start, end);
+  }, [filteredStudents, currentPage, itemsPerPage]);
   
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterClass, filterActive]);
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [currentPage]);
+
+  const registerCardRef = useCallback((id, el) => {
+    if (el) cardRefsMap.current.set(id, el);
+    else cardRefsMap.current.delete(id);
+  }, []);
+
+  const toggleSelect = useCallback((id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : prev.length >= MAX_SELECTABLE
+          ? prev
+          : [...prev, id]
+    );
+  }, []);
+
+  const selectAllOnPage = useCallback(() => {
+    const ids = paginatedStudents.slice(0, MAX_SELECTABLE).map((s) => s.id);
+    setSelectedIds(ids);
+  }, [paginatedStudents]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds([]);
+  }, []);
+
+  const downloadSelected = useCallback(async () => {
+    if (selectedIds.length === 0) {
+      toast.error('لم يتم اختيار أي بطاقة');
+      return;
+    }
+    const studentsById = new Map(filteredStudents.map((s) => [s.id, s]));
+    let done = 0;
+    for (const id of selectedIds) {
+      const el = cardRefsMap.current.get(id);
+      const student = studentsById.get(id);
+      if (!el || !student) continue;
+      try {
+        const canvas = await html2canvas(el, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: null,
+          logging: false,
+        });
+        const dataUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = `${student.fullName || student.username || 'card'}.png`.replace(/[<>:"/\\|?*]/g, '_');
+        link.click();
+        done++;
+        await new Promise((r) => setTimeout(r, 400));
+      } catch (e) {
+        console.error('Download failed for', id, e);
+      }
+    }
+    if (done > 0) toast.success(`تم تحميل ${done} بطاقة`);
+    if (done < selectedIds.length) toast.error(`لم يتم تحميل ${selectedIds.length - done} بطاقة (غير ظاهرة في الصفحة)`);
+  }, [selectedIds, filteredStudents]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -458,19 +156,31 @@ const StudentQRCodes = () => {
           <h1 className="text-2xl font-bold">رموز QR للطلاب</h1>
           <p className="text-gray-600">طباعة وتحميل رموز QR للحافلة</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={downloadBulkQRs} className="btn btn-primary">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-gray-600">اختر حتى {MAX_SELECTABLE} بطاقة ثم حمّل كصور</span>
+          <button
+            type="button"
+            onClick={selectAllOnPage}
+            className="btn btn-outline text-sm"
+          >
+            تحديد الكل
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            disabled={selectedIds.length === 0}
+            className="btn btn-outline text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            إلغاء التحديد
+          </button>
+          <button
+            onClick={downloadSelected}
+            disabled={selectedIds.length === 0}
+            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <Download className="h-5 w-5 mr-2 ml-2" />
-            تحميل ({filteredStudents.length}) ZIP 
+            تحميل المحدد ({selectedIds.length})
           </button>
-          <button onClick={downloadPDF} className="btn btn-primary">
-            <FileText className="h-5 w-5 mr-2 ml-2" />
-            تحميل ({filteredStudents.length}) PDF 
-          </button>
-          {/* <button onClick={printAll} className="btn btn-outline">
-            <Printer className="h-5 w-5 mr-2" />
-            طباعة الكل
-          </button> */}
         </div>
       </div>
       
@@ -605,15 +315,67 @@ const StudentQRCodes = () => {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 print:grid-cols-4">
-          {filteredStudents.map((student) => (
-            <StudentQRCode 
-              key={student.id} 
-              student={student}
-              schoolName={student.school_name || user?.school_name}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 print:grid-cols-4">
+            {paginatedStudents.map((student) => (
+              <StudentQRCode
+                key={student.id}
+                student={student}
+                schoolName={student.school_name || user?.school_name}
+                isSelected={selectedIds.includes(student.id)}
+                onToggleSelect={() => toggleSelect(student.id)}
+                registerCardRef={registerCardRef}
+                canSelect={selectedIds.length < MAX_SELECTABLE || selectedIds.includes(student.id)}
+              />
+            ))}
+          </div>
+          
+          {/* Pagination Controls (mobile-friendly) */}
+          {totalPages > 1 && (
+            <div className="card print:hidden mt-6">
+              <div className="card-body">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-sm text-gray-600">
+                    صفحة {currentPage} من {totalPages} ({filteredStudents.length} طالب)
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="px-3 py-2 rounded-lg border text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition"
+                    >
+                      الأولى
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 rounded-lg border text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition"
+                    >
+                      السابق
+                    </button>
+                    <span className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
+                      {currentPage}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-4 py-2 rounded-lg border text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition"
+                    >
+                      التالي
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-2 rounded-lg border text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition"
+                    >
+                      الأخيرة
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

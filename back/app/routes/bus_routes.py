@@ -309,8 +309,10 @@ def scan_student():
     
     data = request.get_json()
     
-    # Get student by username (from QR code)
-    username = data.get('username')
+    # Get scanned payload (encoded or legacy plain username) and resolve to username
+    from app.qr_payload import decode_student_qr_payload
+    scanned = data.get('username')
+    username = decode_student_qr_payload(scanned) if scanned else None
     bus_id = data.get('bus_id')
     scan_type = data.get('scan_type')  # 'board' or 'exit'
     location = data.get('location')

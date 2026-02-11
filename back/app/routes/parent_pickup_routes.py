@@ -23,8 +23,10 @@ def parent_login():
     Parent login by scanning student QR code and verifying with phone number
     """
     try:
+        from app.qr_payload import decode_student_qr_payload
         data = request.get_json()
-        student_username = data.get('student_username')
+        scanned = data.get('student_username')
+        student_username = decode_student_qr_payload(scanned) if scanned else None
         parent_phone = data.get('parent_phone')
         
         if not student_username or not parent_phone:

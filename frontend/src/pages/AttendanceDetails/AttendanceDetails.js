@@ -29,9 +29,21 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import toast from 'react-hot-toast';
 
+function getCurrentWeekRange() {
+  const today = new Date();
+  const day = today.getDay();
+  const daysSinceSunday = day;
+  const start = new Date(today);
+  start.setDate(today.getDate() - daysSinceSunday);
+  return {
+    start: start.toISOString().split('T')[0],
+    end: today.toISOString().split('T')[0],
+  };
+}
+
 const AttendanceDetails = () => {
   const { user } = useAuth();
-  const [selectedTab, setSelectedTab] = useState('summary');
+  const [selectedTab, setSelectedTab] = useState('repeated');
   const [selectedDate, setSelectedDate] = useState(getTodayAPI());
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const attendanceDetailsRef = useRef(null);
@@ -49,6 +61,8 @@ const AttendanceDetails = () => {
   const [isSendingSms, setIsSendingSms] = useState(false);
   const [showSmsConfirmModal, setShowSmsConfirmModal] = useState(false);
   const [pendingSmsData, setPendingSmsData] = useState(null);
+  const [repeatedAbsenceMinDays, setRepeatedAbsenceMinDays] = useState(2);
+  const [repeatedAbsenceRange, setRepeatedAbsenceRange] = useState(() => getCurrentWeekRange());
 
   // Fetch attendance summary
   const { data: attendanceSummary, isLoading: summaryLoading } = useQuery(
@@ -76,6 +90,21 @@ const AttendanceDetails = () => {
     'allStudents',
     usersAPI.getMySchoolStudents,
     { enabled: !!user && selectedTab === 'log' }
+  );
+
+  // Repeated absence: students absent more than X days (or >7, or all days) in selected date range
+  const { data: repeatedAbsence, isLoading: repeatedLoading } = useQuery(
+    ['repeatedAbsence', repeatedAbsenceMinDays, repeatedAbsenceRange?.start, repeatedAbsenceRange?.end],
+    () => {
+      const params = { start_date: repeatedAbsenceRange?.start, end_date: repeatedAbsenceRange?.end };
+      if (repeatedAbsenceMinDays === 'all') {
+        params.all_days = true;
+      } else {
+        params.min_days = Number(repeatedAbsenceMinDays);
+      }
+      return attendanceAPI.getRepeatedAbsence(params);
+    },
+    { enabled: !!user && selectedTab === 'repeated' }
   );
 
   // Filter students based on search
@@ -305,15 +334,16 @@ const AttendanceDetails = () => {
   // Redirect non-admin users away from log tab
   useEffect(() => {
     if (selectedTab === 'log' && user?.role !== 'school_admin') {
-      setSelectedTab('summary');
+      setSelectedTab('repeated');
     }
   }, [selectedTab, user?.role]);
 
   const tabs = [
+    { id: 'repeated', name: 'الغياب المتكرر', icon: UserX },
     { id: 'summary', name: 'ملخص الحضور', icon: Users },
     ...(user?.role === 'school_admin' || user?.role === 'data_analyst' ? [{ id: 'details', name: 'تفاصيل الطلاب', icon: Eye }] : []),
     { id: 'excused', name: 'ملاحظات العذر', icon: AlertCircle },
-    // Only show behavior notes log for school admins
+    
     // ...(user?.role === 'school_admin' || user?.role === 'data_analyst' ? [{ id: 'log', name: 'سجل ملاحظات الطالب', icon: Calendar }] : []),
   ];
 
@@ -477,6 +507,8 @@ const AttendanceDetails = () => {
         return excusedStudents?.students || [];
       case 'log':
         return studentLog || [];
+      case 'repeated':
+        return repeatedAbsence?.students || [];
       default:
         return [];
     }
@@ -492,6 +524,8 @@ const AttendanceDetails = () => {
         return excusedLoading;
       case 'log':
         return logLoading;
+      case 'repeated':
+        return repeatedLoading;
       default:
         return false;
     }
@@ -667,6 +701,86 @@ const AttendanceDetails = () => {
     },
   ];
 
+  // Repeated absence columns
+  const repeatedAbsenceColumns = [
+    {
+      key: 'student_name',
+      header: 'اسم الطالب',
+      render: (row) => (
+        <div className="flex items-center">
+          <div className="h-8 w-8 bg-red-100 rounded-full flex items-center justify-center">
+            <UserX className="h-4 w-4 text-red-600" />
+          </div>
+          <div className="mr-2">
+            <p className="text-sm font-medium text-gray-900">{row.student_name}</p>
+            {row.phone_number && <p className="text-xs text-gray-500">{row.phone_number}</p>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'class_name',
+      header: 'الفصل',
+      render: (row) => <span className="text-sm text-gray-900">{row.class_name || '-'}</span>,
+    },
+    {
+      key: 'absent_days_count',
+      header: 'أيام الغياب',
+      render: (row) => (
+        <span className="badge badge-danger">{row.absent_days_count}</span>
+      ),
+    },
+    {
+      key: 'absent_dates',
+      header: 'التواريخ',
+      render: (row) => (
+        <div className="flex flex-wrap gap-1">
+          {(row.absent_dates || []).map((d, i) => (
+            <span key={i} className="badge badge-outline text-xs">
+              {formatDate(d, 'dd/MM', 'ar')}
+            </span>
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: 'whatsapp',
+      header: 'واتساب',
+      render: (row) => {
+        const phone = row.phone_number?.replace(/[^0-9]/g, '');
+        if (!phone) return <span className="text-xs text-gray-400">—</span>;
+        let num = phone;
+        if (!num.startsWith('968')) {
+          if (num.length === 8) num = '968' + num;
+          else if (num.length === 9 && num.startsWith('9')) num = '968' + num.slice(1);
+        }
+        const message = [
+          'السلام عليكم،',
+          `نود إبلاغكم بأن الطالب ${row.student_name || 'الطالب'} قد سُجل غيابه في ${row.absent_days_count || 0} يوم خلال الفترة المحددة.`,
+          (row.absent_dates?.length ? `التواريخ: ${row.absent_dates.map((d) => formatDate(d, 'dd/MM', 'ar')).join('، ')}.` : ''),
+          'يرجى التواصل مع المدرسة.',
+        ].filter(Boolean).join('\n');
+        const encodedMessage = encodeURIComponent(message);
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+        const whatsappUrl = isMobile
+          ? `https://wa.me/${num}?text=${encodedMessage}`
+          : `https://web.whatsapp.com/send?phone=${num}&text=${encodedMessage}`;
+        return (
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700 transition-colors"
+            title="إرسال عبر واتساب"
+          >
+            <MessageCircle className="h-4 w-4" />
+            واتساب
+          </a>
+        );
+      },
+    },
+  ];
+
   // Student log columns
   const logColumns = [
     {
@@ -734,6 +848,8 @@ const AttendanceDetails = () => {
         return detailsColumns;
       case 'excused':
         return excusedColumns;
+      case 'repeated':
+        return repeatedAbsenceColumns;
       case 'log':
         return logColumns;
       default:
@@ -751,13 +867,13 @@ const AttendanceDetails = () => {
         </div>
         {(user?.role === 'school_admin' || user?.role === 'data_analyst') && (
           <div className="flex items-center space-x-2">
-            <button
+            {/* <button
               onClick={handlePrint}
               className="btn btn-outline"
             >
               <Printer className="h-5 w-5 mr-2" />
               طباعة
-            </button>
+            </button> */}
             {/* <button
               onClick={handleDownloadPDF}
               disabled={isGeneratingPDF}
@@ -792,7 +908,56 @@ const AttendanceDetails = () => {
       <div className="card">
         <div className="card-body">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {selectedTab !== 'log' && (
+            {selectedTab === 'repeated' && (
+              <>
+                <div>
+                  <label className="label">من تاريخ</label>
+                  <input
+                    type="date"
+                    value={repeatedAbsenceRange?.start || ''}
+                    onChange={(e) => setRepeatedAbsenceRange((prev) => ({ ...prev, start: e.target.value }))}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">إلى تاريخ</label>
+                  <input
+                    type="date"
+                    value={repeatedAbsenceRange?.end || ''}
+                    onChange={(e) => setRepeatedAbsenceRange((prev) => ({ ...prev, end: e.target.value }))}
+                    className="input"
+                  />
+                </div>
+                <div className="flex items-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRepeatedAbsenceRange(getCurrentWeekRange())}
+                    className="btn btn-outline"
+                  >
+                    هذا الأسبوع
+                  </button>
+                </div>
+                <div>
+                  <label className="label">الغياب</label>
+                  <select
+                    value={repeatedAbsenceMinDays}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setRepeatedAbsenceMinDays(v === 'all' || v === '8' ? v : Number(v));
+                    }}
+                    className="input"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                      <option key={n} value={n}>أكثر من {n} يوم</option>
+                    ))}
+                    <option value="8">أكثر من 7 أيام</option>
+                    <option value="all">كل الأيام (غائب في كل يوم من الفترة)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">طلاب مسجل غيابهم حسب الخيار المحدد في الفترة</p>
+                </div>
+              </>
+            )}
+            {selectedTab !== 'log' && selectedTab !== 'repeated' && (
               <div>
                 <label className="label">التاريخ</label>
                 <input
@@ -994,12 +1159,19 @@ const AttendanceDetails = () => {
         </div>
       )}
 
+      {/* Repeated absence week info */}
+      {selectedTab === 'repeated' && repeatedAbsence && (repeatedAbsence.week_start || repeatedAbsence.week_end) && (
+        <p className="text-sm text-gray-600">
+          أسبوع من {repeatedAbsence.week_start ? formatDate(repeatedAbsence.week_start, 'dd/MM/yyyy', 'ar') : ''} إلى {repeatedAbsence.week_end ? formatDate(repeatedAbsence.week_end, 'dd/MM/yyyy', 'ar') : ''}
+        </p>
+      )}
+
       {/* Data Table */}
       <DataTable
         data={getCurrentData()}
         columns={getColumns()}
         loading={getCurrentLoading()}
-        emptyMessage="لا توجد بيانات"
+        emptyMessage={selectedTab === 'repeated' ? 'لا يوجد طلاب غائبون بهذا المعدل هذا الأسبوع' : 'لا توجد بيانات'}
       />
 
       {/* Behavior Note Modal */}

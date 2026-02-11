@@ -1,118 +1,132 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
-import { Download, Printer } from 'lucide-react';
+import { Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { encodeStudentQRPayload } from '../../utils/qrPayload';
 
-const StudentQRCode = ({ student, schoolName }) => {
-  const downloadQR = () => {
-    const canvas = document.getElementById(`qr-${student.id}`);
-    const pngUrl = canvas
-      .toDataURL("image/png")
-      .replace("image/png", "image/octet-stream");
-    
-    let downloadLink = document.createElement("a");
-    downloadLink.href = pngUrl;
-    downloadLink.download = `${student.username}_QR.png`;
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    downloadLink.remove();
+const LOGIN_QR_URL = 'https://tatubu.com/login';
+
+const StudentQRCode = ({ student, schoolName, isSelected, onToggleSelect, registerCardRef, canSelect = true }) => {
+  const cardRef = useRef(null);
+  const qrValue = encodeStudentQRPayload(student.username);
+
+  useEffect(() => {
+    if (typeof registerCardRef !== 'function') return;
+    const el = cardRef.current;
+    registerCardRef(student.id, el);
+    return () => registerCardRef(student.id, null);
+  }, [student.id, registerCardRef]);
+
+  const handleDownloadImage = async () => {
+    if (!cardRef.current) return;
+    try {
+      const canvas = await html2canvas(cardRef.current, {
+        scale: 4,
+        useCORS: true,
+        backgroundColor: null,
+
+        logging: false,
+      });
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `${student.fullName || student.username || 'card'}.png`.replace(/[<>:"/\\|?*]/g, '_');
+      link.click();
+    } catch (err) {
+      console.error('Download failed', err);
+    }
   };
 
-  const printQR = () => {
-    const printWindow = window.open('', '_blank');
-    const canvas = document.getElementById(`qr-${student.id}`);
-    const qrImage = canvas.toDataURL();
-    
-    printWindow.document.write(`
-      <html dir="rtl">
-        <head>
-          <title>QR Code - ${student.fullName}</title>
-          <style>
-            body {
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              height: 100vh;
-              margin: 0;
-              font-family: Arial, sans-serif;
-            }
-            .qr-container {
-              text-align: center;
-              padding: 20px;
-              border: 2px solid #333;
-              border-radius: 10px;
-            }
-            h1 { font-size: 24px; margin: 10px 0; }
-            h2 { font-size: 20px; margin: 10px 0; color: #666; }
-            p { font-size: 18px; margin: 5px 0; }
-            img { margin: 20px 0; }
-          </style>
-        </head>
-        <body>
-          <div class="qr-container">
-            ${schoolName ? `<h2>${schoolName}</h2>` : ''}
-            <h1>${student.fullName}</h1>
-            <img src="${qrImage}" alt="QR Code" />
-            <p>هذا الرمز QR للصعود والنزول من الحافلة</p>
-          </div>
-        </body>
-      </html>
-    `);
-    
-    printWindow.document.close();
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
-  };
+  const CARD_W = 280;
+  const CARD_H = 180;
 
   return (
-    <div className="flex flex-col items-center gap-3 p-6 border-2 border-gray-200 rounded-xl bg-gradient-to-br from-white to-gray-50 shadow-lg hover:shadow-xl hover:border-blue-300 transition-all duration-300 transform hover:-translate-y-1"> 
-      <div className="text-center w-full">
-        {schoolName && (
-          <p className="text-xs font-medium text-gray-400 mb-2 uppercase tracking-wide">{schoolName}</p>
-        )}
-        <h3 className="font-bold text-xl text-gray-900 mb-2">{student.fullName}</h3>
-       
-        {student.class_name && (
-          <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
-            <p className="text-xs font-semibold text-blue-700">الفصل: {student.class_name}</p>
-          </div>
-        )}
-      </div>
-      
-      {/* QR Code Container */}
-      <div className="p-4 bg-white rounded-lg border border-gray-100 shadow-inner">
-        <QRCodeCanvas
-          id={`qr-${student.id}`}
-          value={student.username}
-          size={200}
-          level="H"
-          includeMargin={true}
+    <div className="relative group hover:z-[100]" style={{ width: CARD_W }}>
+      {typeof onToggleSelect === 'function' && (
+        <div className="absolute top-2 left-2 z-[60]">
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!isSelected}
+              onChange={() => onToggleSelect()}
+              disabled={!canSelect && !isSelected}
+              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-xs text-gray-600 bg-white/90 px-1 rounded">اختيار</span>
+          </label>
+        </div>
+      )}
+      <div
+        ref={cardRef}
+        className="relative rounded-[12px] border-2 border-gray-200 bg-gradient-to-br from-white to-gray-50 shadow-lg overflow-hidden hover:shadow-xl hover:border-blue-300 transition-all duration-300"
+        style={{ width: CARD_W, height: CARD_H }}
+      >
+        {/* Logo as subtle background */}
+        <div
+          className="absolute inset-0 bg-center bg-no-repeat bg-contain pointer-events-none absolute top-0 left-0"
+          style={{
+            backgroundImage: "url('/logo.png')",
+            backgroundSize: '100%',
+            opacity: 0.12,
+            zIndex: 0,
+          }}
+          aria-hidden
         />
+      <div className="relative flex flex-row gap-2 h-full z-10" dir="rtl" style={{ padding: 12, boxSizing: 'border-box' }}>
+        {/* Right: Student QR (main) + note - fixed size */}
+        <div className="flex flex-col items-center justify-center flex-shrink-0 gap-1" style={{ width: 140, minHeight: 0 }}>
+          <div className="bg-white rounded-lg border border-gray-100 shadow-inner" style={{ padding: 4 }}>
+            <QRCodeCanvas
+              id={`qr-${student.id}`}
+              value={qrValue}
+              size={128}
+              level="H"
+              includeMargin={true}
+            />
+          </div>
+          <span className="text-gray-400 bg-transparent text-center" style={{ fontSize: 7, lineHeight: 1.2 }}>للاستخدام في التطبيق فقط</span>
+        </div>
+        {/* Left: Text + Login QR - fixed width */}
+        <div className="flex flex-col flex-1 min-w-0 min-h-0" style={{ width: 168 }}>
+          <div className="flex flex-col flex-shrink-0 gap-2" style={{ paddingTop: 2 }}>
+            {schoolName && (
+              <p className="font-medium text-gray-500 break-words bg-transparent" style={{ fontSize: 10, lineHeight: 1.35 }} title={schoolName}>
+                {schoolName}
+              </p>
+            )}
+            <h3 className="font-bold text-gray-900 break-words bg-transparent" style={{ fontSize: 12, lineHeight: 1.4, marginTop: 4 }} title={student.fullName}>
+              {student.fullName}
+            </h3>
+          </div>
+          <div className="flex-1 min-h-0" style={{ minHeight: 0 }} aria-hidden />
+          <div className="flex flex-col items-center flex-shrink-0 gap-0" style={{ paddingTop: 8 }}>
+            <QRCodeCanvas
+              id={`login-qr-${student.id}`}
+              value={LOGIN_QR_URL}
+              size={44}
+              level="M"
+              includeMargin={true}
+            />
+            <span className="text-gray-500 bg-transparent" style={{ fontSize: 8, lineHeight: 1.2 }}>تسجيل الدخول</span>
+          </div>
+        </div>
       </div>
-      
-      {/* Username */}
-      <div className="mt-2 px-4 py-2 bg-gray-100 rounded-lg w-full">
-        <p className="text-xs font-mono text-center text-gray-700">{student.username}</p>
       </div>
-      
-      {/* Actions */}
-      {/* <div className="flex gap-2">
+      {/* Hover: download option - on top of card */}
+      <div
+        className="absolute rounded-[12px] bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center z-50"
+        style={{ inset: 0, width: CARD_W, height: CARD_H }}
+        aria-hidden
+      >
         <button
-          onClick={downloadQR}
-          className="btn btn-sm btn-outline flex items-center gap-2"
+          type="button"
+          onClick={handleDownloadImage}
+          className="flex items-center gap-2 px-4 py-2 bg-white text-gray-800 rounded-lg shadow-lg hover:bg-gray-100 font-medium text-sm"
         >
-          <Download className="h-4 w-4" />
-          تحميل
+          <Download className="w-4 h-4" />
+          تحميل الصورة
         </button>
-        <button
-          onClick={printQR}
-          className="btn btn-sm btn-primary flex items-center gap-2"
-        >
-          <Printer className="h-4 w-4" />
-          طباعة
-        </button>
-      </div> */}
+      </div>
     </div>
   );
 };
