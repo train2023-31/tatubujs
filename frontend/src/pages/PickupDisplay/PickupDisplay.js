@@ -267,10 +267,10 @@ const PickupDisplay = () => {
   const light = isLightMode;
   const bgRoot = light
     ? 'min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 text-gray-900'
-    : 'min-h-screen bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 text-white';
+    : 'min-h-screen bg-gradient-to-br from-sky-900 via-sky-700 to-blue-800 text-white';
   const titleGradient = light
-    ? 'text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600'
-    : 'text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 animate-pulse';
+    ? 'text-transparent bg-clip-text bg-gradient-to-r from-sky-900 to-sky-600'
+    : 'text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-sky-400 animate-pulse';
   const subtitle = light ? 'text-gray-600' : 'text-blue-200';
   const clockBg = light ? 'bg-white/80 border-gray-200 shadow-lg' : 'bg-white/10 border-white/30';
   const clockText = light ? 'text-gray-800' : 'text-white';

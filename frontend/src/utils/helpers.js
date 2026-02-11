@@ -51,6 +51,38 @@ export const formatDate = (date, format = 'dd/MM/yyyy', locale = 'ar-OM') => {
 };
 
 /**
+ * Format time in Oman MCT timezone
+ * @param {string} dateString - ISO date string
+ * @returns {Object} Object with time, date, and full formatted strings
+ */
+export const formatOmanTime = (dateString) => {
+  if (!dateString) return { time: '', date: '', full: '' };
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return { time: '', date: '', full: '' };
+
+    const timeStr = date.toLocaleString('ar-OM', {
+      timeZone: 'Asia/Muscat',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+
+    const dateStr = date.toLocaleString('ar-OM', {
+      timeZone: 'Asia/Muscat',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'short'
+    });
+
+    return { time: timeStr, date: dateStr, full: `${dateStr} - ${timeStr}` };
+  } catch (error) {
+    return { time: '', date: '', full: '' };
+  }
+};
+
+/**
  * Get today's date in API format (YYYY-MM-DD)
  * @returns {string} Today's date in YYYY-MM-DD format
  */
