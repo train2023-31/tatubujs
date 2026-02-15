@@ -195,11 +195,53 @@ const Login = () => {
 
      
 
-        {/* Login Form */}
-        <div className="bg-white/50 backdrop-blur-lg py-8 px-6 shadow-2xl rounded-2xl relative border border-white/30 text-right">
+        {/* Login type tabs — on top of card */}
+        <div className="w-full rounded-t-2xl overflow-hidden border border-b-0 border-white/30 bg-white/40 backdrop-blur-sm">
+          <nav className="flex" aria-label="نوع تسجيل الدخول">
+            <button
+              type="button"
+              onClick={() => {
+                if (isParentMode) {
+                  setIsParentMode(false);
+                  setHasScannedQR(false);
+                  setValue('username', '');
+                }
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 border-b-2 text-sm font-medium transition-colors ${
+                !isParentMode
+                  ? 'border-primary-500 text-primary-600 bg-white/80'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-white/50'
+              }`}
+            >
+              <User className="h-4 w-4" />
+              تسجيل الدخول
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!isParentMode) {
+                  setIsParentMode(true);
+                  setParentVerified(false);
+                  setFirstTimePin(false);
+                }
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 border-b-2 text-sm font-medium transition-colors ${
+                isParentMode
+                  ? 'border-primary-500 text-primary-600 bg-white/80'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-white/50'
+              }`}
+            >
+              <QrCode className="h-4 w-4" />
+              تسجيل دخول ولي أمر
+            </button>
+          </nav>
+        </div>
+
+        {/* Login Form card */}
+        <div className="bg-white/50 backdrop-blur-lg py-8 px-6 shadow-2xl rounded-b-2xl rounded-t-none relative border border-t-0 border-white/30 text-right -mt-px">
           {/* Loading Overlay */}
           {(isSubmitting || loading) && (
-            <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
+            <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-b-2xl">
               <div className="text-center">
                 <LoadingSpinner />
                 <p className="mt-2 text-sm text-gray-600">جاري تسجيل الدخول...</p>
@@ -207,34 +249,6 @@ const Login = () => {
             </div>
           )}
 
-          {/* Parent Mode Toggle */}
-          <div className="mb-6 flex items-center justify-center space-x-2 space-x-reverse">
-            <button
-              type="button"
-              onClick={() => {
-                const next = !isParentMode;
-                setIsParentMode(next);
-                if (next) {
-                  setParentVerified(false);
-                  setFirstTimePin(false);
-                } else {
-                  setHasScannedQR(false);
-                  setValue('username', '');
-                }
-              }}
-              className={`flex items-center space-x-2 space-x-reverse px-4 py-2 rounded-lg transition-all ${
-                isParentMode 
-                  ? 'bg-blue-600 text-white shadow-lg' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <QrCode className="h-5 w-5" />
-              <span className="text-sm font-medium">
-                {isParentMode ? 'تسجيل دخول ولي أمر' : 'تسجيل دخول عادي'}
-              </span>
-            </button>
-          </div>
-          
           <form 
             className="space-y-6" 
             onSubmit={(e) => {
