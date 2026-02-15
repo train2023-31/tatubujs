@@ -12,11 +12,12 @@ from io import StringIO
 import pandas as pd
 import re
 from sqlalchemy import and_
-from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta
-from time import time, sleep 
+from time import time, sleep
 from app.logger import log_action
 from app.config import get_oman_time
+from flask_cors import CORS
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,14 +25,15 @@ logger = logging.getLogger(__name__)
 
 
 auth_blueprint = Blueprint('auth_blueprint', __name__)
+CORS(auth_blueprint)
 
 # Memory-based failed login tracking (replace with Redis for production)
 FAILED_LOGINS = {}
-MAX_ATTEMPTS = 5
+MAX_ATTEMPTS = 15
 BLOCK_TIME_SECONDS = 300  # 5 minutes
 
 @auth_blueprint.route('/login', methods=['POST'])
-@limiter.limit("10 per minute")  # Increased rate limiting: 10 requests per minute per IP
+@limiter.limit("5 per minute")  # Rate limiting: 5 requests per minute per IP
 @log_action("تسجيل ", description="تسجيل الدخول للموقع " , content='')
 def login():
     try:
@@ -104,7 +106,7 @@ def login():
 
         # Create access token with error handling
         try:
-            access_token = create_access_token(identity=user.id)
+            access_token = create_access_token(identity=str(user.id))
             return jsonify(access_token=access_token), 200
         except Exception as e:
             print(f"Token creation error: {str(e)}")
@@ -122,9 +124,9 @@ def register():
     user_id = get_jwt_identity()
     Login_user = User.query.get(user_id)
 
-    if Login_user.user_role != 'admin':  # Ensure only admin can register users
+    if Login_user.user_role != 'admin' :  # Ensure only admin can register users
         return jsonify(message={"en": "Unauthorized to make this action.", "ar": "غير مصرح لك بتنفيذ هذا الإجراء."}, flag=1), 400
-    
+
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
@@ -220,15 +222,16 @@ def register_single_teacher():
     user_id = get_jwt_identity()
     Login_user = User.query.get(user_id)
 
-    if Login_user.user_role != 'school_admin' and Login_user.user_role != 'data_analyst':  # Ensure only school_admin or data_analyst can register teachers
+    if Login_user.user_role != 'school_admin' and Login_user.user_role != 'data_analyst':  # Ensure only school_admin can register teachers
         return jsonify(message={"en": "Unauthorized to make this action.", "ar": "غير مصرح لك بتنفيذ هذا الإجراء."}, flag=1), 400
-    
+
     data = request.get_json()
     username = data.get('username')
     # password = data.get('password')
     email = data.get('email')
     fullName = data.get('fullName')
     phone_number = data.get('phone_number')
+    week_Classes_Number = data.get('week_Classes_Number')
     job_name = data.get('job_name')  # New job_name field
     # /role = data.get('role')
     # school_id = data.get('school_id')
@@ -243,7 +246,7 @@ def register_single_teacher():
     ).first()
     if existing_user:
         return jsonify(message="Username or email already exists."), 409
-    
+
     # Ensure school exists
     school = School.query.get(Login_user.school_id)
 
@@ -255,8 +258,8 @@ def register_single_teacher():
     if not school:
         return jsonify(message="School not found."), 404
 
-  
- 
+
+
     new_user = Teacher(
         password=hashed_password,
         email=email,
@@ -265,16 +268,17 @@ def register_single_teacher():
         fullName=fullName,
         job_name = job_name,
         school_id=Login_user.school_id,
+        week_Classes_Number = week_Classes_Number,
         username=username,)
-       
-   
+
+
     db.session.add(new_user)
     db.session.commit()
 
     return jsonify(message="User registered successfully , تم إضافة المعلم بنجاح"), 201
 
 
-@auth_blueprint.route('/register_Teacher', methods=['POST']) 
+@auth_blueprint.route('/register_Teacher', methods=['POST'])
 @jwt_required()
 @log_action("إضافة", description="إضافة قائمة معلمين جدد ")
 def register_Users():
@@ -282,10 +286,10 @@ def register_Users():
     Login_user = User.query.get(user_id)
 
     data = request.get_json()
-    
-    if Login_user.user_role != 'school_admin' and Login_user.user_role != 'data_analyst':  # Ensure only school_admin or data_analyst can register teachers
+
+    if Login_user.user_role != 'school_admin' and Login_user.user_role != 'data_analyst':  # Ensure only school_admin can register teachers
         return jsonify(message={"en": "Unauthorized to make this action.", "ar": "غير مصرح لك بتنفيذ هذا الإجراء."}, flag=1), 400
-    
+
     if not isinstance(data, list):  # Ensure data is a list of users
         return jsonify(message={"en": "Invalid data format. Expecting a list of users.", "ar": "تنسيق بيانات غير صالح. يجب أن تكون قائمة من المستخدمين."}, flag=2), 400
  # ✅ Limit number of students
@@ -295,7 +299,7 @@ def register_Users():
             "en": f"Maximum allowed students is {MAX_STUDENTS}.",
             "ar": f"الحد الأقصى المسموح به لإرسال الطلاب هو {MAX_STUDENTS}."
         }, flag=5), 400
-    
+
     response = []  # To collect responses for each user
     for user_data in data:
         username = user_data.get('username')
@@ -304,53 +308,53 @@ def register_Users():
         phone_number = user_data.get('phone_number')
         job_name = user_data.get('job_name')  # New job_name field
         week_Classes_Number = user_data.get('week_Classes_Number')
-        
+
         # Validate required fields
         if not all([username, fullName, email]):
             response.append({
-                "username": username, 
+                "username": username,
                 "message": {
-                    "en": "Missing required fields.", 
+                    "en": "Missing required fields.",
                     "ar": "هناك حقول مفقودة."
                 },
                 "flag": 3
             })
             continue
-        
-        
-    
+
+
+
         # Check if username or email already exists
         existing_user = User.query.filter(
             (User.username == username) | (User.email == email)
         ).first()
         if existing_user:
             response.append({
-                "username": username, 
+                "username": username,
                 "message": {
-                    "en": "Username or email already exists.", 
+                    "en": "Username or email already exists.",
                     "ar": "اسم المستخدم أو البريد الإلكتروني موجود بالفعل."
                 },
                 "flag": 4
             })
             continue
-        
+
         # Ensure school exists
         school = School.query.get(Login_user.school_id)
 
         # Hash the password (Default password or generate one)
         hashed_password = generate_password_hash(school.password)  # Default password for new teachers
-        
+
         if not school:
             response.append({
-                "username": username, 
+                "username": username,
                 "message": {
-                    "en": "School not found.", 
+                    "en": "School not found.",
                     "ar": "لم يتم العثور على المدرسة."
                 },
                 "flag": 5
             })
             continue
-        
+
         new_user = Teacher(
             username=username,
             password=hashed_password,
@@ -359,21 +363,20 @@ def register_Users():
             user_role='teacher',
             fullName=fullName,
             school_id=Login_user.school_id,
-            job_name=job_name , # Assign job_name
+            job_name=job_name,
             week_Classes_Number=week_Classes_Number
-
         )
-        
+
         db.session.add(new_user)
         response.append({
-            "username": username, 
+            "username": username,
             "message": {
-                "en": "User registered successfully.", 
+                "en": "User registered successfully.",
                 "ar": "تم تسجيل المستخدم بنجاح."
             },
             "flag": 6
         })
-    
+
     # Commit all users at once
     try:
         db.session.commit()
@@ -381,6 +384,7 @@ def register_Users():
         return jsonify(message={"en": f"Database error: {str(e)}", "ar": f"خطأ في قاعدة البيانات: {str(e)}"}, flag=7), 500
 
     return jsonify(response), 201
+
 
 @auth_blueprint.route('/register_single_data_analyst', methods=['POST'])
 @jwt_required()
@@ -391,7 +395,7 @@ def register_single_data_analyst():
 
     if Login_user.user_role != 'school_admin':  # Ensure only school_admin can register data_analyst
         return jsonify(message={"en": "Unauthorized to make this action.", "ar": "غير مصرح لك بتنفيذ هذا الإجراء."}, flag=1), 400
-    
+
     data = request.get_json()
     username = data.get('username')
     email = data.get('email')
@@ -409,7 +413,7 @@ def register_single_data_analyst():
     ).first()
     if existing_user:
         return jsonify(message="Username or email already exists."), 409
-    
+
     # Ensure school exists
     school = School.query.get(Login_user.school_id)
 
@@ -431,22 +435,24 @@ def register_single_data_analyst():
         school_id=Login_user.school_id,
         username=username,
     )
-       
+
     db.session.add(new_user)
     db.session.commit()
 
     return jsonify(message="Data analyst registered successfully , تم إضافة محلل البيانات بنجاح"), 201
 
 
+
+
 @auth_blueprint.route('/register_single_driver', methods=['POST'])
 @jwt_required()
-@log_action("إضافة", description="إضافة سائق جديد " ,content='')
+@log_action("?????", description="????? ???? ???? " ,content='') 
 def register_single_driver():
     user_id = get_jwt_identity()
     Login_user = User.query.get(user_id)
 
     if Login_user.user_role != 'school_admin':  # Ensure only school_admin can register drivers
-        return jsonify(message={"en": "Unauthorized to make this action.", "ar": "غير مصرح لك بتنفيذ هذا الإجراء."}, flag=1), 400
+        return jsonify(message={"en": "Unauthorized to make this action.", "ar": "??? ???? ?? ?????? ??? ???????."}, flag=1), 400
     
     data = request.get_json()
     username = data.get('username')
@@ -501,7 +507,8 @@ def register_single_driver():
     db.session.add(new_user)
     db.session.commit()
 
-    return jsonify(message="Driver registered successfully , تم إضافة السائق بنجاح"), 201
+    return jsonify(message="Driver registered successfully , ?? ????? ?????? ?????"), 201
+
 
 
 @auth_blueprint.route('/register_Driver', methods=['POST']) 
@@ -627,6 +634,8 @@ def register_Drivers():
     return jsonify(response), 201
 
 
+
+
 @auth_blueprint.route('/register_single_assign_student', methods=['POST'])
 @jwt_required()
 @log_action("إضافة", description="إضافة طالب جديد ")
@@ -638,7 +647,7 @@ def register_single_assign_student():
     if Login_user.user_role != 'school_admin':
         return jsonify(message="Unauthorized to make this action."), 403
 
-    
+
 
     # ✅ قراءة البيانات
     try:
@@ -670,8 +679,7 @@ def register_single_assign_student():
     if User.query.filter_by(username=username).first():
         return jsonify(message="Username already exists."), 409
 
-    default_password = f"{username}@tatubu"
-    hashed_password = generate_password_hash(default_password)
+    hashed_password = generate_password_hash('12345678')
 
     # ✅ إنشاء الطالب
     new_student = Student(
@@ -723,7 +731,7 @@ def register_Students():
     # Validate input is a list
     if not isinstance(data, list):
         return jsonify(message={"en": "Invalid data format. Expecting a list of users.", "ar": "تنسيق بيانات غير صالح. يجب أن تكون القائمة عبارة عن مجموعة من المستخدمين."}, flag=4), 400
-    
+
 
     # ✅ Limit number of students
     MAX_STUDENTS = 10000
@@ -837,7 +845,7 @@ def update_students_phone_numbers():
     # Validate input is a list
     if not isinstance(students_data, list):
         return jsonify(message={"en": "Invalid data format. Expecting a list of students.", "ar": "تنسيق بيانات غير صالح. يجب أن تكون القائمة عبارة عن مجموعة من الطلاب."}, flag=4), 400
-    
+
     # ✅ Limit number of students
     MAX_STUDENTS = 10000
     if len(data) > MAX_STUDENTS:
@@ -878,7 +886,7 @@ def update_students_phone_numbers():
             })
             continue
 
-        # Update the phone number
+         # Update the phone number
         student.phone_number = phone_number
         # Update location if provided
         if location is not None:
@@ -955,8 +963,7 @@ def register_and_assign_students():
             continue
 
         # Hash the default password
-        default_password = f"{username}@tatubu"
-        hashed_password = generate_password_hash(default_password)
+        hashed_password = generate_password_hash('12345678')
 
         # Register the student
         new_student = Student(
@@ -984,6 +991,8 @@ def register_and_assign_students():
         return jsonify(message=f"Database error: {str(e)}"), 500
 
     return jsonify(response), 201
+
+
 
 @auth_blueprint.route('/register_and_assign_students_v2', methods=['POST'])
 @jwt_required()
@@ -1059,7 +1068,7 @@ def register_and_assign_students_v2():
                             "username": username,
                             "message": {
                                 "en": "Username already exists as non-student user.",
-                                "ar": "اسم المستخدم موجود بالفعل كمستخدم غير طالب."
+                                "ar": "اسم المستخدم موجود بالفعل كمستخدم غير طالب." 
                             },
                             "status": "failed"
                         })
@@ -1096,8 +1105,8 @@ def register_and_assign_students_v2():
                 response.append({
                     "username": username,
                     "message": {
-                        "en": "Student already enrolled in class '{class_name}'.",
-                        "ar": "الطالب مسجل بالفعل في الفصل '{class_name}'."
+                        "en": "Student already enrolled in class " + class_name + ".",
+                        "ar": "الطالب مسجل بالفعل في الفصل " + class_name + "."
                     },
                     "status": "skipped"
                 })
@@ -1114,8 +1123,8 @@ def register_and_assign_students_v2():
                 response.append({
                     "username": username,
                     "message": {
-                        "en": "Student already enrolled in class '{class_name}'.",
-                        "ar": "الطالب مسجل بالفعل في الفصل '{class_name}'."
+                        "en": "Student already enrolled in class " + class_name + ".",
+                        "ar": "الطالب مسجل بالفعل في الفصل " + class_name + "."
                     },
                     "status": "skipped"
                 })
@@ -1130,17 +1139,16 @@ def register_and_assign_students_v2():
                 response.append({
                     "username": username,
                     "message": {
-                        "en": "Student enrolled in class '{class_name}'.",
-                        "ar": "تم تسجيل الطالب في الفصل '{class_name}'."
+                        "en": "Student enrolled in class " + class_name + ".",
+                        "ar": "تم تسجيل الطالب في الفصل " + class_name + "."
                     },
                     "status": "success"
                 })
                 continue
 
         # Student doesn't exist - create new student and enroll to class
-        # Construct default password using username
-        default_password = f"{username}@tatubu"
-        hashed_password = generate_password_hash(default_password)
+        # Hash the default password
+        hashed_password = generate_password_hash('12345678')
 
         # Register the student
         new_student = Student(
@@ -1176,8 +1184,8 @@ def register_and_assign_students_v2():
                     response.append({
                         "username": username,
                         "message": {
-                            "en": "Student already enrolled in class '{class_name}'.",
-                            "ar": "الطالب مسجل بالفعل في الفصل '{class_name}'."
+                            "en": "Student already enrolled in class " + class_name + ".",
+                            "ar": "الطالب مسجل بالفعل في الفصل " + class_name + "."
                         },
                         "status": "skipped"
                     })
@@ -1198,8 +1206,8 @@ def register_and_assign_students_v2():
                     response.append({
                         "username": username,
                         "message": {
-                            "en": "Student enrolled in class '{class_name}'.",
-                            "ar": "تم تسجيل الطالب في الفصل '{class_name}'."
+                            "en": "Student enrolled in class " + class_name + ".",
+                            "ar": "تم تسجيل الطالب في الفصل " + class_name + "."
                         },
                         "status": "success"
                     })
@@ -1207,8 +1215,8 @@ def register_and_assign_students_v2():
                     response.append({
                         "username": username,
                         "message": {
-                            "en": "Student already enrolled in class '{class_name}'.",
-                            "ar": "الطالب مسجل بالفعل في الفصل '{class_name}'."
+                            "en": "Student already enrolled in class " + class_name + ".",
+                            "ar": "الطالب مسجل بالفعل في الفصل " + class_name + "."
                         },
                         "status": "skipped"
                     })
@@ -1237,8 +1245,8 @@ def register_and_assign_students_v2():
         batch_class_assignments[username].add(class_obj.id)
         
         response.append({"username": username, "message": {
-            "en": "Student created and enrolled in class '{class_name}'.",
-            "ar": "تم إنشاء الطالب وتسجيله في الفصل '{class_name}'."
+            "en": "Student created and enrolled in class " + class_name + ".",
+            "ar": "تم إنشاء الطالب وتسجيله في الفصل " + class_name + "."
         }, "status": "success"})
 
     # Commit all changes
@@ -1269,11 +1277,12 @@ def register_and_assign_students_v2():
 @jwt_required()
 def get_user_details():
     user_id = get_jwt_identity()
+    #user = User.query.get(user_id)
     user = User.query.get(int(user_id))
 
     if not user:
         return jsonify(message="User not found"), 404
-    
+
     school_name = None  # Default to None if no school is applicable
 
     school = School.query.get(user.school_id)
@@ -1304,7 +1313,8 @@ def get_user_details():
         "role": user.user_role,
         "job_name": user.job_name,
         "week_Classes_Number": user.week_Classes_Number,
-        "school_name": school_name
+        "school_name": school_name,
+        "school_id": user.school_id
     }
     else:
         user_data = {
@@ -1314,9 +1324,10 @@ def get_user_details():
         "fullName": user.fullName,
         "phone_number": user.phone_number,
         "role": user.user_role,
-        "school_name": school_name
+        "school_name": school_name,
+        "school_id": user.school_id
         }
-    
+
         user_data["school_id"] = user.school_id
         # Add additional teacher-specific fields if any (e.g., salary)
         user_data["salary"] = user.salary if hasattr(user, 'salary') else None
@@ -1459,6 +1470,8 @@ def update_user(user_id):
     return jsonify(message="User updated successfully.", user=user_data), 200
 
 
+
+
 @auth_blueprint.route('/getUser/<int:user_id>', methods=['GET'])
 @jwt_required()
 def get_user_details_id(user_id):
@@ -1500,14 +1513,14 @@ def get_user_details_id(user_id):
         user_data["salary"] = user.salary if hasattr(user, 'salary') else None
 
     return jsonify(user_data), 200
-
+    
 @auth_blueprint.route('/user/<int:user_id>', methods=['DELETE'])
 @jwt_required()
 @log_action("حذف", description="حذف بيانات مستخدم")
-def delete_user(user_id):
+def delete_users(user_id):
     # Get the current user's ID from the JWT token
     current_user_id = get_jwt_identity()
-    
+
     # Fetch the user to be deleted
     user = User.query.get(user_id)
     if not user:
@@ -1558,13 +1571,29 @@ def delete_user(user_id):
             }
         ), 400
 
-    # Authorization check (only allow admins or the user themselves to delete)
+    # Authorization check (allow admins, school admins from same school, or the user themselves to delete)
     current_user = User.query.get(current_user_id)
-    if current_user.user_role != 'admin' and current_user_id != user_id:
+
+    # Check if current user can delete this user
+    can_delete = False
+
+    if current_user.user_role == 'admin':
+        # Admin can delete any user
+        can_delete = True
+    elif current_user_id == user_id:
+        # User can delete themselves (except admin)
+        can_delete = True
+    elif (current_user.user_role == 'school_admin' and
+          user.school_id and current_user.school_id and
+          user.school_id == current_user.school_id):
+        # School admin can delete users from their own school
+        can_delete = True
+
+    if not can_delete:
         return jsonify(message="غير مصرح لك بحذف هذا المستخدم."), 403
 
-    # Additional check: prevent admin from deleting themselves
-    if current_user_id == user_id and current_user.user_role == 'admin':
+    # Additional check: prevent admin and school_admin from deleting themselves
+    if current_user_id == user_id and (current_user.user_role == 'admin' or current_user.user_role == 'school_admin'):
         return jsonify(message="لا يمكن للمدير حذف حسابه الخاص."), 400
 
     # Delete the user
@@ -1580,6 +1609,7 @@ def delete_user(user_id):
     ), 200
 
 
+
 @auth_blueprint.route('/send-absence-notifications', methods=['POST'])
 @jwt_required()
 @log_action("إرسال إشعارات الغياب", description="إرسال رسائل WhatsApp للطلاب المتغيبين")
@@ -1590,21 +1620,21 @@ def send_absence_notifications():
     try:
         current_user_id = get_jwt_identity()
         current_user = User.query.get(current_user_id)
-        
+
         # Check authorization (only school admins and data analysts)
         if current_user.user_role not in ['school_admin', 'data_analyst', 'admin']:
             return jsonify(message="غير مصرح لك بإرسال إشعارات الغياب."), 403
-        
+
         # Get request data
         data = request.get_json() or {}
         school_id = data.get('school_id')
         days_back = data.get('days_back', 7)
         custom_message = data.get('custom_message')
-        
+
         # Validate days_back
         if not isinstance(days_back, int) or days_back < 1 or days_back > 30:
             return jsonify(message="عدد الأيام يجب أن يكون بين 1 و 30."), 400
-        
+
         # Import the messaging service
         try:
             from whatsapp_automation import AbsenceMessagingService
@@ -1614,7 +1644,7 @@ def send_absence_notifications():
         except Exception as e:
             logger.error(f"Unexpected error importing whatsapp_automation: {str(e)}")
             return jsonify(message=f"خطأ غير متوقع في تحميل نظام WhatsApp: {str(e)}"), 500
-        
+
         # Initialize and run the messaging service
         messaging_service = AbsenceMessagingService()
         results = messaging_service.send_absence_notifications(
@@ -1622,7 +1652,7 @@ def send_absence_notifications():
             days_back=days_back,
             custom_message=custom_message
         )
-        
+
         if results['success']:
             return jsonify({
                 "message": results['message'],
@@ -1636,7 +1666,7 @@ def send_absence_notifications():
                 "message": results['message'],
                 "error": True
             }), 500
-            
+
     except Exception as e:
         logger.error(f"Error in send_absence_notifications: {str(e)}")
         return jsonify(message=f"حدث خطأ أثناء إرسال الإشعارات: {str(e)}"), 500
@@ -1651,19 +1681,19 @@ def get_absence_stats():
     try:
         current_user_id = get_jwt_identity()
         current_user = User.query.get(current_user_id)
-        
+
         # Check authorization
         if current_user.user_role not in ['school_admin', 'data_analyst', 'admin']:
             return jsonify(message="غير مصرح لك بعرض إحصائيات الغياب."), 403
-        
+
         # Get query parameters
         school_id = request.args.get('school_id', type=int)
         days_back = request.args.get('days_back', 7, type=int)
-        
+
         # Validate days_back
         if days_back < 1 or days_back > 30:
             return jsonify(message="عدد الأيام يجب أن يكون بين 1 و 30."), 400
-        
+
         # Import the messaging service to get stats
         try:
             from whatsapp_automation import AbsenceMessagingService
@@ -1673,15 +1703,15 @@ def get_absence_stats():
         except Exception as e:
             logger.error(f"Unexpected error importing whatsapp_automation: {str(e)}")
             return jsonify(message=f"خطأ غير متوقع في تحميل نظام WhatsApp: {str(e)}"), 500
-        
+
         messaging_service = AbsenceMessagingService()
         students_data = messaging_service.get_students_with_absences(school_id, days_back)
-        
+
         # Calculate statistics
         total_students = len(students_data)
         students_with_phone = len([s for s in students_data if s.get('phone')])
         total_absences = sum(s['absence_count'] for s in students_data)
-        
+
         # Group by absence count
         absence_groups = {}
         for student in students_data:
@@ -1689,7 +1719,7 @@ def get_absence_stats():
             if count not in absence_groups:
                 absence_groups[count] = 0
             absence_groups[count] += 1
-        
+
         return jsonify({
             "total_students_with_absences": total_students,
             "students_with_phone_numbers": students_with_phone,
@@ -1698,11 +1728,10 @@ def get_absence_stats():
             "days_checked": days_back,
             "school_id": school_id
         }), 200
-        
+
     except Exception as e:
         logger.error(f"Error in get_absence_stats: {str(e)}")
         return jsonify(message=f"حدث خطأ أثناء جلب الإحصائيات: {str(e)}"), 500
-
 
 def validate_password_strength(password):
     """
@@ -1765,7 +1794,6 @@ def change_password():
     except Exception as e:
         db.session.rollback()
         return jsonify(message=f"Database error: {str(e)}"), 500
-
 
 
 @auth_blueprint.route('/delete_school_data', methods=['DELETE'])
@@ -2100,14 +2128,14 @@ def view_logs():
     # Get pagination parameters
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
-    
+
     # Limit per_page to prevent excessive data loading
     per_page = min(per_page, 100)
-    
+
     # Get date filter parameter (optional)
     days_back = request.args.get('days', 30, type=int)
     days_back = min(days_back, 90)  # Limit to 90 days max
-    
+
     # 🔍 Calculate the date filter
     date_filter = get_oman_time() - timedelta(days=days_back)
 
@@ -2128,11 +2156,11 @@ def view_logs():
 
     # Get total count for pagination info
     total_count = query.count()
-    
+
     # Apply pagination and ordering
     logs_data = query.order_by(ActionLog.timestamp.desc()).paginate(
-        page=page, 
-        per_page=per_page, 
+        page=page,
+        per_page=per_page,
         error_out=False
     )
 

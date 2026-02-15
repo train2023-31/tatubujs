@@ -1,25 +1,18 @@
 # app/config.py
 
 import os
-from datetime import timezone
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'j4djdbvjk464ljbdljvbj7lkk63ndlk99nsleiputpecbvcx8jborwuteouthebvljoxas24255446n45m5n7nknlk7nk65pinpi')  # Replace with a strong secret key
-
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'f8276b9a3dffa9c0d6ed13184b9dbeeb15d11h86g8jo0c1f29a327d5eb95eb7d262ab32b0e9ccxc323c3v')  # Replace with a strong secret key
     # SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI') or \
     #    'mssql+pyodbc://DESKTOP-QFE0CLH/db?driver=ODBC+Driver+17+for+SQL+Server' #DESKTOP-A7AI1NE   LAPTOP-MHFSLEH2   DESKTOP-QFE0CLH
-
     # SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI') or \
     #   'mysql+pymysql://u401922667_sultan0095:Su107140ltan@auth-db1755.hstgr.io/u401922667_tatabu'
-
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI') or \
-      'mysql+pymysql://root:root@localhost:3306/db'
-    
-    # SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI') or \
-    #   'mysql+pymysql://sultan00095:Su107140ltan@sultan00095.mysql.pythonanywhere-services.com/sultan00095$db'
-    
+      'mysql+pymysql://root:Su107140lt!n@localhost/tatubu'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
+
+
     # Database connection pooling settings
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size': 10,
@@ -29,8 +22,9 @@ class Config:
         'max_overflow': 20,
         'echo': False
     }
+
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'f8276b9a3dffa9c0d6ed13184b9dbeeb15d11h86g8jo0c1f29a327d5eb95eb7d262ab32b0e9')  # Replace with a strong secret key your-jwt-secret-key
-    JWT_ACCESS_TOKEN_EXPIRES = int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRES', 60 * 60 * 24))  # Default: 15 minutes (in seconds)
+    JWT_ACCESS_TOKEN_EXPIRES = int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRES', 60 * 60*24))  # Default: 15 minutes (in seconds)
     JWT_REFRESH_TOKEN_EXPIRES = int(os.environ.get('JWT_REFRESH_TOKEN_EXPIRES', 1 * 24 * 60 * 60))  # Default: 7 days (in seconds)
     
     # VAPID keys for Web Push Notifications (Background notifications)
@@ -38,11 +32,9 @@ class Config:
     # 1. pip install py_vapid && python -c "from py_vapid import Vapid01; v = Vapid01(); print('Private:', v.private_key.pem); print('Public:', v.public_key.pem)"
     # 2. Use online generator: https://web-push-codelab.glitch.me/
     # 3. Use the generate_vapid_keys() function (see BACKGROUND_NOTIFICATIONS_GUIDE.md)
-    VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', 'otk5B991dGEVuaObktl3OXNPc2jVahdqGa-h_nUtNkuYBD69BL_VvdjAbl-TnK3BavbuVCqywIvUYRsnlTvccg')
-    VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
+    VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', 'BI7B7Dt6RA6oZB6-1dLA_wWub95QT2TtlQsp9cV8VVARrhXSFX7xqVQJTtJSZ88QR2xtZewIk3RpOeXCqAyX0_0')
+    VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '-QAlw04lulFelkVXNO_zH_2wKhEETao0Wie8jiu9upc')
     VAPID_CLAIM_EMAIL = os.environ.get('VAPID_CLAIM_EMAIL', 'admin@tatubu.com')
-     
-
 
 
 

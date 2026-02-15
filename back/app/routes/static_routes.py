@@ -17,6 +17,7 @@ import logging
 import requests
 import json
 from ibulk_sms_service import get_ibulk_sms_service, IBulkSMSService
+from flask_cors import CORS
 from app.services.notification_service import (
     notify_students_school_news,
     notify_teachers_school_news,
@@ -25,9 +26,12 @@ from app.services.notification_service import (
     notify_admin_system_news
 )
 
+
 logger = logging.getLogger(__name__)
 
 static_blueprint = Blueprint('static_blueprint', __name__)
+
+CORS(static_blueprint)
 
 
 def get_school_statistics(user, school_id, selected_date):
@@ -177,8 +181,6 @@ def get_class_statistics(user, school_id, selected_date):
         })
 
     return class_stats
-
-
 
 
 def get_school_with_class_statistics(user, school_id, selected_date):
@@ -1261,7 +1263,7 @@ def get_sms_config():
 
     # Get school_id
     school_id = request.args.get('school_id', user.school_id)
-    
+
     if user.user_role == 'admin' and not school_id:
         return jsonify({
             "message": {
@@ -1289,6 +1291,7 @@ def get_sms_config():
                 "ar": "تم استرجاع إعدادات SMS بنجاح"
             },
             "sms_config": {
+                "ibulk_sms_enabled": school.ibulk_sms_enabled,
                 "ibulk_username": school.ibulk_username,
                 "ibulk_sender_id": school.ibulk_sender_id,
                 "ibulk_api_url": school.ibulk_api_url,
@@ -1357,18 +1360,21 @@ def update_sms_config():
             }), 404
 
         # Update SMS configuration
+        if 'ibulk_sms_enabled' in data:
+            school.ibulk_sms_enabled = bool(data['ibulk_sms_enabled'])
+
         if 'ibulk_username' in data:
             school.ibulk_username = data['ibulk_username']
-        
+
         if 'ibulk_password' in data:
             school.ibulk_password = data['ibulk_password']
-        
+
         if 'ibulk_sender_id' in data:
             school.ibulk_sender_id = data['ibulk_sender_id']
-        
+
         if 'ibulk_api_url' in data:
             school.ibulk_api_url = data['ibulk_api_url']
-        
+
         if 'ibulk_balance_threshold' in data:
             school.ibulk_balance_threshold = float(data['ibulk_balance_threshold'])
 
@@ -1381,6 +1387,7 @@ def update_sms_config():
                 "ar": "تم تحديث إعدادات SMS بنجاح"
             },
             "sms_config": {
+                "ibulk_sms_enabled": school.ibulk_sms_enabled,
                 "ibulk_username": school.ibulk_username,
                 "ibulk_sender_id": school.ibulk_sender_id,
                 "ibulk_api_url": school.ibulk_api_url,
@@ -1401,6 +1408,7 @@ def update_sms_config():
             },
             "flag": 5
         }), 500
+
 
 
 @static_blueprint.route('/test-sms-connection', methods=['POST'])
@@ -1661,5 +1669,8 @@ def test_sms_connection():
             },
             "flag": 5
         }), 500
+
+
+
 
 

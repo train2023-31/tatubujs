@@ -10,12 +10,15 @@ from app.logger import log_action
 from app.config import get_oman_time
 from sqlalchemy import func , or_ ,case, and_
 from ibulk_sms_service import get_attendance_sms_service, get_ibulk_sms_service
+from flask_cors import CORS
 from app.routes.notification_routes import create_notification
 from app.services.notification_service import notify_student_attendance
 
 
 
 attendance_blueprint = Blueprint('attendance_blueprint', __name__)
+CORS(attendance_blueprint)  
+
 
 @attendance_blueprint.route('/takes', methods=['POST'])
 @jwt_required()
@@ -503,6 +506,7 @@ def get_attendance_summary_all_classes():
         return jsonify(message=f"Internal server error: {str(e)}"), 500
 
 
+
 @attendance_blueprint.route('/teacherReport', methods=['GET'])
 @jwt_required()
 def get_teacher_report():
@@ -517,7 +521,7 @@ def get_teacher_report():
         # Parse requested date range; default to today if not provided
         from_date_str = request.args.get('from_date', default=date.today().isoformat())
         to_date_str = request.args.get('to_date', default=date.today().isoformat())
-        
+
         try:
             from_date = datetime.strptime(from_date_str, '%Y-%m-%d').date()
             to_date = datetime.strptime(to_date_str, '%Y-%m-%d').date()
@@ -558,7 +562,7 @@ def get_teacher_report():
             # Get classes taught by this teacher
             classes_taught = Class.query.filter_by(teacher_id=teacher.id).all()
             class_names = [cls.name for cls in classes_taught]
-            
+
             # Calculate recorded days (days with at least one record) for the date range
             recorded_days = db.session.query(
                 func.count(func.distinct(func.date(Attendance.date)))
@@ -578,17 +582,17 @@ def get_teacher_report():
                 if current_date.weekday() in [6, 0, 1, 2, 3]:  # Sunday to Thursday
                     working_days += 1
                 current_date += timedelta(days=1)
-            
+
             # Calculate teacher attendance based on weekly class number
             teacher_weekly_classes = teacher.week_Classes_Number or 0
-            
+
             # Calculate number of weeks in the date range
             days_diff = (to_date - from_date).days
             number_of_weeks = max(1, (days_diff + 1) // 7)  # At least 1 week, round up for partial weeks
-            
+
             # Calculate expected classes based on weeks
             total_expected_classes = teacher_weekly_classes * number_of_weeks
-            
+
             # Get total actual classes recorded for additional info
             teacher_actual_classes = db.session.query(
                 func.count(func.distinct(
@@ -603,7 +607,7 @@ def get_teacher_report():
                     func.date(Attendance.date) <= to_date
                 )
             ).scalar()
-            
+
             # Calculate attendance percentage based on actual classes vs expected classes
             teacher_attendance_percentage = round((teacher_actual_classes / total_expected_classes * 100) if total_expected_classes > 0 else 0, 2)
 
@@ -665,7 +669,7 @@ def get_teacher_history(teacher_id):
         # Parse date range parameters
         start_date_str = request.args.get('start_date')
         end_date_str = request.args.get('end_date')
-        
+
         if start_date_str:
             try:
                 start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
@@ -735,14 +739,14 @@ def get_teacher_history(teacher_id):
                     "excused_students": 0,
                     "classes": []
                 }
-            
+
             history_by_date[date_key]["total_classes"] += 1
             history_by_date[date_key]["total_students"] += record.total_students
             history_by_date[date_key]["present_students"] += record.present_students
             history_by_date[date_key]["absent_students"] += record.absent_students
             history_by_date[date_key]["late_students"] += record.late_students
             history_by_date[date_key]["excused_students"] += record.excused_students
-            
+
             history_by_date[date_key]["classes"].append({
                 "class_name": record.class_name,
                 "subject_name": record.subject_name,
@@ -764,11 +768,11 @@ def get_teacher_history(teacher_id):
 
         # Calculate teacher attendance based on weekly class number
         teacher_weekly_classes = teacher.week_Classes_Number or 0
-        
+
         # Calculate number of weeks in the date range
         days_diff = (end_date - start_date).days
         number_of_weeks = max(1, (days_diff + 1) // 7)  # At least 1 week, round up for partial weeks
-        
+
         # Calculate expected classes based on weeks
         total_expected_classes = teacher_weekly_classes * number_of_weeks
         teacher_attendance_percentage = round((total_classes / total_expected_classes * 100) if total_expected_classes > 0 else 0, 2)
@@ -805,6 +809,7 @@ def get_teacher_history(teacher_id):
     except Exception as e:
         print(f"Error in teacherHistory: {str(e)}")
         return jsonify(message=f"Internal server error: {str(e)}"), 500
+
 
 
 @attendance_blueprint.route('/attendanceDetailsByStudent', methods=['GET'])
@@ -1164,6 +1169,8 @@ def get_repeated_absence():
         all_days=all_days,
         students=result,
     ), 200
+
+
 
 
 @attendance_blueprint.route('/students_with_excused_attendance', methods=['GET'])
@@ -1656,6 +1663,7 @@ def get_confirmation_status():
         }), 200
 
 
+
 @attendance_blueprint.route('/student/my-attendance-history', methods=['GET'])
 @jwt_required()
 def get_my_attendance_history():
@@ -1796,6 +1804,7 @@ def get_my_attendance_stats():
     }), 200
 
 
+
 @attendance_blueprint.route('/student/my-profile', methods=['GET'])
 @jwt_required()
 def get_my_profile():
@@ -1847,6 +1856,8 @@ def get_my_profile():
         "classes": classes_data,
         "total_classes": len(classes_data)
     }), 200
+
+
 
 
 @attendance_blueprint.route('/send-daily-sms-reports', methods=['POST'])

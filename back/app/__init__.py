@@ -132,7 +132,7 @@ def create_app():
     from app.routes.substitution_routes import substitution_bp
     from app.routes.notification_routes import notification_blueprint
     from app.routes.parent_pickup_routes import parent_pickup_bp
-
+ 
 
 
     app.register_blueprint(auth_blueprint, url_prefix='/api/auth')
@@ -143,9 +143,9 @@ def create_app():
     app.register_blueprint(bus_blueprint, url_prefix='/api/bus')
     app.register_blueprint(timetable_bp, url_prefix='/api/timetable')
     app.register_blueprint(substitution_bp, url_prefix='/api/substitutions')
-    app.register_blueprint(notification_blueprint, url_prefix='/api/notifications')  # url_prefix already defined in blueprint
+    app.register_blueprint(notification_blueprint, url_prefix='/api/notifications') 
     app.register_blueprint(parent_pickup_bp, url_prefix='/api/parent-pickup')
-    
+  
 
     # --- Security Headers ---
     @app.after_request
@@ -183,7 +183,6 @@ def create_app():
     
         # Security headers
         response.headers['X-Content-Type-Options'] = 'nosniff'
-        # SAMEORIGIN: allow framing only by same origin (e.g. tatubu.com). Use DENY to block all framing.
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'

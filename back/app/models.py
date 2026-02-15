@@ -36,15 +36,15 @@ class User(db.Model):
 class Student(User):
     __tablename__ = 'students'  # Changed from 'student' to 'students'
     id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)  # Updated foreign key reference
-    
-    # Student-specific fields
-    behavior_note = db.Column(db.Text, nullable=True)  # General note for student behavior
-    location = db.Column(db.String(255), nullable=True)  # المنطقة السكنية (Residential Area)
+    behavior_note = db.Column(db.Text, nullable=True)
+    location = db.Column(db.String(255), nullable=True)  # ??????? ??????? (Residential Area)
+
 
     # Relationships
     school = db.relationship('School', back_populates='students')
     classes = db.relationship('Class', secondary='student_classes', back_populates='students')
     attendances = db.relationship('Attendance', back_populates='student')
+    
     buses = db.relationship('Bus', secondary='bus_students', back_populates='students')
 
     __mapper_args__ = {
@@ -53,8 +53,9 @@ class Student(User):
     def to_dict(self):
         """Serialize Student object to dictionary."""
         data = super().to_dict()
+        # Add more student-specific fields if necessary
         data.update({
-            "location": self.location  # المنطقة السكنية
+            "location": self.location  # ??????? ???????
         })
         return data
 
@@ -112,7 +113,7 @@ class Driver(User):
             "bus_number": self.bus.bus_number if self.bus else None,
         })
         return data
-
+        
 
 
 class ParentPickup(db.Model):
@@ -145,9 +146,8 @@ class ParentPickup(db.Model):
             'completed_time': self.completed_time.isoformat() if self.completed_time else None,
             'pickup_date': self.pickup_date.isoformat() if self.pickup_date else None
         }
-  
+        
 
-  
 class School(db.Model):
     __tablename__ = 'schools'  # Changed from 'school' to 'schools'
     id = db.Column(db.Integer, primary_key=True)
@@ -156,13 +156,13 @@ class School(db.Model):
     phone_number = db.Column(db.String(20))
     password = db.Column(db.String(255), nullable=False)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
-    
+
     # iBulk SMS Configuration Fields
     ibulk_sms_enabled = db.Column(db.Boolean, nullable=False, default=False)
     ibulk_username = db.Column(db.String(100), nullable=True)
     ibulk_password = db.Column(db.String(255), nullable=True)
     ibulk_sender_id = db.Column(db.String(11), nullable=True)  # Max 11 characters alphanumeric
-    ibulk_api_url = db.Column(db.String(255), nullable=True, default='https://ismartsms.net/RestApi/api/SMS/PostSMS')
+    ibulk_api_url = db.Column(db.String(255), nullable=True, default='https://ismartsms.net/api/send')
     ibulk_balance_threshold = db.Column(db.Float, nullable=True, default=10.0)  # Minimum balance threshold
     ibulk_last_balance_check = db.Column(db.DateTime, nullable=True)
     ibulk_current_balance = db.Column(db.Float, nullable=True, default=0.0)
@@ -213,17 +213,17 @@ class Class(db.Model):
             "is_active": self.is_active
             # Add more class-specific fields if necessary
         }
-    
 
 
-    
+
+
 student_classes = db.Table('student_classes',
     db.Column('student_id', db.Integer, db.ForeignKey('students.id'), primary_key=True),
     db.Column('class_id', db.Integer, db.ForeignKey('classes.id'), primary_key=True)
 )
 
 
-    
+
 class Subject(db.Model):
     __tablename__ = 'subjects'
     id = db.Column(db.Integer, primary_key=True)
@@ -322,30 +322,35 @@ class News(db.Model):
             'created_at': self.created_at.isoformat(),
             'end_at': self.end_at.isoformat() if self.end_at else None
         }
-    
 
 
 class ConformAtt(db.Model):
     __tablename__ = 'conform_att'
 
     id = db.Column(db.Integer, primary_key=True)
-    school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=False)
     date = db.Column(db.Date, nullable=False)
-    is_confirm = db.Column(db.Boolean, default=False, nullable=False)
+    school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=False)
+    is_confirm = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
     updated_at = db.Column(db.DateTime, default=get_oman_time().utcnow, onupdate=get_oman_time().utcnow)
 
     # Relationships
-    school = db.relationship('School', backref='confirmations')
+    school = db.relationship('School', backref='conform_att')
+
+    # Add a unique constraint to ensure one confirmation per school per date
+    __table_args__ = (
+        db.UniqueConstraint('school_id', 'date', name='unique_school_date_confirmation'),
+    )
 
     def to_dict(self):
+        """Serialize ConformAtt object to dictionary."""
         return {
-            'id': self.id,
-            'school_id': self.school_id,
-            'date': self.date.isoformat(),
-            'is_confirm': self.is_confirm,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            "id": self.id,
+            "date": self.date.isoformat() if self.date else None,
+            "school_id": self.school_id,
+            "is_confirm": self.is_confirm,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
 
 
@@ -363,6 +368,8 @@ class ActionLog(db.Model):
     description = db.Column(db.Text, nullable=True)
     timestamp = db.Column(db.DateTime, default=get_oman_time().utcnow)
     status_code = db.Column(db.Integer)
+
+
 
 
 # Association table for students and buses
@@ -384,7 +391,7 @@ class Bus(db.Model):
     driver_id = db.Column(db.Integer, db.ForeignKey('drivers.id'), nullable=True, unique=True)  # Changed to drivers.id and added unique
     capacity = db.Column(db.Integer, nullable=False, default=50)
     plate_number = db.Column(db.String(50), nullable=True)
-    location = db.Column(db.String(255), nullable=True)  # موقع الحافلة (Bus Location)
+    location = db.Column(db.String(255), nullable=True) 
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
     
@@ -444,6 +451,8 @@ class BusScan(db.Model):
             'scanner_name': self.scanner.fullName if self.scanner else None,
             'notes': self.notes
         }
+
+
 
 
 # Timetable Models
@@ -594,6 +603,7 @@ class TimetableSchedule(db.Model):
         }
 
 
+
 class TeacherSubstitution(db.Model):
     """Records when a teacher is absent and needs substitution"""
     __tablename__ = 'teacher_substitutions'
@@ -689,6 +699,8 @@ class SubstitutionAssignment(db.Model):
         }
 
 
+
+
 # Notification Models
 class Notification(db.Model):
     """Notifications sent to users"""
@@ -774,6 +786,59 @@ class NotificationRead(db.Model):
         }
 
 
+class PushSubscription(db.Model):
+    """Store push notification subscriptions for PWA (Web Push + FCM)"""
+    __tablename__ = 'push_subscriptions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=True)  # For FCM targeting
+    
+    # Web Push API (desktop browsers) - nullable for FCM-only subscriptions
+    endpoint = db.Column(db.Text, nullable=True)
+    p256dh_key = db.Column(db.Text, nullable=True)  # Public key
+    auth_key = db.Column(db.Text, nullable=True)  # Auth secret
+    
+    # Firebase Cloud Messaging (native mobile) - nullable for Web Push-only
+    fcm_token = db.Column(db.String(255), nullable=True, index=True)
+    
+    # Device info
+    device_type = db.Column(db.String(50), nullable=True)  # 'android', 'ios', 'web'
+    device_name = db.Column(db.String(255), nullable=True)
+    app_version = db.Column(db.String(50), nullable=True)
+    user_agent = db.Column(db.Text, nullable=True)
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
+    last_used_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    
+    # Relationships
+    user = db.relationship('User', backref='push_subscriptions')
+    
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'endpoint', name='unique_user_subscription'),
+    )
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'school_id': self.school_id,
+            'endpoint': self.endpoint,
+            'p256dh_key': self.p256dh_key,
+            'auth_key': self.auth_key,
+            'fcm_token': self.fcm_token,
+            'device_type': self.device_type,
+            'device_name': self.device_name,
+            'app_version': self.app_version,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_used_at': self.last_used_at.isoformat() if self.last_used_at else None,
+            'is_active': self.is_active
+        }
+
+
+
 class NotificationDeleted(db.Model):
     """Track which users have deleted which notifications (soft delete per user)"""
     __tablename__ = 'notification_deleted'
@@ -797,48 +862,6 @@ class NotificationDeleted(db.Model):
             'notification_id': self.notification_id,
             'user_id': self.user_id,
             'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None
-        }
-
-
-class PushSubscription(db.Model):
-    """Store push notification subscriptions for PWA"""
-    __tablename__ = 'push_subscriptions'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    
-    # Push subscription data (from browser Push API)
-    endpoint = db.Column(db.Text, nullable=False)
-    p256dh_key = db.Column(db.Text, nullable=False)  # Public key
-    auth_key = db.Column(db.Text, nullable=False)  # Auth secret
-    
-    # Device info
-    user_agent = db.Column(db.Text, nullable=True)
-    device_name = db.Column(db.String(255), nullable=True)
-    
-    # Metadata
-    created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
-    last_used_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
-    is_active = db.Column(db.Boolean, nullable=False, default=True)
-    
-    # Relationships
-    user = db.relationship('User', backref='push_subscriptions')
-    
-    __table_args__ = (
-        db.UniqueConstraint('user_id', 'endpoint', name='unique_user_subscription'),
-    )
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'user_id': self.user_id,
-            'endpoint': self.endpoint,
-            'p256dh_key': self.p256dh_key,
-            'auth_key': self.auth_key,
-            'device_name': self.device_name,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_used_at': self.last_used_at.isoformat() if self.last_used_at else None,
-            'is_active': self.is_active
         }
 
 
@@ -903,3 +926,4 @@ class NotificationPreference(db.Model):
                 'created_at': None,
                 'updated_at': None
             }
+            

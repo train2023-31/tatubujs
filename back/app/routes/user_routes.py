@@ -2,15 +2,16 @@
 
 from flask import Blueprint, jsonify ,request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app.models import User, Student, Teacher, School, Class, Subject, student_classes, Driver
+from app.models import User, Student, Teacher, School,Class, Subject, student_classes, Driver
 from app import db
 from werkzeug.security import generate_password_hash
 from io import StringIO
 from app.logger import log_action
 import pandas as pd
-
+from flask_cors import CORS
 
 user_blueprint = Blueprint('user_blueprint', __name__)
+CORS(user_blueprint)
 
 @user_blueprint.route('/my-school', methods=['GET'])
 @jwt_required()
@@ -29,13 +30,13 @@ def get_users_of_my_school():
             return jsonify(message="User is not associated with a school."), 400
         school_id = user.school_id
 
-        # Fetch all students, teachers, and drivers in the school
+        # Fetch all students and teachers in the school
         students = Student.query.filter_by(school_id=school_id).all()
         teachers = Teacher.query.filter_by(school_id=school_id).all()
         drivers = Driver.query.filter_by(school_id=school_id).all()
 
     elif user.user_role == 'admin':
-        # Admin can fetch only school admin users
+        # Admin can fetch all users from all schools
         teachers = Teacher.query.filter_by(user_role='school_admin').all()
         students = []
         drivers = []
@@ -122,10 +123,6 @@ def get_Students_of_my_school():
     # Serialize the data - no more N+1 queries
     user_list = []
     for student, class_name in students:
-        # Get school name
-        school = School.query.get(student.school_id)
-        school_name = school.name if school else None
-        
         user_list.append({
             "id": student.id,
             "username": student.username,
@@ -134,10 +131,9 @@ def get_Students_of_my_school():
             "phone_number": student.phone_number,
             "is_active": student.is_active,
             "class_name": class_name,
-            "behavior_note": student.behavior_note,
-            "school_name": school_name
+            "behavior_note": student.behavior_note
         })
-    
+
     return jsonify(user_list), 200
 
 
@@ -172,13 +168,14 @@ def update_student_behavior_note(student_id):
 
     # Update the behavior note
     student.behavior_note = data['behavior_note']
-    
+
     try:
         db.session.commit()
         return jsonify(message="Behavior note updated successfully."), 200
     except Exception as e:
         db.session.rollback()
         return jsonify(message="Failed to update behavior note."), 500
+
 
 
 def deactivate_school(school_id):

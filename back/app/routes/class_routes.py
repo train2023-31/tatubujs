@@ -6,8 +6,11 @@ from app.models import Teacher, Class, Student, student_classes, School, User, S
 from sqlalchemy import func
 from app import db
 from app.logger import log_action
+from flask_cors import CORS
+
 
 class_blueprint = Blueprint('class_blueprint', __name__)
+CORS(class_blueprint)
 
 @class_blueprint.route('/addSchool', methods=['POST'])
 @log_action("إضافة ", description="إضافة مدرسة جديدة")
@@ -17,17 +20,17 @@ def create_school():
     Login_user = User.query.get(user_id)
     if Login_user.user_role != 'admin':  # Ensure only school_admin can register teachers
         return jsonify(message={"en": "Unauthorized to make this action.", "ar": "غير مصرح لك بتنفيذ هذا الإجراء."}, flag=1), 400
-    
+
     data = request.get_json()
     new_school = School(
         name=data['name'],
         address=data['address'],
         phone_number=data.get('phone_number', ''),
-        password=data['password'],
-        is_active=data.get('is_active', True))
+        password=data['password'])
     db.session.add(new_school)
     db.session.commit()
     return jsonify(message="School added"), 201
+
 
 @class_blueprint.route('/updateSchool/<int:school_id>', methods=['PUT'])
 @jwt_required()
@@ -35,12 +38,12 @@ def create_school():
 def update_school(school_id):
     user_id = get_jwt_identity()
     Login_user = User.query.get(user_id)
-    
+
     if Login_user.user_role != 'admin':  # Ensure only admin can update schools
         return jsonify(message={"en": "Unauthorized to make this action.", "ar": "غير مصرح لك بتنفيذ هذا الإجراء."}, flag=1), 400
 
     data = request.get_json()
-    
+
     if not data:
         return jsonify(message="No data provided"), 400
 
@@ -67,20 +70,21 @@ def update_school(school_id):
         db.session.rollback()
         return jsonify(message="Failed to update school"), 500
 
+
 @class_blueprint.route('/create', methods=['POST'])
 @jwt_required()
 @log_action("إضافة ", description="إضافة فصل جديدة")
 def create_class():
     data = request.get_json()
     name = data.get('name')
-    
+
     print(name)
 
     if not name:
         return jsonify(message="Class name is required."), 400
 
     user_id = get_jwt_identity()
-  
+
     user = User.query.get(user_id)
 
     if not user.user_role == 'school_admin' and not user.user_role == 'data_analyst':
@@ -251,7 +255,7 @@ def create_subject():
         return jsonify(message="Class name is required."), 400
 
     user_id = get_jwt_identity()
-  
+
     user = User.query.get(user_id)
 
     if not user.user_role == 'school_admin' and not user.user_role == 'data_analyst':
@@ -393,8 +397,8 @@ def assign_students():
     teacher_id = get_jwt_identity()
     class_obj = Class.query.get(class_id)
 
-    if not class_obj or class_obj.teacher_id != teacher_id:
-        return jsonify(message="Unauthorized or class not found."), 403
+    #if not class_obj or class_obj.teacher_id != teacher_id:
+    #    return jsonify(message="Unauthorized or class not found."), 403
 
     # Fetch students and add them to the class
     students = Student.query.filter(
@@ -405,25 +409,10 @@ def assign_students():
     if not students:
         return jsonify(message="No valid students found."), 404
 
-    # Get students already in the class to avoid duplicates
-    existing_student_ids = {student.id for student in class_obj.students}
-    new_students = [student for student in students if student.id not in existing_student_ids]
-    
-    if not new_students:
-        return jsonify(message="All selected students are already in this class."), 400
-
-    # Add only new students to the class (supports multi-class enrollment)
-    class_obj.students.extend(new_students)
+    class_obj.students.extend(students)
     db.session.commit()
 
-    added_count = len(new_students)
-    skipped_count = len(students) - added_count
-    
-    response_message = f"Successfully assigned {added_count} student(s) to class"
-    if skipped_count > 0:
-        response_message += f". {skipped_count} student(s) were already in this class."
-
-    return jsonify(message=response_message), 200
+    return jsonify(message="Students assigned to class"), 200
 
 @class_blueprint.route('/students/<int:class_id>', methods=['GET'])
 @jwt_required()
@@ -437,19 +426,10 @@ def get_class_students(class_id):
     # Ensure that only active students are returned
     active_students = [student for student in class_obj.students if student.is_active]
 
-    student_list = []
-    for student in active_students:
-        # Get all classes the student is enrolled in
-        all_class_names = [cls.name for cls in student.classes] if student.classes else []
-        
-        student_list.append({
-            "id": student.id, 
-            "fullName": student.fullName, 
-            "phone_number": student.phone_number,
-            "class_name": class_obj.name,  # For backward compatibility
-            "class_names": all_class_names,  # All classes student is enrolled in
-            "behavior_note": student.behavior_note
-        })
+    student_list = [
+        {"id": student.id, "fullName": student.fullName}
+        for student in active_students
+    ]
 
     return jsonify(student_list), 200
 
@@ -463,38 +443,27 @@ def get_students_from_my_school():
     if not teacher:
         return jsonify(message="Only teachers can access this resource."), 403
 
-    # Get optional class_id parameter to exclude students already in that class
-    exclude_class_id = request.args.get('exclude_class_id', type=int)
-
-    # Query all active students in the teacher's school
-    query = Student.query.filter(
+    # Query students in the teacher's school who are not assigned to any class
+    students = Student.query.filter(
         Student.school_id == teacher.school_id,
-        Student.is_active == True
-    )
-
-    # If exclude_class_id is provided, exclude students already in that class
-    if exclude_class_id:
-        # Get student IDs already in the target class
-        target_class = Class.query.get(exclude_class_id)
-        if target_class:
-            excluded_student_ids = {student.id for student in target_class.students}
-            if excluded_student_ids:
-                query = query.filter(~Student.id.in_(excluded_student_ids))
-
-    students = query.all()
+        ~Student.classes.any()  # Students with no associated classes
+    ).all()
 
     # Prepare the student list for the response
     student_list = []
     for student in students:
-        # Get all class names for the student (students can be in multiple classes)
-        class_names = [cls.name for cls in student.classes] if student.classes else []
-        
+        if not student.is_active:
+            continue  # Only include active students
+        # Get the first class name for the student (assuming students are in one class)
+        class_name = None
+        if student.classes:
+            class_name = student.classes[0].name
+
         student_list.append({
-            "id": student.id, 
-            "fullName": student.fullName, 
+            "id": student.id,
+            "fullName": student.fullName,
             "phone_number": student.phone_number,
-            "class_name": class_names[0] if class_names else None,  # For backward compatibility
-            "class_names": class_names,  # New field showing all classes
+            "class_name": class_name,
             "behavior_note": student.behavior_note
         })
 
@@ -531,8 +500,8 @@ def remove_students():
     if not class_obj:
         return jsonify(message="Class not found."), 404
 
-    if class_obj.teacher_id != teacher_id:
-        return jsonify(message="Unauthorized: You are not the teacher of this class."), 403
+    #if class_obj.teacher_id != teacher_id:
+    #    return jsonify(message="Unauthorized: You are not the teacher of this class."), 403
 
     # Fetch the students to be removed who are part of the class
     students_to_remove = Student.query.filter(
@@ -569,6 +538,9 @@ def remove_students():
     }
 
     return jsonify(response), 200
+
+
+
 
 
 @class_blueprint.route('/<int:class_id>', methods=['DELETE'])
@@ -684,5 +656,3 @@ def delete_class(class_id):
             },
             "flag": 8
         }), 500
-
-
