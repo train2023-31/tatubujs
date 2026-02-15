@@ -1051,8 +1051,9 @@ def _parse_date(s):
 @jwt_required()
 def get_repeated_absence():
     """
-    Students marked absent on more than (min_days) days in the given date range.
+    Students with absent (هارب) or excused (غائب) on at least min_days distinct days in the date range.
     Optional start_date, end_date (YYYY-MM-DD). If not provided, uses current week (Sunday to today).
+    min_days: minimum number of days with at least one absent or excused record. all_days=true: only students absent/excused on every day in range.
     """
     teacher_id = get_jwt_identity()
     user = User.query.get(teacher_id)
@@ -1102,19 +1103,23 @@ def get_repeated_absence():
     if not week_dates:
         return jsonify(week_start=range_start.isoformat(), week_end=range_end.isoformat(), min_days=min_days, students=[]), 200
 
-    # Distinct (student_id, date) where is_Acsent
+    # Distinct (student_id, date) where is_Acsent OR is_Excus (absent or excused)
+    # Use func.date() because Attendance.date is DateTime
     absent_per_student = defaultdict(set)
     q = (
-        db.session.query(Attendance.student_id, Attendance.date)
+        db.session.query(Attendance.student_id, func.date(Attendance.date).label('att_date'))
         .filter(
             Attendance.class_id.in_(class_ids),
-            Attendance.date.in_(week_dates),
-            Attendance.is_Acsent == True,
+            func.date(Attendance.date) >= range_start,
+            func.date(Attendance.date) <= range_end,
+            or_(Attendance.is_Acsent == True, Attendance.is_Excus == True),
         )
         .distinct()
     )
-    for student_id, d in q.all():
-        absent_per_student[student_id].add(d)
+    for row in q.all():
+        student_id, att_date = row.student_id, row.att_date
+        if att_date is not None:
+            absent_per_student[student_id].add(att_date)
 
     num_days_in_range = len(week_dates)
     if all_days:
@@ -1150,6 +1155,12 @@ def get_repeated_absence():
         dates = sorted(absent_per_student[sid])
         cid = student_class.get(sid)
         c = class_map.get(cid) if cid else None
+        date_strs = []
+        for d in dates:
+            if hasattr(d, 'isoformat'):
+                date_strs.append(d.isoformat())
+            else:
+                date_strs.append(str(d))
         result.append({
             "student_id": sid,
             "student_name": s.fullName,
@@ -1157,7 +1168,7 @@ def get_repeated_absence():
             "class_name": c.name if c else None,
             "class_id": cid,
             "absent_days_count": len(dates),
-            "absent_dates": [d.isoformat() for d in dates],
+            "absent_dates": date_strs,
         })
 
     result.sort(key=lambda x: (-x["absent_days_count"], x["student_name"] or ""))

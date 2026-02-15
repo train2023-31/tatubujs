@@ -44,11 +44,13 @@ export const AuthProvider = ({ children }) => {
       
       while (retries > 0) {
         try {
-          // Use parent login endpoint if in parent mode
+          // Use parent login endpoint if in parent mode (phone + 6-digit PIN)
           if (isParentMode) {
             response = await authAPI.parentLogin({
               student_username: credentials.username,
-              parent_phone: credentials.password
+              parent_phone: credentials.password,
+              parent_pin: credentials.parent_pin,
+              ...(credentials.confirm_pin != null && { confirm_pin: credentials.confirm_pin }),
             });
           } else {
             response = await authAPI.login(credentials);

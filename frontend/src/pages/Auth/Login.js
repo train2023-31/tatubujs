@@ -3,9 +3,13 @@ import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { useAuth } from '../../hooks/useAuth';
+import { authAPI } from '../../services/api';
 import { Eye, EyeOff, Lock, User, School, Users, BookOpen, ClipboardList, BarChart3, Smartphone, Shield, Clock, CheckCircle, Star, Zap, Home, ArrowRight, QrCode, Scan } from 'lucide-react';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import Modal from '../../components/UI/Modal';
+import PinDialog from '../../components/UI/PinDialog';
+
+const PARENT_LOCKED_MESSAGE = 'تم تعطيل الدخول بعد عدة محاولات فاشلة. يرجى التواصل مع المدرسة لتفعيل الحساب.';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -13,14 +17,19 @@ const Login = () => {
   const [loginError, setLoginError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isParentMode, setIsParentMode] = useState(false);
+  const [parentVerified, setParentVerified] = useState(false);
+  const [firstTimePin, setFirstTimePin] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
+  const [pinDialogOpen, setPinDialogOpen] = useState(false);
   const [hasScannedQR, setHasScannedQR] = useState(false);
   const scannerRef = useRef(null);
+  const pendingParentLoginRef = useRef(null);
   const { login, loading } = useAuth();
   const {
     register,
     handleSubmit,
     setValue,
+    getValues,
     formState: { errors },
   } = useForm();
 
@@ -64,6 +73,41 @@ const Login = () => {
     // Ignore scan errors (no QR in frame)
   };
 
+  const onPinDialogSubmit = async ({ pin, confirmPin }) => {
+    const pending = pendingParentLoginRef.current;
+    if (!pending) return;
+    setPinDialogOpen(false);
+    setLoginError('');
+    setIsSubmitting(true);
+    try {
+      const result = await login(
+        {
+          username: pending.username,
+          password: pending.password,
+          parent_pin: pin,
+          confirm_pin: firstTimePin ? confirmPin : undefined,
+        },
+        true
+      );
+      if (result && result.success) {
+        navigate('/app/dashboard');
+      } else {
+        const msg = result?.error || '';
+        setLoginError(msg.includes('تعطيل') ? PARENT_LOCKED_MESSAGE : msg);
+      }
+    } catch (error) {
+      const msg = error.response?.data?.message || error.message || '';
+      if (msg.includes('تعطيل') || error.response?.status === 403) {
+        setLoginError(PARENT_LOCKED_MESSAGE);
+      } else {
+        setLoginError(msg || 'حدث خطأ في تسجيل الدخول. يرجى المحاولة مرة أخرى.');
+      }
+    } finally {
+      setIsSubmitting(false);
+      pendingParentLoginRef.current = null;
+    }
+  };
+
   const openScanModal = () => {
     setShowScanModal(true);
   };
@@ -73,35 +117,48 @@ const Login = () => {
   };
 
   const onSubmit = async (data, event) => {
-    event?.preventDefault(); // Prevent form refresh
-    setLoginError(''); // Clear previous errors
+    event?.preventDefault();
+    setLoginError('');
     setIsSubmitting(true);
-    
+
     try {
-      const result = await login(data, isParentMode);
-      
-      if (result && result.success) {
-        // Login successful - navigate based on role or parent mode
-        if (isParentMode) {
-          // Parent mode - go to dashboard for student pickup
-          navigate('/app/dashboard');
+      if (isParentMode && !parentVerified) {
+        const res = await authAPI.verifyParentPhone({
+          student_username: data.username,
+          parent_phone: data.password,
+        });
+        if (res && res.verified) {
+          setParentVerified(true);
+          setFirstTimePin(!!res.first_time_pin);
         } else {
-          const userRole = result.user?.role;
-          
-          if (userRole === 'driver') {
-            // Redirect drivers directly to scanner
-            navigate('/app/bus-scanner');
-          } else {
-            // Other roles go to dashboard
-            navigate('/app/dashboard');
-          }
+          setLoginError(res?.message || 'رقم الهاتف أو بيانات الطالب غير مطابقة');
         }
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (isParentMode && parentVerified) {
+        pendingParentLoginRef.current = { username: data.username, password: data.password };
+        setPinDialogOpen(true);
+        setIsSubmitting(false);
+        return;
+      }
+
+      const result = await login(data, false);
+      if (result && result.success) {
+        const userRole = result.user?.role;
+        if (userRole === 'driver') navigate('/app/bus-scanner');
+        else navigate('/app/dashboard');
       } else {
-        // Login failed - show error message
         setLoginError(result?.error || 'اسم المستخدم أو كلمة المرور غير صحيحة');
       }
     } catch (error) {
-      setLoginError('حدث خطأ في تسجيل الدخول. يرجى المحاولة مرة أخرى.');
+      const msg = error.response?.data?.message || error.message || '';
+      if (msg.includes('تعطيل') || error.response?.status === 403) {
+        setLoginError(PARENT_LOCKED_MESSAGE);
+      } else {
+        setLoginError(msg || 'حدث خطأ في تسجيل الدخول. يرجى المحاولة مرة أخرى.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -155,8 +212,12 @@ const Login = () => {
             <button
               type="button"
               onClick={() => {
-                setIsParentMode(!isParentMode);
-                if (isParentMode) {
+                const next = !isParentMode;
+                setIsParentMode(next);
+                if (next) {
+                  setParentVerified(false);
+                  setFirstTimePin(false);
+                } else {
                   setHasScannedQR(false);
                   setValue('username', '');
                 }
@@ -247,7 +308,7 @@ const Login = () => {
               </div>
             )}
 
-            {/* Password Field */}
+            {/* Parent: Phone then 6-digit PIN. Normal: Password only */}
             <div>
               <label htmlFor="password" className="label">
                 {isParentMode ? 'رقم الهاتف (ولي الأمر)' : 'كلمة المرور'}
@@ -296,6 +357,8 @@ const Login = () => {
               )}
             </div>
 
+            {/* Parent verified: PIN is entered via dialog (opened on submit) */}
+
             {/* Login Error Message */}
             {loginError && (
               <div className="bg-red-50 border border-red-200 rounded-md p-4">
@@ -327,8 +390,14 @@ const Login = () => {
                 {isSubmitting || loading ? (
                   <>
                     <LoadingSpinner />
-                    <span className="ml-2">جاري تسجيل الدخول...</span>
+                    <span className="ml-2">
+                      {isParentMode && !parentVerified ? 'جاري التحقق...' : 'جاري تسجيل الدخول...'}
+                    </span>
                   </>
+                ) : isParentMode && !parentVerified ? (
+                  'تحقق'
+                ) : isParentMode && parentVerified && firstTimePin ? (
+                  'حفظ وتسجيل الدخول'
                 ) : (
                   'تسجيل الدخول'
                 )}
@@ -386,6 +455,20 @@ const Login = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Parent PIN: 6 digit dialog (after verify) */}
+      <PinDialog
+        open={pinDialogOpen}
+        onClose={() => {
+          setPinDialogOpen(false);
+          pendingParentLoginRef.current = null;
+        }}
+        onSubmit={onPinDialogSubmit}
+        title="الرمز السري (6 أرقام)"
+        requireConfirm={firstTimePin}
+        confirmLabel="تأكيد الرمز السري"
+        submitLabel={firstTimePin ? 'حفظ وتسجيل الدخول' : 'تسجيل الدخول'}
+      />
     </div>
   );
 };

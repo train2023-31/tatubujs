@@ -152,6 +152,12 @@ const Sidebar = ({ isOpen, onClose }) => {
           icon: Truck,
           roles: ['school_admin', 'data_analyst'],
         },
+        {
+          name: 'رموز QR للطلاب',
+          href: '/app/student-qrcodes',
+          icon: QrCode,
+          roles: ['school_admin', 'admin'],
+        },
         
       ]
     },
@@ -213,12 +219,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           icon: FileText,
           roles: ['school_admin', 'admin', 'data_analyst'],
         },
-        {
-          name: 'رموز QR للطلاب',
-          href: '/app/student-qrcodes',
-          icon: QrCode,
-          roles: ['school_admin', 'admin'],
-        },
+       
       ]
     },
     {

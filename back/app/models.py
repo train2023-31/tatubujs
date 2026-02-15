@@ -38,7 +38,11 @@ class Student(User):
     id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)  # Updated foreign key reference
     behavior_note = db.Column(db.Text, nullable=True)
     location = db.Column(db.String(255), nullable=True)  # ??????? ??????? (Residential Area)
-
+    # 6-digit PIN for parent login (hashed). Set on first parent login after phone verification.
+    parent_pin_hash = db.Column(db.String(255), nullable=True)
+    # Lock parent login after 5 failed attempts; school must unlock
+    parent_failed_attempts = db.Column(db.Integer, nullable=False, default=0)
+    parent_locked_until = db.Column(db.DateTime, nullable=True)
 
     # Relationships
     school = db.relationship('School', back_populates='students')

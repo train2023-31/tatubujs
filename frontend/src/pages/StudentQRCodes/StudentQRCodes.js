@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from 'react-query';
-import { Download, Search, X } from 'lucide-react';
+import { Download, Search, X, Lock } from 'lucide-react';
 import html2canvas from 'html2canvas';
-import { usersAPI } from '../../services/api';
+import { usersAPI, parentPickupAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import StudentQRCode from '../../components/StudentQRCode/StudentQRCode';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
@@ -17,6 +17,7 @@ const StudentQRCodes = () => {
   const [filterActive, setFilterActive] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [resettingPinStudentId, setResettingPinStudentId] = useState(null);
   const cardRefsMap = useRef(new Map());
   const itemsPerPage = window.innerWidth <= 768 ? 20 : 100;
   
@@ -106,6 +107,20 @@ const StudentQRCodes = () => {
 
   const clearSelection = useCallback(() => {
     setSelectedIds([]);
+  }, []);
+
+  const handleAdminResetParentPin = useCallback(async (studentId, studentName) => {
+    if (!window.confirm(`إعادة تعيين رمز ولي الأمر للطالب "${studentName || studentId}"؟ سيتم تفعيل الحساب ويمكن لولي الأمر تعيين رمز جديد عند تسجيل الدخول.`)) return;
+    setResettingPinStudentId(studentId);
+    try {
+      await parentPickupAPI.adminResetParentPin(studentId);
+      toast.success('تم إعادة تعيين رمز ولي الأمر وتفعيل الحساب.');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'فشل إعادة التعيين.';
+      toast.error(msg);
+    } finally {
+      setResettingPinStudentId(null);
+    }
   }, []);
 
   const downloadSelected = useCallback(async () => {
@@ -318,15 +333,30 @@ const StudentQRCodes = () => {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 print:grid-cols-4">
             {paginatedStudents.map((student) => (
-              <StudentQRCode
-                key={student.id}
-                student={student}
-                schoolName={student.school_name || user?.school_name}
-                isSelected={selectedIds.includes(student.id)}
-                onToggleSelect={() => toggleSelect(student.id)}
-                registerCardRef={registerCardRef}
-                canSelect={selectedIds.length < MAX_SELECTABLE || selectedIds.includes(student.id)}
-              />
+              <div key={student.id} className="flex flex-col gap-2">
+                <StudentQRCode
+                  student={student}
+                  schoolName={student.school_name || user?.school_name}
+                  isSelected={selectedIds.includes(student.id)}
+                  onToggleSelect={() => toggleSelect(student.id)}
+                  registerCardRef={registerCardRef}
+                  canSelect={selectedIds.length < MAX_SELECTABLE || selectedIds.includes(student.id)}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleAdminResetParentPin(student.id, student.fullName)}
+                  disabled={resettingPinStudentId === student.id}
+                  className="print:hidden text-xs text-slate-600 hover:text-slate-800 hover:underline flex items-center gap-1 justify-center py-1 disabled:opacity-50"
+                  title="إعادة تعيين رمز ولي الأمر وتفعيل الحساب"
+                >
+                  {resettingPinStudentId === student.id ? (
+                    <LoadingSpinner />
+                  ) : (
+                    <Lock className="h-3.5 w-3.5" />
+                  )}
+                  <span>إعادة تعيين رمز ولي الأمر</span>
+                </button>
+              </div>
             ))}
           </div>
           

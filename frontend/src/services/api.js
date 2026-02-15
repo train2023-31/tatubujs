@@ -157,6 +157,7 @@ api.interceptors.response.use(
 // Auth API
 export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
+  verifyParentPhone: (data) => api.post('/parent-pickup/verify-parent-phone', data).then(res => res.data),
   parentLogin: (credentials) => api.post('/parent-pickup/parent-login', credentials),
   getUser: () => api.get('/auth/user').then(res => res.data),
   updateUser: (userId, userData) => api.post(`/auth/update_user/${userId}`, userData),
@@ -348,6 +349,14 @@ export const parentPickupAPI = {
   getDisplayPickups: () => api.get('/parent-pickup/display-pickups').then(res => res.data),
   getAllPickups: (params) => api.get('/parent-pickup/all-pickups', { params }).then(res => res.data),
   cancelPickup: (pickupId) => api.post('/parent-pickup/cancel-pickup', { pickup_id: pickupId }),
+  // Admin: reset student's parent PIN and unlock account
+  adminResetParentPin: (studentId) => api.post('/parent-pickup/admin-reset-parent-pin', { student_id: studentId }).then(res => res.data),
+  // Parent (after login): change own PIN
+  resetParentPin: (currentPin, newPin, confirmPin) => api.post('/parent-pickup/reset-parent-pin', {
+    current_pin: currentPin,
+    new_pin: newPin,
+    confirm_pin: confirmPin,
+  }).then(res => res.data),
 };
 
 export default api;

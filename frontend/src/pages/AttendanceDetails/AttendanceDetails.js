@@ -754,12 +754,17 @@ const AttendanceDetails = () => {
           if (num.length === 8) num = '968' + num;
           else if (num.length === 9 && num.startsWith('9')) num = '968' + num.slice(1);
         }
+        // رسالة واتساب مفصلة لحضور الطالب: الاسم، عدد الأيام، قائمة تواريخ الغياب
         const message = [
           'السلام عليكم،',
-          `نود إبلاغكم بأن الطالب ${row.student_name || 'الطالب'} قد سُجل غيابه في ${row.absent_days_count || 0} يوم خلال الفترة المحددة.`,
-          (row.absent_dates?.length ? `التواريخ: ${row.absent_dates.map((d) => formatDate(d, 'dd/MM', 'ar')).join('، ')}.` : ''),
-          'يرجى التواصل مع المدرسة.',
+          `نفيدكم بأن الطالب ${row.student_name || '—'} تغيّب عن المدرسة خلال الفترة المحددة في (${row.absent_days_count || 0}) يوم${(row.absent_days_count == 1 ? '' : '/ايام')}.`,
+          (Array.isArray(row.absent_dates) && row.absent_dates.length
+            ? `تواريخ الغياب: \n ${row.absent_dates.map((d) => formatDate(d, 'dd/MM', 'ar')).join('\n')}.`    
+            : ''
+          ),
+          'يرجى مواصلة التعاون والمتابعة مع المدرسة. شكرا لتفهمكم.'
         ].filter(Boolean).join('\n');
+       
         const encodedMessage = encodeURIComponent(message);
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
         const whatsappUrl = isMobile

@@ -3,7 +3,7 @@ import { useQuery } from 'react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, UserCheck, AlertCircle, ArrowRight, ArrowLeft, Bus, User, History,
-  QrCode, MapPin, BarChart3, Calendar, TrendingUp, Clock, CheckCircle, FileText, Star, Eye, ChevronDown, ChevronUp, ChevronRight,Truck
+  QrCode, MapPin, BarChart3, Calendar, TrendingUp, Clock, CheckCircle, FileText, Star, Eye, ChevronDown, ChevronUp, ChevronRight, Truck, Lock
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { attendanceAPI, busAPI, parentPickupAPI } from '../../services/api';
@@ -28,9 +28,47 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
   const navigate = useNavigate();
   const [pickupLoading, setPickupLoading] = useState(false);
   const [expandedSection, setExpandedSection] = useState(null);
-  
+  // Reset parent PIN (profile, parent mode only)
+  const [showResetPinForm, setShowResetPinForm] = useState(false);
+  const [resetPinCurrent, setResetPinCurrent] = useState('');
+  const [resetPinNew, setResetPinNew] = useState('');
+  const [resetPinConfirm, setResetPinConfirm] = useState('');
+  const [resetPinError, setResetPinError] = useState('');
+  const [resetPinLoading, setResetPinLoading] = useState(false);
+
   // Check if user is in parent mode
   const isParentMode = localStorage.getItem('isParentMode') === 'true';
+
+  const handleResetParentPin = async (e) => {
+    e.preventDefault();
+    setResetPinError('');
+    if (!/^\d{6}$/.test(resetPinCurrent) || !/^\d{6}$/.test(resetPinNew) || !/^\d{6}$/.test(resetPinConfirm)) {
+      setResetPinError('جميع الحقول يجب أن تكون 6 أرقام.');
+      return;
+    }
+    if (resetPinNew !== resetPinConfirm) {
+      setResetPinError('الرمز الجديد وتأكيد الرمز غير متطابقتين.');
+      return;
+    }
+    if (resetPinNew === resetPinCurrent) {
+      setResetPinError('الرمز الجديد يجب أن يختلف عن الرمز الحالي.');
+      return;
+    }
+    setResetPinLoading(true);
+    try {
+      await parentPickupAPI.resetParentPin(resetPinCurrent, resetPinNew, resetPinConfirm);
+      toast.success('تم تغيير الرمز السري بنجاح.');
+      setShowResetPinForm(false);
+      setResetPinCurrent('');
+      setResetPinNew('');
+      setResetPinConfirm('');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'فشل تغيير الرمز. حاول مرة أخرى.';
+      setResetPinError(msg);
+    } finally {
+      setResetPinLoading(false);
+    }
+  };
 
   const toggleSection = (key) => {
     setExpandedSection((prev) => (prev === key ? null : key));
@@ -588,6 +626,95 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
               </div>
             </div>
           </div>
+
+          {/* Parent mode: change PIN */}
+          {isParentMode && (
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="flex items-center gap-2 mb-2">
+                <Lock className="h-5 w-5 text-slate-600" />
+                <h4 className="font-semibold text-gray-800">الرمز السري لتسجيل دخول ولي الأمر</h4>
+              </div>
+              {!showResetPinForm ? (
+                <button
+                  type="button"
+                  onClick={() => setShowResetPinForm(true)}
+                  className="btn-outline btn-sm"
+                >
+                  تغيير الرمز السري
+                </button>
+              ) : (
+                <form onSubmit={handleResetParentPin} className="space-y-3 max-w-xs">
+                  <div>
+                    <label className="label text-sm">الرمز الحالي (6 أرقام)</label>
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={resetPinCurrent}
+                      onChange={(e) => { setResetPinCurrent(e.target.value); setResetPinError(''); }}
+                      className="input w-full text-right"
+                      placeholder="••••••"
+                      dir="ltr"
+                      autoComplete="current-password"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-sm">الرمز الجديد (6 أرقام)</label>
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={resetPinNew}
+                      onChange={(e) => { setResetPinNew(e.target.value); setResetPinError(''); }}
+                      className="input w-full text-right"
+                      placeholder="••••••"
+                      dir="ltr"
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-sm">تأكيد الرمز الجديد</label>
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={resetPinConfirm}
+                      onChange={(e) => { setResetPinConfirm(e.target.value); setResetPinError(''); }}
+                      className="input w-full text-right"
+                      placeholder="••••••"
+                      dir="ltr"
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  {resetPinError && (
+                    <p className="text-sm text-red-600">{resetPinError}</p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={resetPinLoading}
+                      className="btn-primary btn-sm"
+                    >
+                      {resetPinLoading ? <LoadingSpinner /> : 'حفظ الرمز الجديد'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowResetPinForm(false);
+                        setResetPinCurrent('');
+                        setResetPinNew('');
+                        setResetPinConfirm('');
+                        setResetPinError('');
+                      }}
+                      className="btn-outline btn-sm"
+                    >
+                      إلغاء
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
         </div>
       </div>
       )}
