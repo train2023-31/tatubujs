@@ -1,4 +1,5 @@
 import React from 'react';
+import LoadingSpinner from './LoadingSpinner';
 
 /**
  * Mobile-optimized table component that automatically switches between
@@ -18,9 +19,9 @@ const MobileTable = ({
     return (
       <div className="card">
         <div className="card-body">
-          <div className="flex items-center justify-center py-12">
-            <div className="loading-spinner" />
-            <span className="mr-3 text-gray-500">جاري التحميل...</span>
+          <div className="flex items-center justify-center py-12 gap-3">
+            <LoadingSpinner size="md" />
+            <span className="mr-0 text-gray-500">جاري التحميل...</span>
           </div>
         </div>
       </div>

@@ -254,7 +254,7 @@ const PickupDisplay = () => {
 
   const getStatusLabel = (status) => {
     if (status === 'pending') return 'في انتظار الوصول';
-    if (status === 'confirmed') return 'في انتظار الاستلام';
+    if (status === 'confirmed') return 'في انتظار الاستلام (الرجاء التوجه الى المدخل)';
     return 'تم الاستلام';
   };
 

@@ -71,7 +71,8 @@ const Dashboard = () => {
           <SchoolAdminDashboard 
             schoolStats={schoolStats} 
             teacherAttendance={teacherAttendance}
-            loading={statsLoading || teacherLoading}
+            statsLoading={statsLoading}
+            teacherLoading={teacherLoading}
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
             onNavigateToAttendance={handleNavigateToAttendance}
@@ -86,7 +87,8 @@ const Dashboard = () => {
           <SchoolAdminDashboard 
             schoolStats={schoolStats} 
             teacherAttendance={teacherAttendance}
-            loading={statsLoading || teacherLoading}
+            statsLoading={statsLoading}
+            teacherLoading={teacherLoading}
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
             onNavigateToAttendance={handleNavigateToAttendance}

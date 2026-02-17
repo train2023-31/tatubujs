@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from 'react-query';
-import { Download, Search, X, Lock } from 'lucide-react';
+import { Download, Search, X, Lock, MessageCircle } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { usersAPI, parentPickupAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
@@ -108,6 +108,71 @@ const StudentQRCodes = () => {
   const clearSelection = useCallback(() => {
     setSelectedIds([]);
   }, []);
+
+  const normalizePhoneForWhatsApp = useCallback((phone) => {
+    if (!phone) return '';
+    const digits = String(phone).replace(/\D/g, '');
+    if (digits.length === 8 && !digits.startsWith('968')) return '968' + digits;
+    return digits.startsWith('968') ? digits : digits ? '968' + digits : '';
+  }, []);
+
+  const handleSendQrViaWhatsApp = useCallback(async (student) => {
+    const phone = normalizePhoneForWhatsApp(student.phone_number);
+    if (!phone || phone.length < 8) {
+      toast.error('لا يوجد رقم هاتف لولي الأمر لهذا الطالب. يرجى إضافته من تعديل المستخدم.');
+      return;
+    }
+    const cardEl = cardRefsMap.current.get(student.id);
+    if (!cardEl) {
+      toast.error('البطاقة غير ظاهرة. يرجى التمرير إلى الطالب ثم المحاولة مرة أخرى.');
+      return;
+    }
+    const studentName = student.fullName || student.username || 'الطالب';
+    const shareText = `مرحباً، رمز تسجيل الدخول لولي الأمر للطالب ${studentName}. يرجى فتح تطبيق تتبع واختيار «تسجيل دخول ولي أمر» ثم مسح رمز QR. الرابط: https://tatubu.com/login`;
+    const fileName = `qr-${(studentName || 'طالب').replace(/[<>:"/\\|?*]/g, '_')}.png`;
+
+    try {
+      toast.loading('جاري تحضير صورة البطاقة...', { id: 'qr-wa' });
+      const canvas = await html2canvas(cardEl, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: null,
+        logging: false,
+      });
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) {
+        toast.error('فشل إنشاء الصورة.', { id: 'qr-wa' });
+        return;
+      }
+      const file = new File([blob], fileName, { type: 'image/png' });
+
+      const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(shareText)}`;
+
+      if (typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'بطاقة تسجيل الدخول - ' + studentName,
+          text: shareText,
+        });
+        window.open(waUrl, '_blank', 'noopener,noreferrer');
+        toast.success('تم فتح واتساب. اختر المحادثة مع ولي الأمر لإرسال الصورة إن لم تُرسل تلقائياً.', { id: 'qr-wa' });
+      } else {
+        window.open(waUrl, '_blank', 'noopener,noreferrer');
+        const dataUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = fileName;
+        link.click();
+        toast.success('تم فتح واتساب وتحميل الصورة. أرفق الصورة في المحادثة.', { id: 'qr-wa' });
+      }
+    } catch (err) {
+      if (err?.name === 'AbortError') {
+        toast.dismiss('qr-wa');
+        return;
+      }
+      toast.error('فشل إرسال البطاقة. جرّب تحميل الصورة ثم إرفاقها في واتساب يدوياً.', { id: 'qr-wa' });
+    }
+  }, [normalizePhoneForWhatsApp]);
 
   const handleAdminResetParentPin = useCallback(async (studentId, studentName) => {
     if (!window.confirm(`إعادة تعيين رمز ولي الأمر للطالب "${studentName || studentId}"؟ سيتم تفعيل الحساب ويمكن لولي الأمر تعيين رمز جديد عند تسجيل الدخول.`)) return;
@@ -342,20 +407,31 @@ const StudentQRCodes = () => {
                   registerCardRef={registerCardRef}
                   canSelect={selectedIds.length < MAX_SELECTABLE || selectedIds.includes(student.id)}
                 />
-                <button
-                  type="button"
-                  onClick={() => handleAdminResetParentPin(student.id, student.fullName)}
-                  disabled={resettingPinStudentId === student.id}
-                  className="print:hidden text-xs text-slate-600 hover:text-slate-800 hover:underline flex items-center gap-1 justify-center py-1 disabled:opacity-50"
-                  title="إعادة تعيين رمز ولي الأمر وتفعيل الحساب"
-                >
-                  {resettingPinStudentId === student.id ? (
-                    <LoadingSpinner />
-                  ) : (
-                    <Lock className="h-3.5 w-3.5" />
-                  )}
-                  <span>إعادة تعيين رمز ولي الأمر</span>
-                </button>
+                <div className="print:hidden flex items-center justify-center gap-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleSendQrViaWhatsApp(student)}
+                    className="text-xs text-green-600 hover:text-green-800 hover:underline flex items-center gap-1 py-1"
+                    title="إرسال رابط تسجيل الدخول عبر واتساب لولي الأمر"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    <span>إرسال عبر واتساب</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAdminResetParentPin(student.id, student.fullName)}
+                    disabled={resettingPinStudentId === student.id}
+                    className="text-xs text-slate-600 hover:text-slate-800 hover:underline flex items-center gap-1 py-1 disabled:opacity-50"
+                    title="إعادة تعيين رمز ولي الأمر وتفعيل الحساب"
+                  >
+                    {resettingPinStudentId === student.id ? (
+                      <LoadingSpinner />
+                    ) : (
+                      <Lock className="h-3.5 w-3.5" />
+                    )}
+                    <span>إعادة تعيين رمز ولي الأمر</span>
+                  </button>
+                </div>
               </div>
             ))}
           </div>

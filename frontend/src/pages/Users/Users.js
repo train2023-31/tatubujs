@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { Plus, Search, Edit, Trash2, UserPlus, Users as UsersIcon, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
-import { usersAPI, authAPI, classesAPI } from '../../services/api';
+import { Plus, Search, Edit, Trash2, UserPlus, Users as UsersIcon, Eye, ToggleLeft, ToggleRight, Lock } from 'lucide-react';
+import { usersAPI, authAPI, classesAPI, parentPickupAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { getRoleDisplayName, getRoleColor, formatPhoneNumber } from '../../utils/helpers';
 import DataTable from '../../components/UI/DataTable';
@@ -56,7 +56,8 @@ const Users = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
-  
+  const [resettingPinStudentId, setResettingPinStudentId] = useState(null);
+
   // Filter states
   const [filters, setFilters] = useState({
     role: '',
@@ -134,6 +135,20 @@ const Users = () => {
       },
     }
   );
+
+  const handleAdminResetParentPin = async (studentId, studentName) => {
+    if (!window.confirm(`إعادة تعيين رمز ولي الأمر للطالب "${studentName || studentId}"؟ سيتم تفعيل الحساب ويمكن لولي الأمر تعيين رمز جديد عند تسجيل الدخول.`)) return;
+    setResettingPinStudentId(studentId);
+    try {
+      await parentPickupAPI.adminResetParentPin(studentId);
+      toast.success('تم إعادة تعيين رمز ولي الأمر وتفعيل الحساب.');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'فشل إعادة التعيين.';
+      toast.error(msg);
+    } finally {
+      setResettingPinStudentId(null);
+    }
+  };
 
   // Toggle user active/inactive mutation
   const toggleUserStatusMutation = useMutation(
@@ -273,17 +288,23 @@ const Users = () => {
       key: 'actions',
       header: 'الإجراءات',
       render: (row) => (
-        <div className="flex items-center space-x-2">
-          {/* <button
-            onClick={() => {
-              setSelectedUser(row);
-              setIsViewModalOpen(true);
-            }}
-            className="text-blue-600 hover:text-blue-900 ml-2"
-            title="عرض التفاصيل"
-          >
-            <Eye className="h-4 w-4" />
-          </button> */}
+        <div className="flex items-center space-x-2 flex-wrap gap-1">
+          {/* Reset parent PIN — students only */}
+          {row.role === 'student' && (
+            <button
+              type="button"
+              onClick={() => handleAdminResetParentPin(row.id, row.fullName)}
+              disabled={resettingPinStudentId === row.id}
+              className="text-slate-600 hover:text-slate-800 p-1 rounded hover:bg-slate-100 ml-2 disabled:opacity-50"
+              title="إعادة تعيين رمز ولي الأمر"
+            >
+              {resettingPinStudentId === row.id ? (
+                <LoadingSpinner size="sm" />
+              ) : (
+                <Lock className="h-4 w-4" />
+              )}
+            </button>
+          )}
           <button
             onClick={() => {
               setSelectedUser(row);

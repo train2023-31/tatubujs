@@ -246,10 +246,31 @@ const BulkOperations = () => {
     }
 
     switch (selectedTab) {
-      case 'teachers':
+      case 'teachers': {
+        const invalidRows = [];
+        uploadedData.forEach((row) => {
+          const val = row['عدد الحصص الأسبوعية'];
+          const num = val !== '' && val !== undefined && val !== null ? Number(String(val).trim()) : NaN;
+          if (Number.isNaN(num) || num <= 0) {
+            invalidRows.push({
+              row: row._rowIndex,
+              name: row['الاسم الكامل'] || '(بدون اسم)',
+            });
+          }
+        });
+        if (invalidRows.length > 0) {
+          const list = invalidRows.slice(0, 10).map((r) => `صف ${r.row} (${r.name})`).join('، ');
+          const more = invalidRows.length > 10 ? ` و${invalidRows.length - 10} صفوف أخرى` : '';
+          toast.error(
+            `يرجى تعديل ملف الإكسل: عمود «عدد الحصص الأسبوعية» يجب أن يكون رقماً أكبر من 0. الصفوف غير الصالحة: ${list}${more}.`
+          );
+          setIsProcessing(false);
+          return;
+        }
         setProcessingStage('جاري تسجيل المعلمين...');
         bulkRegisterTeachersMutation.mutate(processedData);
         break;
+      }
       case 'drivers':
         setProcessingStage('جاري تسجيل السائقين...');
         bulkRegisterDriversMutation.mutate(processedData);

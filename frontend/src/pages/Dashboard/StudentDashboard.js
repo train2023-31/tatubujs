@@ -595,14 +595,14 @@ const StudentDashboard = ({ selectedDate, setSelectedDate }) => {
               <label className="label">الاسم الكامل</label>
               <p className="text-gray-900">{studentProfile?.fullName || 'غير محدد'}</p>
             </div>
-            <div>
+            {/* <div>
               <label className="label">اسم المستخدم</label>
               <p className="text-gray-900">{studentProfile?.username || 'غير محدد'}</p>
             </div>
             <div>
               <label className="label">البريد الإلكتروني</label>
               <p className="text-gray-900">{studentProfile?.email || 'غير محدد'}</p>
-            </div>
+            </div> */}
             <div>
               <label className="label">رقم الهاتف</label>
               <p className="text-gray-900">{studentProfile?.phone_number || 'غير محدد'}</p>

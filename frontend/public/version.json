@@ -1,7 +1,7 @@
 {
-  "buildTime": "2026-02-15T20:32:55.389Z",
-  "buildTimestamp": 1771187575390,
-  "version": "2.6.9",
+  "buildTime": "2026-02-16T18:56:21.731Z",
+  "buildTimestamp": 1771268181732,
+  "version": "2.7.0",
   "gitCommit": "unknown",
   "environment": "production"
 }

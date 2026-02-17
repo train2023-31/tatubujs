@@ -14,7 +14,7 @@ import NewsWidget from '../../components/UI/NewsWidget';
 import QuickAccessCard from '../../components/Dashboard/QuickAccessCard';
 import StatCard from '../../components/Dashboard/StatCard';
 
-const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selectedDate, setSelectedDate, onNavigateToAttendance, onNavigateToAttendancesDetails, needsSetup, bulkOpsStatus, bulkOpsLoading }) => {
+const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, statsLoading, teacherLoading, selectedDate, setSelectedDate, onNavigateToAttendance, onNavigateToAttendancesDetails, needsSetup, bulkOpsStatus, bulkOpsLoading }) => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClassData, setSelectedClassData] = useState(null);
@@ -169,20 +169,21 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
   };
 
 
-  if (loading || summaryLoading || bulkOpsLoading || busReportLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
+  const SectionLoader = ({ loading, children, minHeight = '120px' }) => (
+    loading ? (
+      <div className="flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50/50" style={{ minHeight }}>
         <LoadingSpinner />
-        <span className="mr-3 text-gray-500">جاري تحميل البيانات...</span>
+        <span className="mr-2 text-sm text-gray-500">جاري التحميل...</span>
       </div>
-    );
-  }
+    ) : children
+  );
 
   return (
     <div className="space-y-6">
-   
-      {/* School Setup Guide */}
-      {bulkOpsStatus && checkNeedsSetup(bulkOpsStatus) && (
+      {/* School Setup Guide — shows when bulkOps loaded */}
+      {bulkOpsLoading ? (
+        <SectionLoader loading minHeight="140px" />
+      ) : bulkOpsStatus && checkNeedsSetup(bulkOpsStatus) ? (
         <div className="card border-blue-200 bg-blue-50">
           <div className="card-header bg-blue-100">
             <div className="flex items-center space-x-2">
@@ -533,7 +534,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* News Widget */}
       
@@ -619,48 +620,52 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        <StatCard
-          title="إجمالي الطلاب"
-          value={schoolStats?.number_of_students || 0}
-          icon={Users}
-          color="blue"
-        />
-        <StatCard
-          title="الطلاب الحاضرين"
-          value={schoolStats?.number_of_presents || 0}
-          icon={UserCheck}
-          color="green"
-        />
-        <StatCard
-          title="الطلاب الهاربين"
-          value={schoolStats?.number_of_absents || 0}
-          icon={Clock}
-          color="red"
-          showEyeIcon={true}
-          onEyeClick={() => handleViewStudentList('absent')}
-        />
-        <StatCard
-          title="الطلاب المتأخرين"
-          value={schoolStats?.number_of_lates || 0}
-          icon={TrendingUp}
-          color="yellow"
-          showEyeIcon={true}
-          onEyeClick={() => handleViewStudentList('late')}
-        />
-        <StatCard
-          title="الطلاب الغائبين"
-          value={schoolStats?.number_of_excus || 0}
-          icon={AlertCircle}
-          color="orange"
-          showEyeIcon={true}
-          onEyeClick={() => handleViewStudentList('excuse')}
-        />
-      </div>
+      {/* Stats Cards — load independently */}
+      <SectionLoader loading={statsLoading} minHeight="140px">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <StatCard
+            title="إجمالي الطلاب"
+            value={schoolStats?.number_of_students || 0}
+            icon={Users}
+            color="blue"
+          />
+          <StatCard
+            title="الطلاب الحاضرين"
+            value={schoolStats?.number_of_presents || 0}
+            icon={UserCheck}
+            color="green"
+          />
+          <StatCard
+            title="الطلاب الهاربين"
+            value={schoolStats?.number_of_absents || 0}
+            icon={Clock}
+            color="red"
+            showEyeIcon={true}
+            onEyeClick={() => handleViewStudentList('absent')}
+          />
+          <StatCard
+            title="الطلاب المتأخرين"
+            value={schoolStats?.number_of_lates || 0}
+            icon={TrendingUp}
+            color="yellow"
+            showEyeIcon={true}
+            onEyeClick={() => handleViewStudentList('late')}
+          />
+          <StatCard
+            title="الطلاب الغائبين"
+            value={schoolStats?.number_of_excus || 0}
+            icon={AlertCircle}
+            color="orange"
+            showEyeIcon={true}
+            onEyeClick={() => handleViewStudentList('excuse')}
+          />
+        </div>
+      </SectionLoader>
 
-      {/* Bus Statistics Cards */}
-      {busStats.totalBuses > 0 && (
+      {/* Bus Statistics Cards — load independently */}
+      {busReportLoading ? (
+        <SectionLoader loading minHeight="120px" />
+      ) : busStats.totalBuses > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <StatCard
             title="الطلاب على الحافلات"
@@ -679,10 +684,12 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
             onEyeClick={() => handleViewBusStudents('exit')}
           />
         </div>
-      )}
+      ) : null}
 
-      {/* Class Statistics */}
-      {(schoolStats?.classes && schoolStats.classes.length > 0) || (attendanceSummary?.attendance_summary && attendanceSummary.attendance_summary.length > 0) ? (
+      {/* Class Statistics — load independently */}
+      {summaryLoading ? (
+        <SectionLoader loading minHeight="200px" />
+      ) : (schoolStats?.classes && schoolStats.classes.length > 0) || (attendanceSummary?.attendance_summary && attendanceSummary.attendance_summary.length > 0) ? (
         <div className="card">
           <div className="card-header">
             <h3 className="text-lg font-medium text-gray-900">إحصائيات الفصول</h3>
@@ -790,10 +797,12 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
             </div>
           </div>
         </div>
-      ) : null}
+      ) : null }
 
-      {/* Teacher Attendance */}
-      {teacherAttendance?.data && teacherAttendance.data.length > 0 && (
+      {/* Teacher Attendance — load independently */}
+      {teacherLoading ? (
+        <SectionLoader loading minHeight="180px" />
+      ) : teacherAttendance?.data && teacherAttendance.data.length > 0 ? (
         <div className="card">
           <div className="card-header flex items-center justify-between">
             <h3 className="text-lg font-medium text-gray-900">حضور المعلمين هذا الأسبوع</h3>
@@ -845,7 +854,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, loading, selecte
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Absent and Late Students Modal */}
       <Modal
