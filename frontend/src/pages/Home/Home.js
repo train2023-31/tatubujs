@@ -620,7 +620,34 @@ const Home = () => {
         </div>
       </section>
 
-
+      {/* Promo Video Section */}
+      <section className="py-8 md:py-16 bg-white">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-6 md:mb-10">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 md:mb-3">
+               نظام تتبع
+            </h2>
+            <p className="text-base md:text-lg text-gray-600 px-4">
+              فيديو تعريفي قصير عن النظام ومميزاته
+            </p>
+          </div>
+          <div className="rounded-xl overflow-hidden shadow-xl border border-gray-200 bg-black">
+            <video
+              className="w-full h-auto"
+              controls
+              playsInline
+              preload="metadata"
+              poster="/tatubu_fram.png"
+            >
+              <source src="/tatubu.mp4" type="video/mp4" />
+              <p className="text-white p-4 text-center">
+                متصفحك لا يدعم تشغيل الفيديو. يمكنك تحميله من
+                <a href="/tatubu.mp4" className="underline mr-1">هنا</a>.
+              </p>
+            </video>
+          </div>
+        </div>
+      </section>
 
       {/* System Preview Images */}
       <section id="system-preview" className="py-8 md:py-16 bg-white bg-gradient-to-br from-sky-100 via-gray-100 to-sky-200 animate-gradient-x">
