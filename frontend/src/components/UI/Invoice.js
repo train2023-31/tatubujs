@@ -15,10 +15,10 @@ const Invoice = ({ school, onClose }) => {
   const invoiceItems = [
     {
       id: 1,
-      description: 'اشتراك سنوي - نظام إدارة سجلات الحضور والغياب والتقارير والإحصائيات بالمدرسة',
+      description: 'اشتراك فصلي - نظام إدارة سجلات الحضور والغياب والتقارير والإحصائيات بالمدرسة',
       quantity: 1,
-      unitPrice: 50,
-      total: 50
+      unitPrice: 25,
+      total: 25
     },
   ];
 
