@@ -193,6 +193,16 @@ export const authAPI = {
   getSmsConfig: (schoolId) => api.get('/static/sms-config', { params: { school_id: schoolId } }).then(res => res.data),
   updateSmsConfig: (data) => api.put('/static/sms-config', data).then(res => res.data),
   testSmsConnection: (data) => api.post('/static/test-sms-connection', data).then(res => res.data),
+
+  // Evolution API (WhatsApp) Configuration
+  getWhatsAppConfig: (schoolId) => api.get('/static/whatsapp-config', { params: { school_id: schoolId } }).then(res => res.data),
+  updateWhatsAppConfig: (data) => api.put('/static/whatsapp-config', data).then(res => res.data),
+  createWhatsAppInstance: (data) => api.post('/static/create-whatsapp-instance', data).then(res => res.data),
+  testWhatsAppConnection: (data) => api.post('/static/test-whatsapp-connection', data).then(res => res.data),
+  getWhatsAppQR: (schoolId) => api.get('/static/whatsapp-qr', { params: { school_id: schoolId } }).then(res => res.data),
+  getWhatsAppStatus: (schoolId) => api.get('/static/whatsapp-status', { params: { school_id: schoolId } }).then(res => res.data),
+  sendWhatsAppTestMessage: (data) => api.post('/static/send-whatsapp-test', data).then(res => res.data),
+  sendWhatsAppReports: (data) => api.post('/static/send-whatsapp-reports', data).then(res => res.data),
   
   // SMS Operations API
   sendDailySmsReports: (data) => api.post('/attendance/send-daily-sms-reports', data).then(res => res.data),

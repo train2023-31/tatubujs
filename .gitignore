@@ -16,6 +16,14 @@ dist/
 .env.test.local
 .env.production.local
 
+# Evolution API (WhatsApp gateway)
+evolution-api/.env
+evolution-api/.env.*
+evolution-api/instances/
+evolution-api/node_modules/
+evolution-api/dist/
+evolution-api/.cache
+
 # VAPID Keys (NEVER commit private keys!)
 vapid_private_key.txt
 vapid_public_key.txt

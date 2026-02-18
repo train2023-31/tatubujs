@@ -109,6 +109,12 @@ const Sidebar = ({ isOpen, onClose }) => {
           roles: ['school_admin'],
         },
         {
+          name: 'إعدادات WhatsApp',
+          href: '/app/whatsapp-configuration',
+          icon: MessageSquare,
+          roles: ['school_admin'],
+        },
+        {
           name: 'إرسال رسائل مخصصة',
           href: '/app/bulk-messaging',
           icon: MessageCircle,

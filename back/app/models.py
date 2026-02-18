@@ -171,6 +171,15 @@ class School(db.Model):
     ibulk_last_balance_check = db.Column(db.DateTime, nullable=True)
     ibulk_current_balance = db.Column(db.Float, nullable=True, default=0.0)
 
+    # Evolution API (WhatsApp) Configuration Fields
+    evolution_whatsapp_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    evolution_api_url = db.Column(db.String(255), nullable=True)
+    evolution_api_key = db.Column(db.String(255), nullable=True)
+    evolution_instance_name = db.Column(db.String(100), nullable=True)
+    evolution_instance_token = db.Column(db.String(255), nullable=True)
+    evolution_phone_number = db.Column(db.String(20), nullable=True)
+    evolution_instance_status = db.Column(db.String(50), nullable=True, default='disconnected')
+
     # Relationships
     students = db.relationship('Student', back_populates='school', lazy='dynamic')
     teachers = db.relationship('Teacher', back_populates='school', lazy='dynamic')

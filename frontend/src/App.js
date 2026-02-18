@@ -27,6 +27,7 @@ import ViewLogs from './pages/ViewLogs/ViewLogs';
 import VersionFeatures from './pages/VersionFeatures/VersionFeatures';
 import WhatsAppMessaging from './pages/WhatsAppMessaging/WhatsAppMessaging';
 import SmsConfiguration from './pages/SmsConfiguration/SmsConfiguration';
+import WhatsAppConfiguration from './pages/WhatsAppConfiguration/WhatsAppConfiguration';
 import BulkMessaging from './pages/BulkMessaging/BulkMessaging';
 import StudentNotesLog from './pages/StudentNotesLog/StudentNotesLog';
 import Guide from './pages/Guide/Guide';
@@ -353,6 +354,16 @@ function App() {
                   element={
                     <ProtectedRoute allowedRoles={['school_admin']}>
                       <SmsConfiguration />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* WhatsApp Configuration - School Admin */}
+                <Route 
+                  path="whatsapp-configuration" 
+                  element={
+                    <ProtectedRoute allowedRoles={['school_admin']}>
+                      <WhatsAppConfiguration />
                     </ProtectedRoute>
                   } 
                 />

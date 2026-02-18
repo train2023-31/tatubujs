@@ -17,6 +17,7 @@ import logging
 import requests
 import json
 from ibulk_sms_service import get_ibulk_sms_service, IBulkSMSService
+from evolution_whatsapp_service import get_evolution_service, invalidate_service_cache, EvolutionWhatsAppService
 from flask_cors import CORS
 from app.services.notification_service import (
     notify_students_school_news,
@@ -1240,6 +1241,414 @@ def get_bulk_operations_status():
         'setup_complete': not needs_setup
     }), 200
 
+
+# ─────────────────────────────────────────────────────────────
+# Evolution API (WhatsApp) Routes
+# ─────────────────────────────────────────────────────────────
+
+@static_blueprint.route('/whatsapp-config', methods=['GET'])
+@jwt_required()
+def get_whatsapp_config():
+    """Get Evolution API WhatsApp configuration for a school."""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if user.user_role not in ['admin', 'school_admin']:
+        return jsonify({"message": {"en": "Unauthorized access.", "ar": "ليس لديك صلاحية الوصول."}, "flag": 1}), 403
+
+    school_id = request.args.get('school_id', user.school_id)
+    if user.user_role == 'admin' and not school_id:
+        return jsonify({"message": {"en": "School ID is required.", "ar": "معرف المدرسة مطلوب."}, "flag": 2}), 400
+
+    try:
+        school = School.query.get(school_id)
+        if not school:
+            return jsonify({"message": {"en": "School not found.", "ar": "المدرسة غير موجودة."}, "flag": 3}), 404
+
+        return jsonify({
+            "whatsapp_config": {
+                "evolution_whatsapp_enabled": school.evolution_whatsapp_enabled,
+                "evolution_api_url": school.evolution_api_url,
+                "evolution_api_key": school.evolution_api_key,
+                "evolution_instance_name": school.evolution_instance_name,
+                "evolution_phone_number": school.evolution_phone_number,
+                "evolution_instance_status": school.evolution_instance_status,
+            },
+            "school_id": school_id,
+            "flag": 4
+        }), 200
+    except Exception as e:
+        return jsonify({"message": {"en": f"Error: {str(e)}", "ar": f"خطأ: {str(e)}"}, "flag": 5}), 500
+
+
+@static_blueprint.route('/whatsapp-config', methods=['PUT'])
+@jwt_required()
+@log_action("تحديث", description="تحديث إعدادات WhatsApp للمدرسة")
+def update_whatsapp_config():
+    """Update Evolution API WhatsApp configuration for a school."""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if user.user_role not in ['admin', 'school_admin']:
+        return jsonify({"message": {"en": "Unauthorized access.", "ar": "ليس لديك صلاحية الوصول."}, "flag": 1}), 403
+
+    data = request.get_json()
+    school_id = data.get('school_id', user.school_id)
+
+    if user.user_role == 'admin' and not school_id:
+        return jsonify({"message": {"en": "School ID is required.", "ar": "معرف المدرسة مطلوب."}, "flag": 2}), 400
+
+    try:
+        school = School.query.get(school_id)
+        if not school:
+            return jsonify({"message": {"en": "School not found.", "ar": "المدرسة غير موجودة."}, "flag": 3}), 404
+
+        updatable_fields = [
+            'evolution_whatsapp_enabled', 'evolution_api_url', 'evolution_api_key',
+            'evolution_instance_name', 'evolution_instance_token', 'evolution_phone_number',
+        ]
+        for field in updatable_fields:
+            if field in data:
+                setattr(school, field, data[field])
+
+        db.session.commit()
+        invalidate_service_cache(school_id)
+
+        return jsonify({
+            "message": {"en": "WhatsApp configuration updated successfully", "ar": "تم تحديث إعدادات WhatsApp بنجاح"},
+            "whatsapp_config": {
+                "evolution_whatsapp_enabled": school.evolution_whatsapp_enabled,
+                "evolution_api_url": school.evolution_api_url,
+                "evolution_api_key": school.evolution_api_key,
+                "evolution_instance_name": school.evolution_instance_name,
+                "evolution_phone_number": school.evolution_phone_number,
+                "evolution_instance_status": school.evolution_instance_status,
+            },
+            "school_id": school_id,
+            "flag": 4
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"message": {"en": f"Error: {str(e)}", "ar": f"خطأ: {str(e)}"}, "flag": 5}), 500
+
+
+@static_blueprint.route('/test-whatsapp-connection', methods=['POST'])
+@jwt_required()
+@log_action("اختبار", description="اختبار اتصال WhatsApp")
+def test_whatsapp_connection():
+    """Test Evolution API connection and check the instance status."""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if user.user_role not in ['admin', 'school_admin']:
+        return jsonify({"message": {"en": "Unauthorized access.", "ar": "ليس لديك صلاحية الوصول."}, "flag": 1}), 403
+
+    data = request.get_json()
+    school_id = data.get('school_id', user.school_id)
+
+    api_url = (data.get('evolution_api_url') or '').rstrip('/')
+    api_key = data.get('evolution_api_key')
+    instance_name = data.get('evolution_instance_name')
+
+    if not api_url or not api_key or not instance_name:
+        return jsonify({
+            "message": {"en": "API URL, API Key, and Instance Name are required.", "ar": "رابط API ومفتاح API واسم الـ Instance مطلوبة."},
+            "flag": 2
+        }), 400
+
+    svc = EvolutionWhatsAppService.__new__(EvolutionWhatsAppService)
+    svc.school_id = school_id
+    svc.api_url = api_url
+    svc.api_key = api_key
+    svc.instance_name = instance_name
+
+    result = svc.check_instance_status()
+
+    if result['success']:
+        school = School.query.get(school_id)
+        if school:
+            school.evolution_instance_status = result['state']
+            db.session.commit()
+        return jsonify({
+            "message": {"en": f"Connection successful. Instance state: {result['state']}", "ar": f"تم الاتصال بنجاح. حالة الـ Instance: {result['state']}"},
+            "connection_status": {"success": True, "state": result['state']},
+            "flag": 3
+        }), 200
+
+    return jsonify({
+        "message": {"en": f"Connection failed: {result.get('error')}", "ar": f"فشل الاتصال: {result.get('error')}"},
+        "connection_status": {"success": False, "state": result.get('state', 'error'), "error": result.get('error')},
+        "flag": 4
+    }), 400
+
+
+@static_blueprint.route('/create-whatsapp-instance', methods=['POST'])
+@jwt_required()
+@log_action("إنشاء", description="إنشاء Instance جديد في Evolution API")
+def create_whatsapp_instance():
+    """
+    Create a new Evolution API instance for the school.
+    This must be called once before the school can connect their WhatsApp number.
+    """
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if user.user_role not in ['admin', 'school_admin']:
+        return jsonify({"message": {"en": "Unauthorized access.", "ar": "ليس لديك صلاحية الوصول."}, "flag": 1}), 403
+
+    data = request.get_json()
+    school_id = data.get('school_id', user.school_id)
+
+    school = School.query.get(school_id)
+    if not school:
+        return jsonify({"message": {"en": "School not found.", "ar": "المدرسة غير موجودة."}, "flag": 2}), 404
+
+    api_url = (data.get('evolution_api_url') or school.evolution_api_url or '').rstrip('/')
+    api_key = data.get('evolution_api_key') or school.evolution_api_key
+    instance_name = data.get('evolution_instance_name') or school.evolution_instance_name
+
+    if not api_url or not api_key or not instance_name:
+        return jsonify({
+            "message": {"en": "API URL, API Key and Instance Name are required.", "ar": "رابط API ومفتاح API واسم الـ Instance مطلوبة."},
+            "flag": 3
+        }), 400
+
+    svc = EvolutionWhatsAppService.__new__(EvolutionWhatsAppService)
+    svc.school_id = school_id
+    svc.api_url = api_url
+    svc.api_key = api_key
+    svc.instance_name = instance_name
+
+    result = svc.create_instance(instance_name)
+
+    if result['success']:
+        school.evolution_api_url = api_url
+        school.evolution_api_key = api_key
+        school.evolution_instance_name = instance_name
+        school.evolution_instance_status = 'close'
+        db.session.commit()
+        invalidate_service_cache(school_id)
+        return jsonify({
+            "message": {"en": "Instance created successfully. Now get the QR code to connect.", "ar": "تم إنشاء الـ Instance بنجاح. الآن احصل على رمز QR للاتصال."},
+            "instance_data": result.get('data', {}),
+            "flag": 4
+        }), 200
+
+    error_msg = result.get('error', '')
+    if 'already' in error_msg.lower() or '409' in error_msg:
+        return jsonify({
+            "message": {"en": "Instance already exists. You can proceed to get the QR code.", "ar": "الـ Instance موجود مسبقاً. يمكنك الانتقال للحصول على رمز QR."},
+            "flag": 5
+        }), 200
+
+    return jsonify({
+        "message": {"en": f"Failed to create instance: {error_msg}", "ar": f"فشل إنشاء الـ Instance: {error_msg}"},
+        "flag": 6
+    }), 400
+
+
+@static_blueprint.route('/whatsapp-qr', methods=['GET'])
+@jwt_required()
+def get_whatsapp_qr():
+    """Get QR code for connecting a WhatsApp number to the instance."""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if user.user_role not in ['admin', 'school_admin']:
+        return jsonify({"message": {"en": "Unauthorized access.", "ar": "ليس لديك صلاحية الوصول."}, "flag": 1}), 403
+
+    school_id = request.args.get('school_id', user.school_id)
+    school = School.query.get(school_id)
+    if not school:
+        return jsonify({"message": {"en": "School not found.", "ar": "المدرسة غير موجودة."}, "flag": 2}), 404
+
+    # Always use fresh service for QR — bypasses stale cache
+    invalidate_service_cache(school_id)
+    svc = get_evolution_service(school_id)
+    if not svc.is_configured:
+        return jsonify({
+            "message": {"en": "WhatsApp not configured. Please save your configuration first.", "ar": "لم يتم تكوين WhatsApp. يرجى حفظ الإعدادات أولاً."},
+            "flag": 3
+        }), 400
+
+    result = svc.get_qr_code()
+    if result['success']:
+        school.evolution_instance_status = 'connecting'
+        db.session.commit()
+        return jsonify({"success": True, "data": result['data'], "flag": 4}), 200
+
+    return jsonify({
+        "message": {"en": f"Failed to get QR: {result.get('error')}", "ar": f"فشل الحصول على QR: {result.get('error')}"},
+        "flag": 5
+    }), 400
+
+
+@static_blueprint.route('/whatsapp-status', methods=['GET'])
+@jwt_required()
+def get_whatsapp_status():
+    """Refresh and return the current WhatsApp instance connection status."""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if user.user_role not in ['admin', 'school_admin']:
+        return jsonify({"message": {"en": "Unauthorized access.", "ar": "ليس لديك صلاحية الوصول."}, "flag": 1}), 403
+
+    school_id = request.args.get('school_id', user.school_id)
+    school = School.query.get(school_id)
+    if not school:
+        return jsonify({"message": {"en": "School not found.", "ar": "المدرسة غير موجودة."}, "flag": 2}), 404
+
+    svc = get_evolution_service(school_id)
+    if not svc.is_configured:
+        return jsonify({"success": True, "state": "not_configured", "flag": 3}), 200
+
+    result = svc.check_instance_status()
+    state = result.get('state', 'unknown')
+
+    school.evolution_instance_status = state
+    db.session.commit()
+
+    return jsonify({"success": True, "state": state, "flag": 4}), 200
+
+
+@static_blueprint.route('/send-whatsapp-test', methods=['POST'])
+@jwt_required()
+@log_action("اختبار", description="إرسال رسالة WhatsApp تجريبية")
+def send_whatsapp_test_message():
+    """Send a test WhatsApp message to verify the setup is working."""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if user.user_role not in ['admin', 'school_admin']:
+        return jsonify({"message": {"en": "Unauthorized access.", "ar": "ليس لديك صلاحية الوصول."}, "flag": 1}), 403
+
+    data = request.get_json()
+    school_id = data.get('school_id', user.school_id)
+    phone_number = data.get('phone_number', '').strip()
+    message = data.get('message', 'رسالة تجريبية من نظام تتبع الحضور ✅')
+
+    if not phone_number:
+        return jsonify({"message": {"en": "Phone number is required.", "ar": "رقم الهاتف مطلوب."}, "flag": 2}), 400
+
+    school = School.query.get(school_id)
+    if not school or not school.evolution_whatsapp_enabled:
+        return jsonify({"message": {"en": "WhatsApp is not enabled for this school.", "ar": "WhatsApp غير مفعل لهذه المدرسة."}, "flag": 3}), 400
+
+    svc = get_evolution_service(school_id)
+    if not svc.is_configured:
+        return jsonify({"message": {"en": "WhatsApp not configured.", "ar": "لم يتم تكوين WhatsApp."}, "flag": 4}), 400
+
+    result = svc.send_text_message(phone_number, message)
+    if result['success']:
+        return jsonify({"message": {"en": "Test message sent successfully.", "ar": "تم إرسال الرسالة التجريبية بنجاح."}, "flag": 5}), 200
+
+    return jsonify({"message": {"en": f"Failed to send: {result.get('error')}", "ar": f"فشل الإرسال: {result.get('error')}"}, "flag": 6}), 400
+
+
+@static_blueprint.route('/send-whatsapp-reports', methods=['POST'])
+@jwt_required()
+@log_action("إرسال", description="إرسال تقارير الحضور عبر WhatsApp")
+def send_whatsapp_reports():
+    """Send daily attendance reports to parents via WhatsApp (Evolution API)."""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if user.user_role not in ['admin', 'school_admin', 'data_analyst']:
+        return jsonify({"message": {"en": "Unauthorized.", "ar": "غير مصرح."}, "flag": 1}), 403
+
+    data = request.get_json() or {}
+    report_date = data.get('date')
+    school_id = data.get('school_id', user.school_id)
+    delay = float(data.get('delay_between_messages', 1.0))
+
+    if not report_date:
+        return jsonify({"message": {"en": "Date is required.", "ar": "التاريخ مطلوب."}, "flag": 2}), 400
+
+    school = School.query.get(school_id)
+    if not school or not school.evolution_whatsapp_enabled:
+        return jsonify({"message": {"en": "WhatsApp is not enabled for this school.", "ar": "WhatsApp غير مفعل لهذه المدرسة."}, "flag": 3}), 400
+
+    svc = get_evolution_service(school_id)
+    if not svc.is_configured:
+        return jsonify({"message": {"en": "WhatsApp not configured.", "ar": "لم يتم تكوين WhatsApp."}, "flag": 4}), 400
+
+    from app.models import Attendance, Student, Class
+    from sqlalchemy import and_
+
+    attendance_records = db.session.query(Attendance, Student, Class).join(
+        Student, Attendance.student_id == Student.id
+    ).join(
+        Class, Attendance.class_id == Class.id
+    ).filter(
+        and_(
+            Attendance.date == report_date,
+            Student.school_id == school_id,
+            Student.phone_number.isnot(None),
+            Student.phone_number != ''
+        )
+    ).all()
+
+    if not attendance_records:
+        return jsonify({"message": "لا توجد سجلات حضور للتاريخ المحدد أو لا توجد أرقام هواتف متاحة", "total": 0, "sent": 0, "failed": 0}), 200
+
+    students_to_notify = []
+    for attendance, student, class_obj in attendance_records:
+        absent_periods, late_periods, excused_periods = [], [], []
+        try:
+            absent_periods = eval(attendance.absent_periods) if isinstance(attendance.absent_periods, str) else (attendance.absent_periods or [])
+        except Exception:
+            pass
+        try:
+            late_periods = eval(attendance.late_periods) if isinstance(attendance.late_periods, str) else (attendance.late_periods or [])
+        except Exception:
+            pass
+        try:
+            excused_periods = eval(attendance.excused_periods) if isinstance(attendance.excused_periods, str) else (attendance.excused_periods or [])
+        except Exception:
+            pass
+
+        if absent_periods or late_periods or excused_periods:
+            students_to_notify.append({
+                'student_name': student.student_name,
+                'class_name': class_obj.name,
+                'phone_number': student.phone_number,
+                'absent_periods': absent_periods,
+                'late_periods': late_periods,
+                'excused_periods': excused_periods,
+            })
+
+    if not students_to_notify:
+        return jsonify({"message": "لا توجد طلاب لديهم مشاكل في الحضور للتاريخ المحدد", "total": 0, "sent": 0, "failed": 0}), 200
+
+    school_name = school.name or "المدرسة"
+
+    def build_message(recipient):
+        lines = [f"📚 {school_name}"]
+        lines.append(f"عزيزي ولي أمر الطالب/ة: {recipient['student_name']}")
+        lines.append(f"الصف: {recipient['class_name']} | التاريخ: {report_date}")
+        if recipient['absent_periods']:
+            lines.append(f"🔴 غياب في الحصص: {', '.join(str(p) for p in recipient['absent_periods'])}")
+        if recipient['late_periods']:
+            lines.append(f"🟡 تأخير في الحصص: {', '.join(str(p) for p in recipient['late_periods'])}")
+        if recipient['excused_periods']:
+            lines.append(f"🟢 غياب بعذر في الحصص: {', '.join(str(p) for p in recipient['excused_periods'])}")
+        lines.append("للاستفسار يرجى التواصل مع إدارة المدرسة.")
+        return "\n".join(lines)
+
+    results = svc.send_bulk_messages(students_to_notify, build_message, delay_seconds=delay)
+
+    return jsonify({
+        "message": f"تم الإرسال: {results['sent']} نجاح، {results['failed']} فشل",
+        "total": results['total'],
+        "sent": results['sent'],
+        "failed": results['failed'],
+        "errors": results['errors']
+    }), 200
+
+
+# ─────────────────────────────────────────────────────────────
+# SMS Configuration Routes
+# ─────────────────────────────────────────────────────────────
 
 @static_blueprint.route('/sms-config', methods=['GET'])
 @jwt_required()
