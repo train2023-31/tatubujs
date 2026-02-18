@@ -27,7 +27,8 @@ const Attendance = () => {
   const [isViewMode, setIsViewMode] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
-  // Update attendance records when subject or time changes
+  // Update attendance records when subject changes only. When period (selectedTime) changes,
+  // do not reset here so that existingAttendance onSuccess can set correct defaults (excuse / auto-absent) and checkboxes stay in sync.
   useEffect(() => {
     if (attendanceRecords.length > 0 && selectedSubject) {
       setAttendanceRecords(prev => 
@@ -35,7 +36,6 @@ const Attendance = () => {
           ...record,
           subject_id: parseInt(selectedSubject),
           class_time_num: selectedTime,
-          // When changing time, reset to present if no existing data
           is_present: true,
           is_Acsent: false,
           is_Excus: false,
@@ -44,7 +44,7 @@ const Attendance = () => {
         }))
       );
     }
-  }, [selectedSubject, selectedTime]);
+  }, [selectedSubject]);
 
   // Fetch classes
   const { data: classes, isLoading: classesLoading } = useQuery(
@@ -157,6 +157,28 @@ const Attendance = () => {
           }
         });
 
+        // إذا كان الطالب غائباً (هارب) في [1,2] أو [1,3] أو [1,2,3] يُحدد تلقائياً غائباً في الحصص التالية (تحديد فقط حتى الحفظ)
+        const studentIdsAutoAbsentInLaterPeriods = new Set();
+        if (selectedTime >= 4) {
+          const absentIn = (periodNum) => {
+            const periodData = data.class_time_data?.[periodNum];
+            if (!periodData || !periodData.attendance) return new Set();
+            const set = new Set();
+            periodData.attendance.forEach((att) => {
+              if (att.is_absent) set.add(att.student_id);
+            });
+            return set;
+          };
+          const absent1 = absentIn(1);
+          const absent2 = absentIn(2);
+          const absent3 = absentIn(3);
+          absent1.forEach((studentId) => {
+            if (absent2.has(studentId) || absent3.has(studentId)) {
+              studentIdsAutoAbsentInLaterPeriods.add(studentId);
+            }
+          });
+        }
+
         const applyDefaultForPeriod = (records) =>
           records.map((record) => {
             const hasExcuseInEarlyPeriods = studentIdsWithExcuseInEarlyPeriods.has(record.student_id);
@@ -170,6 +192,18 @@ const Attendance = () => {
                 is_Excus: true,
                 is_late: false,
                 ExcusNote: excuseNoteByStudent[record.student_id] || '',
+              };
+            }
+            if (selectedTime >= 4 && studentIdsAutoAbsentInLaterPeriods.has(record.student_id)) {
+              return {
+                ...record,
+                subject_id: parseInt(selectedSubject),
+                class_time_num: selectedTime,
+                is_present: false,
+                is_Acsent: true,
+                is_Excus: false,
+                is_late: false,
+                ExcusNote: '',
               };
             }
             return {
@@ -187,37 +221,33 @@ const Attendance = () => {
         if (data.class_time_data && data.class_time_data[selectedTime]) {
           const existingRecords = data.class_time_data[selectedTime].attendance || [];
           if (existingRecords.length > 0) {
-            // Update with existing data
-            const updatedRecords = attendanceRecords.map(record => {
-              const existing = existingRecords.find(ex => ex.student_id === record.student_id);
-              if (existing) {
+            setAttendanceRecords((current) =>
+              current.map(record => {
+                const existing = existingRecords.find(ex => ex.student_id === record.student_id);
+                if (existing) {
+                  return {
+                    ...record,
+                    subject_id: parseInt(selectedSubject),
+                    class_time_num: selectedTime,
+                    is_present: existing.is_present,
+                    is_Acsent: existing.is_absent,
+                    is_Excus: existing.is_excused,
+                    is_late: existing.is_late,
+                    ExcusNote: existing.ExcusNote || '',
+                  };
+                }
                 return {
                   ...record,
                   subject_id: parseInt(selectedSubject),
                   class_time_num: selectedTime,
-                  is_present: existing.is_present,
-                  is_Acsent: existing.is_absent,
-                  is_Excus: existing.is_excused,
-                  is_late: existing.is_late,
-                  ExcusNote: existing.ExcusNote || '',
                 };
-              }
-              return {
-                ...record,
-                subject_id: parseInt(selectedSubject),
-                class_time_num: selectedTime,
-              };
-            });
-            setAttendanceRecords(updatedRecords);
+              })
+            );
           } else {
-            // No existing data for this class time - default present; students with excuse in periods 1–3 → excuse
-            const updatedRecords = applyDefaultForPeriod(attendanceRecords);
-            setAttendanceRecords(updatedRecords);
+            setAttendanceRecords((current) => applyDefaultForPeriod(current));
           }
         } else {
-          // No class time data at all - default present; students with excuse in periods 1–3 → excuse
-          const updatedRecords = applyDefaultForPeriod(attendanceRecords);
-          setAttendanceRecords(updatedRecords);
+          setAttendanceRecords((current) => applyDefaultForPeriod(current));
         }
       }
     }
@@ -457,9 +487,17 @@ const Attendance = () => {
           {/* Note for teachers: default excuse from early periods */}
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800" role="note">
             <p className="font-medium mb-1">ملاحظة للمعلم:</p>
-            <p className="text-gray-700">
-              إذا كان الطالب قد سُجّل له <strong>«غائب»</strong> في الحصة الأولى أو الثانية أو الثالثة لنفس اليوم، سيظهر تلقائياً كـ <strong>«غائب»</strong> في هذه الحصة. يمكنك تعديل الحالة قبل الحفظ إذا لزم الأمر.
-            </p>
+            <ul className="list-disc list-inside text-gray-700 space-y-1">
+              <li>
+                إذا كان الطالب قد سُجّل له <strong>«غائب»</strong> في الحصة <strong>الأولى</strong> أو <strong>الثانية</strong> أو <strong>الثالثة</strong> لنفس اليوم، سيظهر تلقائياً كـ <strong>«غائب»</strong> في باقي الحصص .
+              </li>
+              <li>
+                إذا كان قد سُجّل <strong>«هارب»</strong> في الحصتين <strong>الأولى والثانية</strong>، أو <strong>الأولى والثالثة</strong>، أو <strong>الثلاث حصص الأولى</strong>، يُحدد تلقائياً <strong>«هارب»</strong> في الحصص التالية .
+              </li>
+              <li>
+              (التحديد فقط؛ التسجيل عند الضغط على حفظ الحضور).
+              </li>
+            </ul>
           </div>
         </div>
       </div>
@@ -1006,6 +1044,29 @@ const Attendance = () => {
                     })}
                   </div>
                 </div>
+
+                {/* Save attendance button at the end */}
+                {!isViewMode && (
+                  <div className="mt-6 flex justify-center">
+                    <button
+                      onClick={handleSubmit}
+                      disabled={!selectedClass || !selectedSubject || takeAttendanceMutation.isLoading || !allStudentsMarked()}
+                      className={`btn px-8 ${allStudentsMarked() ? 'btn-primary' : 'btn-secondary opacity-50 cursor-not-allowed'}`}
+                    >
+                      {takeAttendanceMutation.isLoading ? (
+                        <>
+                          <LoadingSpinner size="sm" />
+                          <span className="mr-2">جاري الحفظ...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-5 w-5 mr-2" />
+                          {allStudentsMarked() ? 'حفظ الحضور' : `حفظ الحضور (${getUnmarkedCount()} طالب لم يتم تحديد حالته)`}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </>
             ) : (
               <div className="text-center py-12">
