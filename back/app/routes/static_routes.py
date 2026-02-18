@@ -1560,6 +1560,7 @@ def send_whatsapp_reports():
     report_date = data.get('date')
     school_id = data.get('school_id', user.school_id)
     delay = float(data.get('delay_between_messages', 1.0))
+    student_ids = data.get('student_ids')  # optional: list of student ids to send to (only these)
 
     if not report_date:
         return jsonify({"message": {"en": "Date is required.", "ar": "التاريخ مطلوب."}, "flag": 2}), 400
@@ -1587,6 +1588,10 @@ def send_whatsapp_reports():
             Student.phone_number != ''
         )
     ).all()
+
+    if student_ids:
+        sid_set = set(int(s) for s in student_ids)
+        attendance_records = [(a, s, c) for a, s, c in attendance_records if s.id in sid_set]
 
     if not attendance_records:
         return jsonify({"message": "لا توجد سجلات حضور للتاريخ المحدد أو لا توجد أرقام هواتف متاحة", "total": 0, "sent": 0, "failed": 0}), 200
