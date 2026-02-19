@@ -358,11 +358,11 @@ function App() {
                   } 
                 />
                 
-                {/* WhatsApp Configuration - School Admin */}
+                {/* WhatsApp Configuration - Super Admin and School Admin */}
                 <Route 
                   path="whatsapp-configuration" 
                   element={
-                    <ProtectedRoute allowedRoles={['school_admin']}>
+                    <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
                       <WhatsAppConfiguration />
                     </ProtectedRoute>
                   } 

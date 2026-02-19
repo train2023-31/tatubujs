@@ -22,8 +22,9 @@ import {
   Power,
   PlusCircle,
   Terminal,
+  Building,
 } from 'lucide-react';
-import { authAPI } from '../../services/api';
+import { authAPI, classesAPI } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import toast from 'react-hot-toast';
@@ -49,6 +50,15 @@ const STATUS_LABELS = {
 const WhatsAppConfiguration = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const isAdmin = user?.role === 'admin';
+  const [selectedSchoolId, setSelectedSchoolId] = useState(null);
+  const effectiveSchoolId = isAdmin ? selectedSchoolId : user?.school_id;
+
+  const { data: schools } = useQuery(
+    'schools',
+    classesAPI.getAllSchools,
+    { enabled: !!user && isAdmin }
+  );
 
   const [config, setConfig] = useState({
     evolution_whatsapp_enabled: false,
@@ -74,10 +84,10 @@ const WhatsAppConfiguration = () => {
   const [testMsgText, setTestMsgText] = useState('رسالة تجريبية من نظام تتبع الحضور ✅');
 
   const { data: whatsappConfig, isLoading, error, refetch } = useQuery(
-    ['whatsappConfig', user?.school_id],
-    () => authAPI.getWhatsAppConfig(user?.school_id),
+    ['whatsappConfig', effectiveSchoolId],
+    () => authAPI.getWhatsAppConfig(effectiveSchoolId),
     {
-      enabled: !!user,
+      enabled: !!user && !!effectiveSchoolId,
       staleTime: 5 * 60 * 1000,
       onSuccess: (data) => {
         const cfg = data.whatsapp_config || {};
@@ -99,7 +109,7 @@ const WhatsAppConfiguration = () => {
     {
       onSuccess: () => {
         toast.success('تم حفظ الإعدادات بنجاح');
-        queryClient.invalidateQueries(['whatsappConfig', user?.school_id]);
+        queryClient.invalidateQueries(['whatsappConfig', effectiveSchoolId]);
         setIsSaving(false);
       },
       onError: (err) => {
@@ -115,7 +125,7 @@ const WhatsAppConfiguration = () => {
 
   const handleSave = () => {
     setIsSaving(true);
-    updateConfigMutation.mutate({ school_id: user?.school_id, ...config });
+    updateConfigMutation.mutate({ school_id: effectiveSchoolId, ...config });
   };
 
   const handleCreateInstance = async () => {
@@ -127,7 +137,7 @@ const WhatsAppConfiguration = () => {
     setInstanceCreateResult(null);
     try {
       const res = await authAPI.createWhatsAppInstance({
-        school_id: user?.school_id,
+        school_id: effectiveSchoolId,
         evolution_api_url: config.evolution_api_url,
         evolution_api_key: config.evolution_api_key,
         evolution_instance_name: config.evolution_instance_name,
@@ -148,7 +158,7 @@ const WhatsAppConfiguration = () => {
     setTestResults(null);
     try {
       const res = await authAPI.testWhatsAppConnection({
-        school_id: user?.school_id,
+        school_id: effectiveSchoolId,
         evolution_api_url: config.evolution_api_url,
         evolution_api_key: config.evolution_api_key,
         evolution_instance_name: config.evolution_instance_name,
@@ -171,7 +181,7 @@ const WhatsAppConfiguration = () => {
     setIsLoadingQR(true);
     setQrData(null);
     try {
-      const res = await authAPI.getWhatsAppQR(user?.school_id);
+      const res = await authAPI.getWhatsAppQR(effectiveSchoolId);
       if (res.success) {
         setQrData(res.data);
         setInstanceStatus('connecting');
@@ -189,7 +199,7 @@ const WhatsAppConfiguration = () => {
   const handleRefreshStatus = async () => {
     setIsRefreshingStatus(true);
     try {
-      const res = await authAPI.getWhatsAppStatus(user?.school_id);
+      const res = await authAPI.getWhatsAppStatus(effectiveSchoolId);
       setInstanceStatus(res.state || 'unknown');
       if (res.state === 'open') toast.success('WhatsApp متصل بنجاح ✅');
       else toast('الحالة: ' + (STATUS_LABELS[res.state] || res.state));
@@ -205,7 +215,7 @@ const WhatsAppConfiguration = () => {
     setIsSendingTest(true);
     try {
       await authAPI.sendWhatsAppTestMessage({
-        school_id: user?.school_id,
+        school_id: effectiveSchoolId,
         phone_number: testMsgPhone.trim(),
         message: testMsgText,
       });
@@ -239,6 +249,34 @@ const WhatsAppConfiguration = () => {
     );
   }
 
+  if (isAdmin && !effectiveSchoolId) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">إعدادات WhatsApp (مدير النظام)</h1>
+          <p className="text-gray-600">اختر المدرسة لإدارة إعدادات Evolution API وربط Instance الخاصة بها.</p>
+        </div>
+        <div className="card">
+          <div className="card-body">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <Building className="h-4 w-4 inline ml-1" /> المدرسة
+            </label>
+            <select
+              value={selectedSchoolId ?? ''}
+              onChange={(e) => setSelectedSchoolId(e.target.value ? Number(e.target.value) : null)}
+              className="input w-full max-w-md"
+            >
+              <option value="">-- اختر المدرسة --</option>
+              {(schools || []).map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
 
@@ -258,6 +296,24 @@ const WhatsAppConfiguration = () => {
           </button>
         </div>
       </div>
+
+      {/* School selector for super admin */}
+      {isAdmin && (
+        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+          <Building className="h-5 w-5 text-gray-600" />
+          <label className="text-sm font-medium text-gray-700">المدرسة:</label>
+          <select
+            value={effectiveSchoolId ?? ''}
+            onChange={(e) => setSelectedSchoolId(e.target.value ? Number(e.target.value) : null)}
+            className="input max-w-xs"
+          >
+            <option value="">-- اختر المدرسة --</option>
+            {(schools || []).map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Connection Status Banner */}
       <div className={`flex items-center justify-between p-4 rounded-lg border ${statusClass}`}>

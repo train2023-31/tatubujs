@@ -112,7 +112,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'إعدادات WhatsApp',
           href: '/app/whatsapp-configuration',
           icon: MessageSquare,
-          roles: ['school_admin'],
+          roles: ['admin', 'school_admin'],
         },
         {
           name: 'إرسال رسائل مخصصة',
@@ -162,7 +162,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'رموز QR للطلاب',
           href: '/app/student-qrcodes',
           icon: QrCode,
-          roles: ['school_admin', 'admin'],
+          roles: ['school_admin'],
         },
         
       ]

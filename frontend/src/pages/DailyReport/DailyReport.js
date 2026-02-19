@@ -552,7 +552,7 @@ ${attendanceStatus}
     const data = {
       date: selectedDate,
       school_id: user?.school_id,
-      delay_between_messages: 1.0,
+      delay_between_messages: 4, // seconds between messages (4s reduces WhatsApp blocking risk)
       ...(selectedStudents.size > 0 && { student_ids: Array.from(selectedStudents) })
     };
     sendEvolutionWhatsAppReportsMutation.mutate(data);

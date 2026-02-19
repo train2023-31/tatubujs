@@ -1559,7 +1559,8 @@ def send_whatsapp_reports():
     data = request.get_json() or {}
     report_date = data.get('date')
     school_id = data.get('school_id', user.school_id)
-    delay = float(data.get('delay_between_messages', 1.0))
+    # 3–5 seconds between messages reduces WhatsApp blocking risk; 1s is risky for bulk sends
+    delay = float(data.get('delay_between_messages', 4.0))
     student_ids = data.get('student_ids')  # optional: list of student ids to send to (only these)
 
     if not report_date:
@@ -1575,14 +1576,25 @@ def send_whatsapp_reports():
 
     from app.models import Attendance, Student, Class
     from sqlalchemy import and_
+    from datetime import datetime
 
+    # Normalize report_date for comparison (Attendance.date may be date or datetime)
+    if isinstance(report_date, str):
+        try:
+            report_date_parsed = datetime.strptime(report_date, '%Y-%m-%d').date()
+        except ValueError:
+            report_date_parsed = report_date
+    else:
+        report_date_parsed = report_date
+
+    # Attendance model: one row per (student, class, date, class_time_num, subject) with is_Acsent, is_Excus, is_late
     attendance_records = db.session.query(Attendance, Student, Class).join(
         Student, Attendance.student_id == Student.id
     ).join(
         Class, Attendance.class_id == Class.id
     ).filter(
         and_(
-            Attendance.date == report_date,
+            Attendance.date == report_date_parsed,
             Student.school_id == school_id,
             Student.phone_number.isnot(None),
             Student.phone_number != ''
@@ -1596,31 +1608,39 @@ def send_whatsapp_reports():
     if not attendance_records:
         return jsonify({"message": "لا توجد سجلات حضور للتاريخ المحدد أو لا توجد أرقام هواتف متاحة", "total": 0, "sent": 0, "failed": 0}), 200
 
-    students_to_notify = []
+    # Group by (student_id, class_id) and build absent/excused/late period lists from is_Acsent, is_Excus, is_late
+    students_aggregated = {}
     for attendance, student, class_obj in attendance_records:
-        absent_periods, late_periods, excused_periods = [], [], []
-        try:
-            absent_periods = eval(attendance.absent_periods) if isinstance(attendance.absent_periods, str) else (attendance.absent_periods or [])
-        except Exception:
-            pass
-        try:
-            late_periods = eval(attendance.late_periods) if isinstance(attendance.late_periods, str) else (attendance.late_periods or [])
-        except Exception:
-            pass
-        try:
-            excused_periods = eval(attendance.excused_periods) if isinstance(attendance.excused_periods, str) else (attendance.excused_periods or [])
-        except Exception:
-            pass
-
-        if absent_periods or late_periods or excused_periods:
-            students_to_notify.append({
-                'student_name': student.student_name,
+        key = (student.id, class_obj.id)
+        if key not in students_aggregated:
+            students_aggregated[key] = {
+                'student_name': getattr(student, 'fullName', None) or getattr(student, 'student_name', ''),
                 'class_name': class_obj.name,
                 'phone_number': student.phone_number,
-                'absent_periods': absent_periods,
-                'late_periods': late_periods,
-                'excused_periods': excused_periods,
-            })
+                'absent_periods': [],
+                'late_periods': [],
+                'excused_periods': [],
+            }
+        rec = students_aggregated[key]
+        if attendance.is_Acsent and attendance.class_time_num not in rec['absent_periods']:
+            rec['absent_periods'].append(attendance.class_time_num)
+        if attendance.is_Excus and attendance.class_time_num not in rec['excused_periods']:
+            rec['excused_periods'].append(attendance.class_time_num)
+        if attendance.is_late and attendance.class_time_num not in rec['late_periods']:
+            rec['late_periods'].append(attendance.class_time_num)
+
+    students_to_notify = [
+        {
+            'student_name': v['student_name'],
+            'class_name': v['class_name'],
+            'phone_number': v['phone_number'],
+            'absent_periods': sorted(v['absent_periods']),
+            'late_periods': sorted(v['late_periods']),
+            'excused_periods': sorted(v['excused_periods']),
+        }
+        for v in students_aggregated.values()
+        if v['absent_periods'] or v['late_periods'] or v['excused_periods']
+    ]
 
     if not students_to_notify:
         return jsonify({"message": "لا توجد طلاب لديهم مشاكل في الحضور للتاريخ المحدد", "total": 0, "sent": 0, "failed": 0}), 200

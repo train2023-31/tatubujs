@@ -30,7 +30,7 @@ CORS(auth_blueprint)
 # Memory-based failed login tracking (replace with Redis for production)
 FAILED_LOGINS = {}
 MAX_ATTEMPTS = 15
-BLOCK_TIME_SECONDS = 300  # 5 minutes
+BLOCK_TIME_SECONDS = 60  # 1 minutes
 
 @auth_blueprint.route('/login', methods=['POST'])
 @limiter.limit("5 per minute")  # Rate limiting: 5 requests per minute per IP

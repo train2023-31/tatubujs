@@ -111,9 +111,10 @@ class EvolutionWhatsAppService:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def send_bulk_messages(self, recipients: list, message_fn, delay_seconds: float = 1.0):
+    def send_bulk_messages(self, recipients: list, message_fn, delay_seconds: float = 4.0):
         """
         Send messages to multiple recipients with a delay between each.
+        Use 3–5+ seconds between messages to reduce WhatsApp blocking risk.
         recipients: list of dicts — each must have a 'phone_number' key
         message_fn: callable(recipient_dict) -> str
         Returns: { sent, failed, errors }
@@ -138,12 +139,17 @@ class EvolutionWhatsAppService:
 
     @staticmethod
     def _normalize_phone(phone: str) -> str:
-        """Strip non-digits and ensure international format."""
+        """Strip non-digits and ensure international format. Add Oman country code 968 if missing."""
         digits = ''.join(c for c in phone if c.isdigit())
         if digits.startswith('00'):
             digits = digits[2:]
-        elif digits.startswith('+'):
-            digits = digits[1:]
+        if not digits.startswith('968'):
+            # Omani local numbers are 8 digits; prepend 968 if not present
+            if len(digits) == 8:
+                digits = '968' + digits
+            elif len(digits) == 9 and digits.startswith('9'):
+                # e.g. 998912168 -> 968 + 98912168 (drop leading 9, add country code)
+                digits = '968' + digits[1:]
         return digits
 
     def create_instance(self, instance_name: str):
