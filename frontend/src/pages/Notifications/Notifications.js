@@ -17,6 +17,7 @@ const Notifications = () => {
     markAsRead,
     markAllAsRead,
     deleteNotification,
+    deleteAllNotifications,
   } = useNotifications();
 
   const {
@@ -148,13 +149,27 @@ const Notifications = () => {
             </button>
 
             {notifications.length > 0 && (
-              <button
-                onClick={markAllAsRead}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors"
-              >
-                <CheckCheck className="w-3.5 h-3.5" />
-                <span>تحديد الكل كمقروء</span>
-              </button>
+              <>
+                <button
+                  onClick={markAllAsRead}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors"
+                >
+                  <CheckCheck className="w-3.5 h-3.5" />
+                  <span>تحديد الكل كمقروء</span>
+                </button>
+                <button
+                  onClick={async () => {
+                    if (window.confirm('هل أنت متأكد من حذف جميع الإشعارات؟')) {
+                      const ok = await deleteAllNotifications();
+                      if (ok) loadNotifications();
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>حذف الكل</span>
+                </button>
+              </>
             )}
           </div>
         </div>

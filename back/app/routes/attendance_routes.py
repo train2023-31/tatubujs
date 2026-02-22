@@ -300,12 +300,21 @@ def get_attendance_by_class_and_subject(class_id):
     # Initialize the response structure
     grouped_by_class_time = defaultdict(lambda: {"subjects": [], "attendance": []})
 
-    # Query attendance for this class on the selected date
-    query = Attendance.query.filter_by(class_id=class_id, date=selected_date)
+    day_start = datetime.combine(selected_date, datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+
+    # Query attendance for this class on the selected date (index-friendly range)
+    query = Attendance.query.filter(
+        and_(
+            Attendance.class_id == class_id,
+            Attendance.date >= day_start,
+            Attendance.date < day_end,
+        )
+    )
 
     # If a subject_id is provided, filter by subject_id
     if selected_subject_id:
-        query = query.filter_by(subject_id=selected_subject_id)
+        query = query.filter(Attendance.subject_id == selected_subject_id)
 
     attendances = query.all()
 
@@ -377,6 +386,9 @@ def get_attendance_summary_all_classes():
         class_ids = [class_data[0] for class_data in classes_data]
         class_map = {class_data[0]: {'name': class_data[1], 'teacher_name': class_data[2]} for class_data in classes_data}
 
+        day_start = datetime.combine(selected_date, datetime.min.time())
+        day_end = day_start + timedelta(days=1)
+
         # Get all attendance data for all classes in one optimized query
         attendance_stats = db.session.query(
             Attendance.class_id,
@@ -388,7 +400,8 @@ def get_attendance_summary_all_classes():
         ).filter(
             and_(
                 Attendance.class_id.in_(class_ids),
-                Attendance.date == selected_date
+                Attendance.date >= day_start,
+                Attendance.date < day_end,
             )
         ).group_by(Attendance.class_id).all()
 
@@ -415,7 +428,8 @@ def get_attendance_summary_all_classes():
         ).filter(
             and_(
                 Attendance.class_id.in_(class_ids),
-                Attendance.date == selected_date,
+                Attendance.date >= day_start,
+                Attendance.date < day_end,
                 or_(Attendance.is_Acsent == True, Attendance.is_Excus == True, Attendance.is_late == True)
             )
         ).all()
@@ -427,7 +441,8 @@ def get_attendance_summary_all_classes():
         ).filter(
             and_(
                 Attendance.class_id.in_(class_ids),
-                Attendance.date == selected_date
+                Attendance.date >= day_start,
+                Attendance.date < day_end,
             )
         ).distinct().all()
 
@@ -563,14 +578,16 @@ def get_teacher_report():
             classes_taught = Class.query.filter_by(teacher_id=teacher.id).all()
             class_names = [cls.name for cls in classes_taught]
 
-            # Calculate recorded days (days with at least one record) for the date range
+            # Calculate recorded days (days with at least one record) for the date range (index-friendly)
+            range_start = datetime.combine(from_date, datetime.min.time())
+            range_end = datetime.combine(to_date, datetime.min.time()) + timedelta(days=1)
             recorded_days = db.session.query(
                 func.count(func.distinct(func.date(Attendance.date)))
             ).filter(
                 and_(
                     Attendance.teacher_id == teacher.id,
-                    func.date(Attendance.date) >= from_date,
-                    func.date(Attendance.date) <= to_date
+                    Attendance.date >= range_start,
+                    Attendance.date < range_end
                 )
             ).scalar()
 
@@ -593,7 +610,7 @@ def get_teacher_report():
             # Calculate expected classes based on weeks
             total_expected_classes = teacher_weekly_classes * number_of_weeks
 
-            # Get total actual classes recorded for additional info
+            # Get total actual classes recorded for additional info (index-friendly)
             teacher_actual_classes = db.session.query(
                 func.count(func.distinct(
                     func.concat(
@@ -603,8 +620,8 @@ def get_teacher_report():
             ).filter(
                 and_(
                     Attendance.teacher_id == teacher.id,
-                    func.date(Attendance.date) >= from_date,
-                    func.date(Attendance.date) <= to_date
+                    Attendance.date >= range_start,
+                    Attendance.date < range_end
                 )
             ).scalar()
 
@@ -845,6 +862,9 @@ def get_attendance_details_by_student():
     class_map = {class_id: class_name for class_id, class_name in class_ids}
     class_id_list = [class_id for class_id, _ in class_ids]
 
+    day_start = datetime.combine(selected_date, datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+
     # OPTIMIZATION 1: Single optimized query with all needed data
     # Use select_from to avoid multiple joins and get all data in one query
     attendance_records = db.session.query(
@@ -864,7 +884,8 @@ def get_attendance_details_by_student():
         Teacher, Teacher.id == Attendance.teacher_id
     ).filter(
         Attendance.class_id.in_(class_id_list),
-        Attendance.date == selected_date,
+        Attendance.date >= day_start,
+        Attendance.date < day_end,
         db.or_(
             Attendance.is_Acsent == True,
             Attendance.is_Excus == True,
@@ -1104,14 +1125,15 @@ def get_repeated_absence():
         return jsonify(week_start=range_start.isoformat(), week_end=range_end.isoformat(), min_days=min_days, students=[]), 200
 
     # Distinct (student_id, date) where is_Acsent OR is_Excus (absent or excused)
-    # Use func.date() because Attendance.date is DateTime
+    range_start_dt = datetime.combine(range_start, datetime.min.time())
+    range_end_dt = datetime.combine(range_end, datetime.min.time()) + timedelta(days=1)
     absent_per_student = defaultdict(set)
     q = (
         db.session.query(Attendance.student_id, func.date(Attendance.date).label('att_date'))
         .filter(
             Attendance.class_id.in_(class_ids),
-            func.date(Attendance.date) >= range_start,
-            func.date(Attendance.date) <= range_end,
+            Attendance.date >= range_start_dt,
+            Attendance.date < range_end_dt,
             or_(Attendance.is_Acsent == True, Attendance.is_Excus == True),
         )
         .distinct()
@@ -1231,6 +1253,9 @@ def get_students_with_excused_attendance():
             "flag": 3
         }), 400
 
+    day_start = datetime.combine(selected_date, datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+
     # Query for excused attendance records
     excused_attendance_records = (
         db.session.query(
@@ -1250,7 +1275,8 @@ def get_students_with_excused_attendance():
         .filter(
             Attendance.is_Excus == True,
             Class.school_id == school_id,
-            Attendance.date == selected_date
+            Attendance.date >= day_start,
+            Attendance.date < day_end,
         )
         .all()
     )

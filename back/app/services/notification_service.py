@@ -660,3 +660,62 @@ def notify_admin_forgot_students_on_bus(school_id, bus_data, created_by):
     except Exception as e:
         print(f"Error notifying admins about forgot students: {str(e)}")
         return None
+
+
+# ============================================================================
+# WHATSAPP NOTIFICATIONS
+# ============================================================================
+
+def notify_super_admin_whatsapp_request(school_id, school_name, created_by):
+    """
+    Notify super admin when a school requests WhatsApp API activation.
+    """
+    try:
+        admin_users = User.query.filter(
+            User.user_role == 'admin',
+            User.is_active == True
+        ).all()
+        admin_ids = [u.id for u in admin_users]
+        if not admin_ids:
+            return None
+        return create_notification(
+            school_id=school_id,
+            title="طلب تفعيل WhatsApp",
+            message=f"مدرسة {school_name} تطلب تفعيل خدمة WhatsApp. يرجى إضافة رابط API ومفتاح API للمدرسة.",
+            notification_type='general',
+            created_by=created_by,
+            priority='high',
+            target_user_ids=admin_ids,
+            related_entity_type='whatsapp',
+            action_url='/app/whatsapp-config'
+        )
+    except Exception as e:
+        print(f"Error notifying super admin about WhatsApp request: {str(e)}")
+        return None
+
+
+def notify_school_admins_whatsapp_activated(school_id, created_by):
+    """
+    Notify school admins and data analysts when super admin successfully connects/configures WhatsApp for their school.
+    """
+    try:
+        from app.services.notification_utils import get_users_by_role, create_targeted_notification, deduplicate_user_ids
+        admin_ids = get_users_by_role('school_admin', school_id)
+        analyst_ids = get_users_by_role('data_analyst', school_id)
+        target_ids = deduplicate_user_ids(admin_ids + analyst_ids)
+        if not target_ids:
+            return None
+        return create_targeted_notification(
+            school_id=school_id,
+            title="تم تفعيل WhatsApp لمدرستك",
+            message="تم ربط WhatsApp بنجاح من قبل مدير النظام. يمكنك الآن إضافة رقم الهاتف واسم الـ Instance ومسح رمز QR.",
+            notification_type='general',
+            created_by=created_by,
+            target_user_ids=target_ids,
+            priority='high',
+            related_entity_type='whatsapp',
+            action_url='/app/whatsapp-config'
+        )
+    except Exception as e:
+        print(f"Error notifying school admins about WhatsApp activation: {str(e)}")
+        return None

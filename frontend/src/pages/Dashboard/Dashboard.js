@@ -37,7 +37,7 @@ const Dashboard = () => {
     () => reportsAPI.getSchoolStatistics({ date: selectedDate }),
     {
       enabled: !!user && user.role !== 'student',
-      refetchInterval: 30000, // Refetch every 30 seconds
+      refetchInterval: 60000, // Refetch every 60 seconds
     }
   );
 
@@ -47,7 +47,7 @@ const Dashboard = () => {
     () => reportsAPI.getBulkOperationsStatus(),
     {
       enabled: !!user && user.role !== 'student',
-      refetchInterval: 30000, // Refetch every 30 seconds
+      refetchInterval: 100000, // Refetch every 100 seconds
     }
   );
 
@@ -57,7 +57,7 @@ const Dashboard = () => {
     () => reportsAPI.getTeacherAttendanceThisWeek({ date: selectedDate }),
     {
       enabled: !!user && (user.role === 'teacher' || user.role === 'school_admin' || user.role === 'data_analyst'),
-      refetchInterval: 30000,
+      refetchInterval: 60000,
     }
   );
 

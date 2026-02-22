@@ -16,6 +16,8 @@ class User(db.Model):
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=True)
 
+    __table_args__ = (db.Index('ix_users_school_id_is_active', 'school_id', 'is_active'),)
+
     __mapper_args__ = {
         'polymorphic_identity': 'user',
         'polymorphic_on': type
@@ -132,7 +134,9 @@ class ParentPickup(db.Model):
     confirmation_time = db.Column(db.DateTime(timezone=True), nullable=True)
     completed_time = db.Column(db.DateTime(timezone=True), nullable=True)
     pickup_date = db.Column(db.Date, nullable=False)  # Date of pickup for filtering
-    
+
+    __table_args__ = (db.Index('ix_parent_pickups_school_id_pickup_date', 'school_id', 'pickup_date'),)
+
     # Relationships
     student = db.relationship('Student', backref='pickup_requests')
     school = db.relationship('School', backref='pickup_requests')
@@ -210,6 +214,8 @@ class Class(db.Model):
     teacher_id = db.Column(db.Integer, db.ForeignKey('teachers.id'), nullable=False)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
 
+    __table_args__ = (db.Index('ix_classes_school_id_is_active', 'school_id', 'is_active'),)
+
     # Relationships
     school = db.relationship('School', back_populates='classes')
     teacher = db.relationship('Teacher', back_populates='classes')
@@ -244,6 +250,8 @@ class Subject(db.Model):
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=False)
     teacher_id = db.Column(db.Integer, db.ForeignKey('teachers.id'), nullable=False)
+
+    __table_args__ = (db.Index('ix_subjects_school_id_is_active', 'school_id', 'is_active'),)
 
     # Relationships
     attendances = db.relationship('Attendance', back_populates='subject')  # Fixed property name
@@ -283,9 +291,11 @@ class Attendance(db.Model):
     class_obj = db.relationship('Class', back_populates='attendances')
     subject = db.relationship('Subject', back_populates='attendances')
 
-     # Add a unique constraint
+     # Add a unique constraint and indexes for stats + per-student queries
     __table_args__ = (
         db.UniqueConstraint('student_id', 'class_id', 'date', 'class_time_num', 'subject_id', name='unique_attendance_record'),
+        db.Index('ix_attendances_class_id_date', 'class_id', 'date'),
+        db.Index('ix_attendances_student_id_date', 'student_id', 'date'),
     )
 
     def to_dict(self):
@@ -318,6 +328,8 @@ class News(db.Model):
     school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
     end_at = db.Column(db.DateTime, nullable=True)  # New field
+
+    __table_args__ = (db.Index('ix_news_school_id_type_is_active', 'school_id', 'type', 'is_active'),)
 
     # Relationships
     creator = db.relationship('User', backref='news_items')
@@ -407,7 +419,9 @@ class Bus(db.Model):
     location = db.Column(db.String(255), nullable=True) 
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
-    
+
+    __table_args__ = (db.Index('ix_buses_school_id_is_active', 'school_id', 'is_active'),)
+
     # Relationships
     school = db.relationship('School', backref='buses')
     driver = db.relationship('Driver', back_populates='bus')  # Changed relationship
@@ -443,7 +457,9 @@ class BusScan(db.Model):
     location = db.Column(db.String(255), nullable=True)
     scanned_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     notes = db.Column(db.Text, nullable=True)
-    
+
+    __table_args__ = (db.Index('ix_bus_scans_bus_id_scan_time', 'bus_id', 'scan_time'),)
+
     # Relationships
     student = db.relationship('Student', foreign_keys=[student_id], backref='bus_scans')
     bus = db.relationship('Bus', back_populates='scans')
@@ -480,10 +496,12 @@ class Timetable(db.Model):
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
     updated_at = db.Column(db.DateTime, default=get_oman_time().utcnow, onupdate=get_oman_time().utcnow)
-    
+
     # Raw XML data (optional - for reference)
     xml_data = db.Column(db.Text, nullable=True)
-    
+
+    __table_args__ = (db.Index('ix_timetables_school_id_is_active', 'school_id', 'is_active'),)
+
     # Relationships
     school = db.relationship('School', backref='timetables')
     creator = db.relationship('User', backref='timetables_created')
@@ -642,7 +660,9 @@ class TeacherSubstitution(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
-    
+
+    __table_args__ = (db.Index('ix_teacher_substitutions_school_id', 'school_id'),)
+
     # Relationships
     timetable = db.relationship('Timetable', backref='substitutions')
     assignments = db.relationship('SubstitutionAssignment', back_populates='substitution', cascade='all, delete-orphan')
@@ -742,10 +762,12 @@ class Notification(db.Model):
     created_at = db.Column(db.DateTime, default=get_oman_time().utcnow)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     expires_at = db.Column(db.DateTime, nullable=True)  # Optional expiration
-    
+
     # Action link (optional)
     action_url = db.Column(db.String(500), nullable=True)  # Deep link to specific page
-    
+
+    __table_args__ = (db.Index('ix_notifications_school_id_is_active', 'school_id', 'is_active'),)
+
     # Relationships
     school = db.relationship('School', backref='notifications')
     creator = db.relationship('User', foreign_keys=[created_by], backref='notifications_created')

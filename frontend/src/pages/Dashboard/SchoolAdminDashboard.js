@@ -427,7 +427,7 @@ const SchoolAdminDashboard = ({ schoolStats, teacherAttendance, statsLoading, te
                 <h4 className="font-medium text-gray-900 mb-1 text-sm">بدء تسجيل الحضور</h4>
                 <p className="text-xs text-gray-600 mb-2">
                   {bulkOpsStatus?.step_status?.step7_attendance?.completed 
-                    ? `تم تسجيل ${bulkOpsStatus.step_status.step7_attendance?.count || bulkOpsStatus.step_status.step5_attendance?.count || 0} سجل حضور في آخر 30 يوم`
+                    ? `تم تسجيل ${bulkOpsStatus.step_status.step7_attendance?.count || bulkOpsStatus.step_status.step5_attendance?.count || 0} سجل حضور في آخر 1 يوم`
                     : 'بعد إضافة المعلمين والطلاب والمواد، يمكنك البدء في تسجيل الحضور اليومي'
                   }
                 </p>

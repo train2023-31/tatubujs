@@ -7,7 +7,7 @@ from app import db
 from werkzeug.security import generate_password_hash
 from io import StringIO
 import pandas as pd
-from sqlalchemy import func, and_ ,or_, case
+from sqlalchemy import func, and_ ,or_, case, select
 from datetime import datetime, date ,timedelta
 from twilio.rest import Client
 from app.logger import log_action
@@ -24,7 +24,9 @@ from app.services.notification_service import (
     notify_teachers_school_news,
     notify_teachers_system_news,
     notify_driver_school_news,
-    notify_admin_system_news
+    notify_admin_system_news,
+    notify_super_admin_whatsapp_request,
+    notify_school_admins_whatsapp_activated,
 )
 
 
@@ -38,158 +40,279 @@ CORS(static_blueprint)
 def get_school_statistics(user, school_id, selected_date):
     """Get statistics for a school based on user role."""
 
-    # Ensure the selected_date is a `date` object
     if isinstance(selected_date, str):
         selected_date = datetime.strptime(selected_date, '%Y-%m-%d').date()
 
-    # Retrieve the school
+    day_start = datetime.combine(selected_date, datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+
     school = db.session.query(School).filter(School.id == school_id, School.is_active == True).first()
     if not school:
         return {"error": "School not found or inactive"}
 
-    # Active class IDs
-    classes = db.session.query(Class.id).filter(
+    # Active class IDs subquery (reused across all queries)
+    active_classes = db.session.query(Class.id).filter(
         and_(Class.school_id == school_id, Class.is_active == True)
     ).subquery()
 
-    # Number of active students
     num_students = db.session.query(func.count(Student.id)).filter(
         and_(Student.school_id == school_id, Student.is_active == True)
     ).scalar()
 
-    # Number of active teachers
     num_teachers = db.session.query(func.count(Teacher.id)).filter(
         and_(Teacher.school_id == school_id, Teacher.is_active == True)
     ).scalar()
 
-    # Number of active classes
     num_classes = db.session.query(func.count(Class.id)).filter(
-        Class.id.in_(classes)
+        Class.id.in_(active_classes)
     ).scalar()
 
-    # Count distinct student_ids for each attendance category
-    num_absents = db.session.query(func.count(func.distinct(Attendance.student_id))).filter(
+    # All four attendance counts in a single query using conditional aggregation
+    att = db.session.query(
+        func.count(func.distinct(
+            case((Attendance.is_Acsent == True, Attendance.student_id))
+        )).label('num_absents'),
+        func.count(func.distinct(
+            case((Attendance.is_late == True, Attendance.student_id))
+        )).label('num_lates'),
+        func.count(func.distinct(
+            case((Attendance.is_present == True, Attendance.student_id))
+        )).label('num_presents'),
+        func.count(func.distinct(
+            case((Attendance.is_Excus == True, Attendance.student_id))
+        )).label('num_excus'),
+    ).filter(
         and_(
-            Attendance.class_id.in_(classes),
-            Attendance.date == selected_date,
-            Attendance.is_Acsent == True
+            Attendance.class_id.in_(active_classes),
+            Attendance.date >= day_start,
+            Attendance.date < day_end,
         )
-    ).scalar()
-
-    num_lates = db.session.query(func.count(func.distinct(Attendance.student_id))).filter(
-        and_(
-            Attendance.class_id.in_(classes),
-            Attendance.date == selected_date,
-            Attendance.is_late == True
-        )
-    ).scalar()
-
-    num_presents = db.session.query(func.count(func.distinct(Attendance.student_id))).filter(
-        and_(
-            Attendance.class_id.in_(classes),
-            Attendance.date == selected_date,
-            Attendance.is_present == True
-        )
-    ).scalar()
-
-    number_excus = db.session.query(func.count(func.distinct(Attendance.student_id))).filter(
-        and_(
-            Attendance.class_id.in_(classes),
-            Attendance.date == selected_date,
-            Attendance.is_Excus == True
-        )
-    ).scalar()
+    ).first()
 
     return {
         "school_name": school.name,
         "number_of_students": num_students,
         "number_of_teachers": num_teachers,
         "number_of_classes": num_classes,
-        "number_of_absents": num_absents,
-        "number_of_lates": num_lates,
-        "number_of_presents": num_presents,
-        "number_of_excus": number_excus
+        "number_of_absents": att.num_absents or 0,
+        "number_of_lates": att.num_lates or 0,
+        "number_of_presents": att.num_presents or 0,
+        "number_of_excus": att.num_excus or 0
     }
 
 
 def get_class_statistics(user, school_id, selected_date):
     """Get the number of absents, presents, excused, total students, and teacher's name for each active class in a school on a specific date."""
 
-    # Ensure the selected_date is a `date` object
     if isinstance(selected_date, str):
         selected_date = datetime.strptime(selected_date, '%Y-%m-%d').date()
 
-    # Filter classes in this school
-    class_query = db.session.query(Class.id, Class.name, Teacher.fullName).join(Teacher).filter(
+    day_start = datetime.combine(selected_date, datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+
+    # All active classes with their teacher names — single query
+    classes = db.session.query(Class.id, Class.name, Teacher.fullName).join(Teacher).filter(
         and_(Class.school_id == school_id, Class.is_active == True)
-    )
+    ).all()
 
-    classes = class_query.all()
+    if not classes:
+        return []
 
-    # Collect statistics for each class
+    class_ids = [c.id for c in classes]
+
+    # Total students per class — single bulk query
+    student_counts = db.session.query(
+        student_classes.c.class_id,
+        func.count(student_classes.c.student_id).label('total')
+    ).filter(
+        student_classes.c.class_id.in_(class_ids)
+    ).group_by(student_classes.c.class_id).all()
+
+    students_map = {row.class_id: row.total for row in student_counts}
+
+    # All attendance stats for all classes — single bulk query with conditional aggregation
+    att_rows = db.session.query(
+        Attendance.class_id,
+        func.count(func.distinct(
+            case((Attendance.is_present == True, Attendance.student_id))
+        )).label('presents'),
+        func.count(func.distinct(
+            case((Attendance.is_Acsent == True, Attendance.student_id))
+        )).label('absents'),
+        func.count(func.distinct(
+            case((Attendance.is_Excus == True, Attendance.student_id))
+        )).label('excus'),
+        func.count(func.distinct(
+            case((Attendance.is_late == True, Attendance.student_id))
+        )).label('lates'),
+    ).filter(
+        and_(
+            Attendance.class_id.in_(class_ids),
+            Attendance.date >= day_start,
+            Attendance.date < day_end,
+        )
+    ).group_by(Attendance.class_id).all()
+
+    attendance_map = {row.class_id: row for row in att_rows}
+
     class_stats = []
     for class_id, class_name, teacher_name in classes:
-        # Total students in the class
-        total_students = db.session.query(func.count(student_classes.c.student_id)).filter(
-            student_classes.c.class_id == class_id
-        ).scalar()
-
-        # Number of presents
-        number_of_presents = db.session.query(func.count(func.distinct(Attendance.student_id))).filter(
-            and_(
-                Attendance.class_id == class_id,
-                Attendance.date == selected_date,
-                Attendance.is_present == True
-            )
-        ).scalar()
-
-        # Number of absents
-        number_of_absents = db.session.query(func.count(func.distinct(Attendance.student_id))).filter(
-            and_(
-                Attendance.class_id == class_id,
-                Attendance.date == selected_date,
-                Attendance.is_Acsent == True
-            )
-        ).scalar()
-
-        # Number of excused
-        number_of_excus = db.session.query(func.count(func.distinct(Attendance.student_id))).filter(
-            and_(
-                Attendance.class_id == class_id,
-                Attendance.date == selected_date,
-                Attendance.is_Excus == True
-            )
-        ).scalar()
-
-        # Number of lates
-        number_of_lates = db.session.query(func.count(func.distinct(Attendance.student_id))).filter(
-            and_(
-                Attendance.class_id == class_id,
-                Attendance.date == selected_date,
-                Attendance.is_late == True
-            )
-        ).scalar()
-
+        att = attendance_map.get(class_id)
         class_stats.append({
             "class_id": class_id,
             "class_name": class_name,
             "teacher_name": teacher_name,
-            "total_students": total_students,
-            "number_of_presents": number_of_presents,
-            "number_of_absents": number_of_absents,
-            "number_of_lates": number_of_lates,
-            "number_of_excus": number_of_excus
+            "total_students": students_map.get(class_id, 0),
+            "number_of_presents": att.presents if att else 0,
+            "number_of_absents": att.absents if att else 0,
+            "number_of_lates": att.lates if att else 0,
+            "number_of_excus": att.excus if att else 0
         })
 
     return class_stats
 
 
 def get_school_with_class_statistics(user, school_id, selected_date):
-    """Get school statistics along with class-level stats for a specific date."""
-    school_stats = get_school_statistics(user, school_id, selected_date)
-    class_stats = get_class_statistics(user, school_id, selected_date)
-    school_stats['classes'] = class_stats
-    return school_stats
+    """Get school + per-class statistics for a date in 4 DB queries."""
+
+    if isinstance(selected_date, str):
+        selected_date = datetime.strptime(selected_date, '%Y-%m-%d').date()
+
+    # Index-friendly date range for attendances.date (DateTime column)
+    day_start = datetime.combine(selected_date, datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+
+    # ── Query 1 ──────────────────────────────────────────────────────────────
+    # School name + active student/teacher/class counts as scalar subqueries,
+    # all fetched in a single SQL SELECT.
+    students_sq = select(func.count(Student.id)).where(
+        and_(Student.school_id == school_id, Student.is_active == True)
+    ).scalar_subquery()
+
+    teachers_sq = select(func.count(Teacher.id)).where(
+        and_(Teacher.school_id == school_id, Teacher.is_active == True)
+    ).scalar_subquery()
+
+    classes_sq = select(func.count(Class.id)).where(
+        and_(Class.school_id == school_id, Class.is_active == True)
+    ).scalar_subquery()
+
+    school_row = db.session.query(
+        School.name,
+        students_sq.label('num_students'),
+        teachers_sq.label('num_teachers'),
+        classes_sq.label('num_classes'),
+    ).filter(School.id == school_id, School.is_active == True).first()
+
+    if not school_row:
+        return {"error": "School not found or inactive"}
+
+    # ── Query 2 ──────────────────────────────────────────────────────────────
+    # Active classes with teacher names and enrolled student count,
+    # all in one JOIN + GROUP BY query.
+    classes_rows = db.session.query(
+        Class.id,
+        Class.name,
+        Teacher.fullName,
+        func.count(student_classes.c.student_id).label('total_students'),
+    ).join(Teacher).outerjoin(
+        student_classes, student_classes.c.class_id == Class.id
+    ).filter(
+        and_(Class.school_id == school_id, Class.is_active == True)
+    ).group_by(Class.id, Class.name, Teacher.fullName).all()
+
+    if not classes_rows:
+        return {
+            "school_name": school_row.name,
+            "number_of_students": school_row.num_students,
+            "number_of_teachers": school_row.num_teachers,
+            "number_of_classes": school_row.num_classes,
+            "number_of_absents": 0,
+            "number_of_lates": 0,
+            "number_of_presents": 0,
+            "number_of_excus": 0,
+            "classes": [],
+        }
+
+    class_ids = [r.id for r in classes_rows]
+
+    # ── Query 3 ──────────────────────────────────────────────────────────────
+    # Per-class attendance using conditional aggregation + GROUP BY.
+    att_rows = db.session.query(
+        Attendance.class_id,
+        func.count(func.distinct(
+            case((Attendance.is_present == True, Attendance.student_id))
+        )).label('presents'),
+        func.count(func.distinct(
+            case((Attendance.is_Acsent == True, Attendance.student_id))
+        )).label('absents'),
+        func.count(func.distinct(
+            case((Attendance.is_Excus == True, Attendance.student_id))
+        )).label('excus'),
+        func.count(func.distinct(
+            case((Attendance.is_late == True, Attendance.student_id))
+        )).label('lates'),
+    ).filter(
+        and_(
+            Attendance.class_id.in_(class_ids),
+            Attendance.date >= day_start,
+            Attendance.date < day_end,
+        )
+    ).group_by(Attendance.class_id).all()
+
+    attendance_map = {row.class_id: row for row in att_rows}
+
+    # ── Query 4 ──────────────────────────────────────────────────────────────
+    # School-level attendance uses DISTINCT student_id across all classes,
+    # so it must stay a separate aggregation (cannot safely sum class totals
+    # if a student appears in more than one class on the same day).
+    school_att = db.session.query(
+        func.count(func.distinct(
+            case((Attendance.is_Acsent == True, Attendance.student_id))
+        )).label('num_absents'),
+        func.count(func.distinct(
+            case((Attendance.is_late == True, Attendance.student_id))
+        )).label('num_lates'),
+        func.count(func.distinct(
+            case((Attendance.is_present == True, Attendance.student_id))
+        )).label('num_presents'),
+        func.count(func.distinct(
+            case((Attendance.is_Excus == True, Attendance.student_id))
+        )).label('num_excus'),
+    ).filter(
+        and_(
+            Attendance.class_id.in_(class_ids),
+            Attendance.date >= day_start,
+            Attendance.date < day_end,
+        )
+    ).first()
+
+    # ── Assemble result in Python (zero DB cost) ──────────────────────────────
+    class_stats = []
+    for row in classes_rows:
+        att = attendance_map.get(row.id)
+        class_stats.append({
+            "class_id": row.id,
+            "class_name": row.name,
+            "teacher_name": row.fullName,
+            "total_students": row.total_students,
+            "number_of_presents": att.presents if att else 0,
+            "number_of_absents": att.absents if att else 0,
+            "number_of_lates": att.lates if att else 0,
+            "number_of_excus": att.excus if att else 0,
+        })
+
+    return {
+        "school_name": school_row.name,
+        "number_of_students": school_row.num_students,
+        "number_of_teachers": school_row.num_teachers,
+        "number_of_classes": school_row.num_classes,
+        "number_of_absents": school_att.num_absents or 0,
+        "number_of_lates": school_att.num_lates or 0,
+        "number_of_presents": school_att.num_presents or 0,
+        "number_of_excus": school_att.num_excus or 0,
+        "classes": class_stats,
+    }
 
 
 
@@ -250,6 +373,9 @@ def teacher_attendance_this_week():
     start_of_week = selected_date - timedelta(days=adjusted_day)
     end_of_week = start_of_week + timedelta(days=4)
 
+    week_start_dt = datetime.combine(start_of_week, datetime.min.time())
+    week_end_dt = datetime.combine(end_of_week, datetime.min.time()) + timedelta(days=1)
+
     teacher_attendance_summary = []
 
     # 3️⃣ If user is a teacher
@@ -269,8 +395,8 @@ def teacher_attendance_this_week():
         ).filter(
             and_(
                 Attendance.teacher_id == teacher.id,
-                func.date(Attendance.date) >= start_of_week.date(),
-                func.date(Attendance.date) <= end_of_week.date()
+                Attendance.date >= week_start_dt,
+                Attendance.date < week_end_dt
             )
         ).scalar()
 
@@ -298,8 +424,8 @@ def teacher_attendance_this_week():
             ).filter(
                 and_(
                     Attendance.teacher_id == teacher.id,
-                    func.date(Attendance.date) >= start_of_week.date(),
-                    func.date(Attendance.date) <= end_of_week.date()
+                    Attendance.date >= week_start_dt,
+                    Attendance.date < week_end_dt
                 )
             ).scalar()
 
@@ -351,6 +477,9 @@ def teacher_master_report():
         if start_date > end_date:
             return jsonify(message="Start date cannot be after end date."), 400
 
+        range_start_dt = datetime.combine(start_date, datetime.min.time())
+        range_end_dt = datetime.combine(end_date, datetime.min.time()) + timedelta(days=1)
+
         teacher_master_summary = []
 
         # If user is a teacher
@@ -359,14 +488,14 @@ def teacher_master_report():
             if not teacher:
                 return jsonify(message="Teacher not found."), 404
 
-            # Calculate recorded days (days with at least one record) for the date range
+            # Calculate recorded days (days with at least one record) for the date range (index-friendly)
             recorded_days = db.session.query(
                 func.count(func.distinct(func.date(Attendance.date)))
             ).filter(
                 and_(
                     Attendance.teacher_id == teacher.id,
-                    func.date(Attendance.date) >= start_date,
-                    func.date(Attendance.date) <= end_date
+                    Attendance.date >= range_start_dt,
+                    Attendance.date < range_end_dt
                 )
             ).scalar()
 
@@ -401,14 +530,14 @@ def teacher_master_report():
             teachers = Teacher.query.filter_by(school_id=user.school_id).all()
 
             for teacher in teachers:
-                # Calculate recorded days (days with at least one record) for the date range
+                # Calculate recorded days (days with at least one record) for the date range (index-friendly)
                 recorded_days = db.session.query(
                     func.count(func.distinct(func.date(Attendance.date)))
                 ).filter(
                     and_(
                         Attendance.teacher_id == teacher.id,
-                        func.date(Attendance.date) >= start_date,
-                        func.date(Attendance.date) <= end_date
+                        Attendance.date >= range_start_dt,
+                        Attendance.date < range_end_dt
                     )
                 ).scalar()
 
@@ -626,6 +755,9 @@ def send_bulk_daily_reports():
         from app.models import Attendance, Student, Class
         from sqlalchemy import and_, or_
 
+        day_start = datetime.combine(date if hasattr(date, 'year') else datetime.strptime(str(date), '%Y-%m-%d').date(), datetime.min.time())
+        day_end = day_start + timedelta(days=1)
+
         # Query students with attendance records for the date
         attendance_records = db.session.query(Attendance, Student, Class).join(
             Student, Attendance.student_id == Student.id
@@ -633,7 +765,8 @@ def send_bulk_daily_reports():
             Class, Attendance.class_id == Class.id
         ).filter(
             and_(
-                Attendance.date == date,
+                Attendance.date >= day_start,
+                Attendance.date < day_end,
                 Student.school_id == school_id,
                 Student.phone_number.isnot(None),
                 Student.phone_number != ''
@@ -1198,7 +1331,7 @@ def get_bulk_operations_status():
     attendance_count = Attendance.query.join(Class).filter(
         and_(
             Class.school_id == school_id,
-            Attendance.date >= date.today() - timedelta(days=30)  # Check last 30 days
+            Attendance.date >= date.today() - timedelta(days=3)  # Check last 30 days
         )
     ).count()
     step_status['step7_attendance'] = {
@@ -1246,6 +1379,56 @@ def get_bulk_operations_status():
 # Evolution API (WhatsApp) Routes
 # ─────────────────────────────────────────────────────────────
 
+STATUS_LABELS_WHATSAPP = {
+    'open': 'متصل ✅',
+    'connecting': 'جاري الاتصال...',
+    'close': 'غير متصل',
+    'disconnected': 'غير متصل',
+    'not_configured': 'غير مكوَّن',
+    'unknown': 'غير معروف',
+}
+
+
+@static_blueprint.route('/schools-whatsapp-status', methods=['GET'])
+@jwt_required()
+def get_schools_whatsapp_status():
+    """Get WhatsApp status for all schools (super admin only)."""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if user.user_role != 'admin':
+        return jsonify({"message": {"en": "Unauthorized.", "ar": "غير مصرح."}, "flag": 1}), 403
+
+    try:
+        schools = School.query.filter_by(is_active=True).order_by(School.name).all()
+        result = []
+        for s in schools:
+            has_api_config = bool(s.evolution_api_url and s.evolution_api_key)
+            status = (s.evolution_instance_status or 'unknown').lower() if s.evolution_instance_status else 'unknown'
+            if not has_api_config and not s.evolution_instance_name:
+                status_label = 'غير مكوَّن'
+                status_badge = 'not_configured'
+            elif not has_api_config and (s.evolution_instance_name or s.evolution_phone_number):
+                status_label = 'في انتظار الموافقة'
+                status_badge = 'pending'
+            else:
+                status_label = STATUS_LABELS_WHATSAPP.get(status, status or 'غير معروف')
+                status_badge = status or 'unknown'
+            result.append({
+                "id": s.id,
+                "name": s.name,
+                "evolution_whatsapp_enabled": bool(s.evolution_whatsapp_enabled),
+                "has_api_config": has_api_config,
+                "evolution_instance_status": s.evolution_instance_status or 'unknown',
+                "status_label": status_label,
+                "status_badge": status_badge,
+                "evolution_phone_number": s.evolution_phone_number or None,
+                "evolution_instance_name": s.evolution_instance_name or None,
+            })
+        return jsonify({"schools": result, "flag": 2}), 200
+    except Exception as e:
+        return jsonify({"message": {"en": str(e), "ar": str(e)}, "flag": 3}), 500
+
+
 @static_blueprint.route('/whatsapp-config', methods=['GET'])
 @jwt_required()
 def get_whatsapp_config():
@@ -1265,15 +1448,18 @@ def get_whatsapp_config():
         if not school:
             return jsonify({"message": {"en": "School not found.", "ar": "المدرسة غير موجودة."}, "flag": 3}), 404
 
+        cfg = {
+            "evolution_whatsapp_enabled": school.evolution_whatsapp_enabled,
+            "evolution_instance_name": school.evolution_instance_name,
+            "evolution_phone_number": school.evolution_phone_number,
+            "evolution_instance_status": school.evolution_instance_status,
+        }
+        if user.user_role == 'admin':
+            cfg["evolution_api_url"] = school.evolution_api_url
+            cfg["evolution_api_key"] = school.evolution_api_key
+
         return jsonify({
-            "whatsapp_config": {
-                "evolution_whatsapp_enabled": school.evolution_whatsapp_enabled,
-                "evolution_api_url": school.evolution_api_url,
-                "evolution_api_key": school.evolution_api_key,
-                "evolution_instance_name": school.evolution_instance_name,
-                "evolution_phone_number": school.evolution_phone_number,
-                "evolution_instance_status": school.evolution_instance_status,
-            },
+            "whatsapp_config": cfg,
             "school_id": school_id,
             "flag": 4
         }), 200
@@ -1303,10 +1489,21 @@ def update_whatsapp_config():
         if not school:
             return jsonify({"message": {"en": "School not found.", "ar": "المدرسة غير موجودة."}, "flag": 3}), 404
 
+        # Capture state before update for notification triggers
+        had_no_api_config = not (school.evolution_api_url and school.evolution_api_key)
+        had_no_instance_or_phone = not (school.evolution_instance_name or school.evolution_phone_number)
+        admin_is_connecting = (
+            user.user_role == 'admin' and
+            data.get('evolution_api_url') and data.get('evolution_api_key')
+        )
+
         updatable_fields = [
-            'evolution_whatsapp_enabled', 'evolution_api_url', 'evolution_api_key',
-            'evolution_instance_name', 'evolution_instance_token', 'evolution_phone_number',
+            'evolution_whatsapp_enabled', 'evolution_instance_name',
+            'evolution_instance_token', 'evolution_phone_number',
         ]
+        if user.user_role == 'admin':
+            updatable_fields.extend(['evolution_api_url', 'evolution_api_key'])
+
         for field in updatable_fields:
             if field in data:
                 setattr(school, field, data[field])
@@ -1314,16 +1511,46 @@ def update_whatsapp_config():
         db.session.commit()
         invalidate_service_cache(school_id)
 
+        # Notifications
+        try:
+            # Super admin: when a school (school_admin) saves phone and/or instance name and doesn't have API config yet
+            school_requesting = (
+                user.user_role == 'school_admin' and
+                had_no_api_config and
+                had_no_instance_or_phone and
+                (data.get('evolution_instance_name') or data.get('evolution_phone_number'))
+            )
+            if school_requesting:
+                notify_super_admin_whatsapp_request(
+                    school_id=school_id,
+                    school_name=school.name,
+                    created_by=user_id
+                )
+            # School admins/analysts: when super admin first sets API URL+Key (confirms connection) for their school
+            admin_just_activated = (
+                admin_is_connecting and had_no_api_config
+            )
+            if admin_just_activated:
+                notify_school_admins_whatsapp_activated(
+                    school_id=school_id,
+                    created_by=user_id
+                )
+        except Exception as notif_err:
+            logger.warning("WhatsApp notification failed: %s", notif_err)
+
+        cfg = {
+            "evolution_whatsapp_enabled": school.evolution_whatsapp_enabled,
+            "evolution_instance_name": school.evolution_instance_name,
+            "evolution_phone_number": school.evolution_phone_number,
+            "evolution_instance_status": school.evolution_instance_status,
+        }
+        if user.user_role == 'admin':
+            cfg["evolution_api_url"] = school.evolution_api_url
+            cfg["evolution_api_key"] = school.evolution_api_key
+
         return jsonify({
             "message": {"en": "WhatsApp configuration updated successfully", "ar": "تم تحديث إعدادات WhatsApp بنجاح"},
-            "whatsapp_config": {
-                "evolution_whatsapp_enabled": school.evolution_whatsapp_enabled,
-                "evolution_api_url": school.evolution_api_url,
-                "evolution_api_key": school.evolution_api_key,
-                "evolution_instance_name": school.evolution_instance_name,
-                "evolution_phone_number": school.evolution_phone_number,
-                "evolution_instance_status": school.evolution_instance_status,
-            },
+            "whatsapp_config": cfg,
             "school_id": school_id,
             "flag": 4
         }), 200
@@ -1587,6 +1814,9 @@ def send_whatsapp_reports():
     else:
         report_date_parsed = report_date
 
+    day_start = datetime.combine(report_date_parsed, datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+
     # Attendance model: one row per (student, class, date, class_time_num, subject) with is_Acsent, is_Excus, is_late
     attendance_records = db.session.query(Attendance, Student, Class).join(
         Student, Attendance.student_id == Student.id
@@ -1594,7 +1824,8 @@ def send_whatsapp_reports():
         Class, Attendance.class_id == Class.id
     ).filter(
         and_(
-            Attendance.date == report_date_parsed,
+            Attendance.date >= day_start,
+            Attendance.date < day_end,
             Student.school_id == school_id,
             Student.phone_number.isnot(None),
             Student.phone_number != ''

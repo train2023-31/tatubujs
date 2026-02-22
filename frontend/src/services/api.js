@@ -196,6 +196,7 @@ export const authAPI = {
 
   // Evolution API (WhatsApp) Configuration
   getWhatsAppConfig: (schoolId) => api.get('/static/whatsapp-config', { params: { school_id: schoolId } }).then(res => res.data),
+  getSchoolsWhatsAppStatus: () => api.get('/static/schools-whatsapp-status').then(res => res.data),
   updateWhatsAppConfig: (data) => api.put('/static/whatsapp-config', data).then(res => res.data),
   createWhatsAppInstance: (data) => api.post('/static/create-whatsapp-instance', data).then(res => res.data),
   testWhatsAppConnection: (data) => api.post('/static/test-whatsapp-connection', data).then(res => res.data),

@@ -377,6 +377,35 @@ export const NotificationProvider = ({ children }) => {
     }
   }, [token, getAxiosConfig, fetchUnreadCount]);
 
+  // Delete all notifications for the current user (soft delete)
+  const deleteAllNotifications = useCallback(async () => {
+    if (!token) return false;
+
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/notifications/delete-all`,
+        {},
+        getAxiosConfig()
+      );
+
+      const count = response.data?.count ?? 0;
+      setNotifications([]);
+      setUnreadCount(0);
+      fetchUnreadCount();
+
+      if (count > 0) {
+        toast.success(`تم حذف ${count} إشعار`);
+      } else {
+        toast.success('لا توجد إشعارات للحذف');
+      }
+      return true;
+    } catch (error) {
+      console.error('Error deleting all notifications:', error);
+      toast.error('فشل في حذف الإشعارات');
+      return false;
+    }
+  }, [token, getAxiosConfig, fetchUnreadCount]);
+
   const value = {
     notifications,
     unreadCount,
@@ -388,6 +417,7 @@ export const NotificationProvider = ({ children }) => {
     markAsRead,
     markAllAsRead,
     deleteNotification,
+    deleteAllNotifications,
     subscribeToPush,
     unsubscribeFromPush,
     requestNotificationPermission,

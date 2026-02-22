@@ -212,9 +212,24 @@ def get_notifications():
         unread_only = request.args.get('unread_only', 'false').lower() == 'true'
         notification_type = request.args.get('type', None)
         
+        # School filter: for super admin, also show notifications where they are in target_user_ids (e.g. WhatsApp requests from any school)
+        user_id = user.id
+        target_ids_conditions = or_(
+            Notification.target_user_ids.like(f'%[{user_id}]%'),
+            Notification.target_user_ids.like(f'%"{user_id}"%'),
+            Notification.target_user_ids.like(f'%{user_id}%')
+        )
+        if user.user_role == 'admin':
+            school_filter = or_(
+                Notification.school_id == user.school_id,
+                target_ids_conditions
+            )
+        else:
+            school_filter = Notification.school_id == user.school_id
+        
         # Build base query
         query = Notification.query.filter(
-            Notification.school_id == user.school_id,
+            school_filter,
             Notification.is_active == True
         )
         
@@ -241,8 +256,7 @@ def get_notifications():
             conditions.append(Notification.target_role == user.user_role)
         
         # Condition 2: User-specific targeting (check if user ID is in JSON array)
-        # Handle both JSON array format [1,2,3] and string format
-        user_id = user.id
+        # Handle both JSON array format [1,2,3] and string format (user_id already set above)
         conditions.append(
             or_(
                 Notification.target_user_ids.like(f'%[{user_id}]%'),  # [1,2,3] format
@@ -337,26 +351,22 @@ def get_unread_count():
         
         # Get all active notifications for the user (same filtering as get_notifications)
         now = get_oman_time()
+        user_id = user.id
+        target_ids_conditions = or_(
+            Notification.target_user_ids.like(f'%[{user_id}]%'),
+            Notification.target_user_ids.like(f'%"{user_id}"%'),
+            Notification.target_user_ids.like(f'%{user_id}%')
+        )
+        school_filter = or_(Notification.school_id == user.school_id, target_ids_conditions) if user.user_role == 'admin' else (Notification.school_id == user.school_id)
         
         # Build conditions for targeting (same logic as get_notifications)
         conditions = []
-        
-        # Condition 1: Role-based targeting
         if user.user_role:
             conditions.append(Notification.target_role == user.user_role)
-        
-        # Condition 2: User-specific targeting
-        user_id = user.id
-        conditions.append(
-            or_(
-                Notification.target_user_ids.like(f'%[{user_id}]%'),
-                Notification.target_user_ids.like(f'%"{user_id}"%'),
-                Notification.target_user_ids.like(f'%{user_id}%')
-            )
-        )
+        conditions.append(target_ids_conditions)
         
         notifications_query = Notification.query.filter(
-            Notification.school_id == user.school_id,
+            school_filter,
             Notification.is_active == True,
             or_(
                 Notification.expires_at.is_(None),
@@ -441,26 +451,21 @@ def mark_all_notifications_read():
         
         # Get all unread notifications (same filtering as get_notifications)
         now = get_oman_time()
+        user_id = user.id
+        target_ids_conditions = or_(
+            Notification.target_user_ids.like(f'%[{user_id}]%'),
+            Notification.target_user_ids.like(f'%"{user_id}"%'),
+            Notification.target_user_ids.like(f'%{user_id}%')
+        )
+        school_filter = or_(Notification.school_id == user.school_id, target_ids_conditions) if user.user_role == 'admin' else (Notification.school_id == user.school_id)
         
-        # Build conditions for targeting (same logic as get_notifications)
         conditions = []
-        
-        # Condition 1: Role-based targeting
         if user.user_role:
             conditions.append(Notification.target_role == user.user_role)
-        
-        # Condition 2: User-specific targeting
-        user_id = user.id
-        conditions.append(
-            or_(
-                Notification.target_user_ids.like(f'%[{user_id}]%'),
-                Notification.target_user_ids.like(f'%"{user_id}"%'),
-                Notification.target_user_ids.like(f'%{user_id}%')
-            )
-        )
+        conditions.append(target_ids_conditions)
         
         notifications = Notification.query.filter(
-            Notification.school_id == user.school_id,
+            school_filter,
             Notification.is_active == True,
             or_(
                 Notification.expires_at.is_(None),
@@ -498,6 +503,69 @@ def mark_all_notifications_read():
         return jsonify({"message": f"Error marking notifications as read: {str(e)}"}), 500
 
 
+@notification_blueprint.route('/delete-all', methods=['POST'])
+@jwt_required()
+def delete_all_notifications():
+    """Soft-delete all notifications for the current user (per-user deletion)."""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        
+        if not user:
+            return jsonify({"message": "User not found"}), 404
+        
+        now = get_oman_time()
+        user_id = user.id
+        target_ids_conditions = or_(
+            Notification.target_user_ids.like(f'%[{user_id}]%'),
+            Notification.target_user_ids.like(f'%"{user_id}"%'),
+            Notification.target_user_ids.like(f'%{user_id}%')
+        )
+        school_filter = or_(Notification.school_id == user.school_id, target_ids_conditions) if user.user_role == 'admin' else (Notification.school_id == user.school_id)
+        
+        conditions = []
+        if user.user_role:
+            conditions.append(Notification.target_role == user.user_role)
+        conditions.append(target_ids_conditions)
+        
+        notifications = Notification.query.filter(
+            school_filter,
+            Notification.is_active == True,
+            or_(
+                Notification.expires_at.is_(None),
+                Notification.expires_at > now
+            ),
+            or_(*conditions)
+        ).all()
+        
+        already_deleted = set(
+            r[0] for r in db.session.query(NotificationDeleted.notification_id).filter(
+                NotificationDeleted.user_id == current_user_id
+            ).all()
+        )
+        
+        count = 0
+        for notification in notifications:
+            if notification.id not in already_deleted:
+                db.session.add(NotificationDeleted(
+                    notification_id=notification.id,
+                    user_id=current_user_id
+                ))
+                count += 1
+                already_deleted.add(notification.id)
+        
+        db.session.commit()
+        
+        return jsonify({
+            "message": "تم حذف جميع الإشعارات" if count > 0 else "لا توجد إشعارات للحذف",
+            "count": count
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"message": f"Error deleting notifications: {str(e)}"}), 500
+
+
 @notification_blueprint.route('/<int:notification_id>/delete', methods=['DELETE'])
 @jwt_required()
 def delete_notification(notification_id):
@@ -514,8 +582,8 @@ def delete_notification(notification_id):
         if not notification:
             return jsonify({"message": "Notification not found"}), 404
         
-        # Verify notification belongs to user's school
-        if notification.school_id != user.school_id:
+        # Verify notification belongs to user's school (super admin can see notifications where they are in target_user_ids)
+        if notification.school_id != user.school_id and user.user_role != 'admin':
             return jsonify({"message": "Unauthorized"}), 403
         
         # Verify user is targeted by this notification

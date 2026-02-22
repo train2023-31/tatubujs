@@ -14,6 +14,7 @@ const NotificationBell = () => {
     markAsRead,
     markAllAsRead,
     deleteNotification,
+    deleteAllNotifications,
   } = useNotifications();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -317,18 +318,34 @@ const NotificationBell = () => {
             </h3>
             <div className="flex items-center gap-2">
               {notifications.length > 0 && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleMarkAllAsRead();
-                  }}
-                  className="text-xs sm:text-sm text-indigo-600 active:text-indigo-800 flex items-center gap-1 px-2 py-1 rounded"
-                  style={{ touchAction: 'manipulation' }}
-                  title="تحديد الكل كمقروء"
-                >
-                  <CheckCheck className="w-4 h-4" />
-                  <span className="hidden sm:inline">تحديد الكل كمقروء</span>
-                </button>
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMarkAllAsRead();
+                    }}
+                    className="text-xs sm:text-sm text-indigo-600 active:text-indigo-800 flex items-center gap-1 px-2 py-1 rounded"
+                    style={{ touchAction: 'manipulation' }}
+                    title="تحديد الكل كمقروء"
+                  >
+                    <CheckCheck className="w-4 h-4" />
+                    <span className="hidden sm:inline">تحديد الكل كمقروء</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm('هل أنت متأكد من حذف جميع الإشعارات؟')) {
+                        deleteAllNotifications().then(() => fetchNotifications({ per_page: 20 }));
+                      }
+                    }}
+                    className="text-xs sm:text-sm text-red-600 active:text-red-800 flex items-center gap-1 px-2 py-1 rounded"
+                    style={{ touchAction: 'manipulation' }}
+                    title="حذف الكل"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span className="hidden sm:inline">حذف الكل</span>
+                  </button>
+                </>
               )}
               <button
                 onClick={(e) => {
