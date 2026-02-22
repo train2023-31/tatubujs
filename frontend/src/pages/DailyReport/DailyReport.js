@@ -55,6 +55,7 @@ const DailyReport = () => {
   const [isSendingBulkEvolutionWhatsApp, setIsSendingBulkEvolutionWhatsApp] = useState(false);
   const [showBulkEvolutionWhatsAppModal, setShowBulkEvolutionWhatsAppModal] = useState(false);
   const [evolutionWhatsAppResult, setEvolutionWhatsAppResult] = useState(null);
+  const [evolutionWhatsAppTemplate, setEvolutionWhatsAppTemplate] = useState('with_class_numbers');
   const [isSendingBulkSms, setIsSendingBulkSms] = useState(false);
   const [showBulkSmsModal, setShowBulkSmsModal] = useState(false);
   const [smsResults, setSmsResults] = useState(null);
@@ -553,6 +554,7 @@ ${attendanceStatus}
       date: selectedDate,
       school_id: user?.school_id,
       delay_between_messages: 4, // seconds between messages (4s reduces WhatsApp blocking risk)
+      template: evolutionWhatsAppTemplate,
       ...(selectedStudents.size > 0 && { student_ids: Array.from(selectedStudents) })
     };
     sendEvolutionWhatsAppReportsMutation.mutate(data);
@@ -1762,6 +1764,51 @@ ${attendanceStatus}
                 <p className="font-medium mt-2">الطلاب المختارون: {selectedStudents.size}</p>
               </div>
             </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-sm font-medium text-gray-800 mb-2">نموذج الرسالة:</p>
+            <div className="flex flex-wrap gap-3 mb-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="evolutionWhatsAppTemplate"
+                  value="with_class_numbers"
+                  checked={evolutionWhatsAppTemplate === 'with_class_numbers'}
+                  onChange={() => setEvolutionWhatsAppTemplate('with_class_numbers')}
+                  className="text-green-600"
+                />
+                <span className="text-sm text-gray-700">مع أرقام الحصص (غياب في الحصص: 1، 2، 3...)</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="evolutionWhatsAppTemplate"
+                  value="status_only"
+                  checked={evolutionWhatsAppTemplate === 'status_only'}
+                  onChange={() => setEvolutionWhatsAppTemplate('status_only')}
+                  className="text-green-600"
+                />
+                <span className="text-sm text-gray-700">الحالة فقط (غياب | تأخير | غياب بعذر بدون أرقام)</span>
+              </label>
+            </div>
+            <p className="text-xs font-medium text-gray-500 mb-1">مثال على الرسالة:</p>
+            <pre className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3 whitespace-pre-wrap font-sans text-right">
+              {evolutionWhatsAppTemplate === 'with_class_numbers'
+                ? `📚 المدرسة النموذجية
+عزيزي ولي أمر الطالب/ة : أحمد محمد
+الصف: الخمس 1 | التاريخ: ${formatDate(selectedDate, 'yyyy-MM-dd', 'ar')}
+تم تسجيل :
+🔴 غياب في الحصص: 1, 2
+🟡 تأخير في الحصص: 3
+للاستفسار يرجى التواصل مع إدارة المدرسة.`
+                : `📚 المدرسة النموذجية
+عزيزي ولي أمر الطالب/ة : أحمد محمد
+الصف: الخمس 1 | التاريخ: ${formatDate(selectedDate, 'yyyy-MM-dd', 'ar')}
+تم تسجيل :
+🔴 غياب | 🟡 تأخير
+للاستفسار يرجى التواصل مع إدارة المدرسة.`}
+            </pre>
           </div>
 
           {evolutionWhatsAppResult && (

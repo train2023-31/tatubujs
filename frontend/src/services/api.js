@@ -150,6 +150,18 @@ api.interceptors.response.use(
       return api(originalRequest);
     }
 
+    // Handle 429 Too Many Requests (e.g. after deploy/restart when many requests hit at once)
+    if (error.response?.status === 429 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      const retryAfter = Math.min(parseInt(error.response?.headers?.['retry-after'], 10) || 8, 15) * 1000;
+      await new Promise(resolve => setTimeout(resolve, retryAfter));
+      return api(originalRequest);
+    }
+    if (error.response?.status === 429) {
+      const msg = error.response?.data?.message || error.response?.data?.msg;
+      error.message = typeof msg === 'string' ? msg : 'تم تجاوز حد الطلبات. يرجى الانتظار دقيقة ثم المحاولة مرة أخرى.';
+    }
+
     return Promise.reject(error);
   }
 );

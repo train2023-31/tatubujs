@@ -33,7 +33,7 @@ MAX_ATTEMPTS = 15
 BLOCK_TIME_SECONDS = 60  # 1 minutes
 
 @auth_blueprint.route('/login', methods=['POST'])
-@limiter.limit("5 per minute")  # Rate limiting: 5 requests per minute per IP
+@limiter.limit("30 per minute")  # Generous limit to avoid 429 on deploy/restart; brute-force still protected by FAILED_LOGINS below
 @log_action("تسجيل ", description="تسجيل الدخول للموقع " , content='')
 def login():
     try:

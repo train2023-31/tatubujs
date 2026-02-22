@@ -118,7 +118,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'إرسال رسائل مخصصة',
           href: '/app/bulk-messaging',
           icon: MessageCircle,
-          roles: ['admin', 'school_admin', 'data_analyst'],
+          roles: [ 'school_admin', 'data_analyst'],
         }
       ]
     },

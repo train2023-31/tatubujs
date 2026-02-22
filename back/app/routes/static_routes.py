@@ -1457,6 +1457,8 @@ def get_whatsapp_config():
         if user.user_role == 'admin':
             cfg["evolution_api_url"] = school.evolution_api_url
             cfg["evolution_api_key"] = school.evolution_api_key
+        else:
+            cfg["has_api_config"] = bool(school.evolution_api_url and school.evolution_api_key)
 
         return jsonify({
             "whatsapp_config": cfg,
@@ -1789,6 +1791,10 @@ def send_whatsapp_reports():
     # 3–5 seconds between messages reduces WhatsApp blocking risk; 1s is risky for bulk sends
     delay = float(data.get('delay_between_messages', 4.0))
     student_ids = data.get('student_ids')  # optional: list of student ids to send to (only these)
+    # template: 'with_class_numbers' (default) or 'status_only'
+    message_template = data.get('template', 'with_class_numbers')
+    if message_template not in ('with_class_numbers', 'status_only'):
+        message_template = 'with_class_numbers'
 
     if not report_date:
         return jsonify({"message": {"en": "Date is required.", "ar": "التاريخ مطلوب."}, "flag": 2}), 400
@@ -1878,19 +1884,38 @@ def send_whatsapp_reports():
 
     school_name = school.name or "المدرسة"
 
-    def build_message(recipient):
+    def build_message_with_class_numbers(recipient):
         lines = [f"📚 {school_name}"]
-        lines.append(f"عزيزي ولي أمر الطالب/ة: {recipient['student_name']}")
+        lines.append(f"عزيزي ولي أمر الطالب/ة : {recipient['student_name']}")
         lines.append(f"الصف: {recipient['class_name']} | التاريخ: {report_date}")
+        lines.append("تم تسجيل :")
         if recipient['absent_periods']:
-            lines.append(f"🔴 غياب في الحصص: {', '.join(str(p) for p in recipient['absent_periods'])}")
+            lines.append(f"🔴 هروب في الحصص: {', '.join(str(p) for p in recipient['absent_periods'])}")
         if recipient['late_periods']:
             lines.append(f"🟡 تأخير في الحصص: {', '.join(str(p) for p in recipient['late_periods'])}")
         if recipient['excused_periods']:
-            lines.append(f"🟢 غياب بعذر في الحصص: {', '.join(str(p) for p in recipient['excused_periods'])}")
+            lines.append(f"🟢 غياب  في الحصص: {', '.join(str(p) for p in recipient['excused_periods'])}")
         lines.append("للاستفسار يرجى التواصل مع إدارة المدرسة.")
         return "\n".join(lines)
 
+    def build_message_status_only(recipient):
+        lines = [f"📚 {school_name}"]
+        lines.append(f"عزيزي ولي أمر الطالب/ة : {recipient['student_name']}")
+        lines.append(f"الصف: {recipient['class_name']} | التاريخ: {report_date}")
+        lines.append("تم تسجيل :")
+        status_parts = []
+        if recipient['absent_periods']:
+            status_parts.append("🔴 هروب")
+        if recipient['late_periods']:
+            status_parts.append("🟡 تأخير")
+        if recipient['excused_periods']:
+            status_parts.append("🟢 غياب ")
+        if status_parts:
+            lines.append(" | ".join(status_parts))
+        lines.append("للاستفسار يرجى التواصل مع إدارة المدرسة.")
+        return "\n".join(lines)
+
+    build_message = build_message_with_class_numbers if message_template == 'with_class_numbers' else build_message_status_only
     results = svc.send_bulk_messages(students_to_notify, build_message, delay_seconds=delay)
 
     return jsonify({
