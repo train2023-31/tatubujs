@@ -52,7 +52,8 @@ import {
   Bus,
   QrCode,
   RotateCcw,
-  Route
+  Route,
+  Server
 } from 'lucide-react';
 
 const Home = () => {
@@ -270,11 +271,7 @@ const Home = () => {
       title: "نسخ احتياطية",
       description: "نسخ احتياطية تلقائية للبيانات مع إمكانية الاستعادة السريعة"
     },
-    {
-      icon: Globe,
-      title: "اللغة العربية",
-      description: "دعم اللغة العربية مع واجهة سهلة الاستخدام"
-    },
+    
     {
       icon: Zap,
       title: "سرعة عالية",
@@ -284,6 +281,11 @@ const Home = () => {
       icon: Lock,
       title: "خصوصية البيانات",
       description: "حماية كاملة لبيانات الطلاب والمعلمين وفقاً لأعلى المعايير"
+    },
+    {
+      icon: Server,
+      title: "مستضاف في Oman Data Park - Otech",
+      description: "الموقع يعمل على بنية تحتية آمنة وموثوقة في سلطنة عمان"
     }
   ];
 
@@ -1222,6 +1224,7 @@ const Home = () => {
           
           <div className="border-t border-gray-800 mt-6 md:mt-8 pt-6 md:pt-8 text-center text-xs md:text-sm text-gray-400">
             <p>&copy; 2024 نظام تتبع. جميع الحقوق محفوظة.</p>
+            <p className="mt-2 opacity-90"> Oman Data Park - Otech</p>
           </div>
         </div>
       </footer>
