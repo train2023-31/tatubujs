@@ -7,7 +7,7 @@ const NotificationContext = createContext();
 
 export { NotificationContext };
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://api.tatubu.com';
+const API_URL = process.env.REACT_APP_API_URL || 'https://api.tatabu.om';
 
 export const NotificationProvider = ({ children }) => {
   const { user, token, isAuthenticated } = useAuth();

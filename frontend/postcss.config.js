@@ -7,7 +7,7 @@ module.exports = {
     return [
       {
         source: '/api/:path*',
-        destination: 'https://api.tatubu.com/api/:path*',
+        destination: 'https://api.tatabu.om/api/:path*',
       },
     ];
   },

@@ -32,6 +32,9 @@ def create_app():
     allowed_origins_list = [
         # Domain patterns (Flask-CORS supports regex patterns)
         r"https://.*\.tatubu\.com",
+        r"https://tatabu\.om",
+        r"https://www\.tatabu\.om",
+        r"https://.*\.tatabu\.om",
         r"https://.*\.pythonanywhere\.com",
         r"https://.*\.hostinger\.com",
         r"https://.*\.000webhostapp\.com",
@@ -169,6 +172,8 @@ def create_app():
             r"^https://tatubu\.com$",
             r"^https://.*\.vercel\.app$",
             r"^https://.*\.pythonanywhere\.com$",
+            r"^https://.*\.tatabu\.om$",
+            r"^https://tatabu\.om$",
             r"^https?://localhost(:\d+)?$",
             r"^https?://38\.60\.243\.25(:\d+)?$"
         ]
@@ -193,7 +198,7 @@ def create_app():
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: blob: https://*; "
-            "connect-src 'self' https://api.tatubu.com https://*.tatubu.com "
+            "connect-src 'self' https://api.tatubu.com https://*.tatubu.com https://api.tatabu.om https://*.tatabu.om "
             "http://localhost:3000 http://localhost:5000;"
         )
     

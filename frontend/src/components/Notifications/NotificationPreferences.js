@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { Bell, BellOff, Save } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://api.tatubu.com';
+const API_URL = process.env.REACT_APP_API_URL || 'https://api.tatabu.om';
 
 const NotificationPreferences = () => {
   const { token } = useAuth();

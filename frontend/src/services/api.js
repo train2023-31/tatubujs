@@ -26,7 +26,7 @@ const addCacheBuster = (url) => {
 
 // Create axios instance with mobile-friendly configuration
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://api.tatubu.com/api',
+  baseURL: process.env.REACT_APP_API_URL || 'https://api.tatabu.om/api',
   credentials: 'include', // Allow cookies to be sent
   timeout: isMobile() ? 60000 : 30000, // 60s on mobile, 30s on desktop (mobile networks are slower)
   headers: {
